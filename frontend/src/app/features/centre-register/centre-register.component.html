@@ -1,0 +1,873 @@
+<!-- ============================================================
+  frontend/src/app/features/centre-register/centre-register.component.html
+  ============================================================ -->
+
+<!-- SUCCESS STATE -->
+<div class="success-screen" *ngIf="submitSuccess">
+  <div class="success-card">
+    <div class="success-icon">🌿</div>
+    <h1>Application Submitted</h1>
+    <p class="success-subtitle">Thank you for joining the Amani network</p>
+    <div class="success-body">
+      <p>Your registration for <strong>{{ form.get('centre_name')?.value }}</strong> has been received and is now under review.</p>
+      <div class="ref-box">
+        <span class="ref-label">Your Reference Number</span>
+        <span class="ref-id">{{ centreId }}</span>
+        <small>Save this — you'll need it to track your application status</small>
+      </div>
+      <div class="what-next">
+        <h3>What happens next?</h3>
+        <div class="next-step">
+          <span class="step-num">1</span>
+          <div>
+            <strong>Document Review (1–3 days)</strong>
+            <p>Our team verifies your uploaded certificates and registration documents.</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <span class="step-num">2</span>
+          <div>
+            <strong>Site Visit (if in pilot area)</strong>
+            <p>An Amani representative may schedule a physical visit to your centre.</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <span class="step-num">3</span>
+          <div>
+            <strong>Verification Decision (7–14 days)</strong>
+            <p>You'll receive an email at <strong>{{ form.get('contact_email')?.value }}</strong> with the outcome.</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <span class="step-num">4</span>
+          <div>
+            <strong>Go Live</strong>
+            <p>Once approved, your centre is listed on the Amani map — discoverable by survivors across South Africa.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN REGISTRATION FORM -->
+<div class="register-page" *ngIf="!submitSuccess">
+
+  <!-- Header -->
+  <header class="page-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🌿</span>
+        <span class="logo-text">Amani</span>
+      </div>
+      <div class="header-copy">
+        <h1>Centre Registration</h1>
+        <p>Join South Africa's national care network</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Progress Stepper -->
+  <div class="stepper-wrapper">
+    <div class="stepper">
+      <div
+        *ngFor="let step of steps; let i = index"
+        class="step-item"
+        [class.active]="i === currentStep"
+        [class.completed]="i < currentStep"
+      >
+        <div class="step-circle">
+          <span *ngIf="i < currentStep" class="check">✓</span>
+          <span *ngIf="i >= currentStep">{{ step.icon }}</span>
+        </div>
+        <div class="step-label">{{ step.label }}</div>
+      </div>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" [style.width.%]="((currentStep) / (steps.length - 1)) * 100"></div>
+    </div>
+  </div>
+
+  <!-- Form Container -->
+  <div class="form-container">
+    <div class="step-header">
+      <div class="step-icon-large">{{ steps[currentStep].icon }}</div>
+      <div>
+        <h2>{{ steps[currentStep].label }}</h2>
+        <p>{{ steps[currentStep].description }}</p>
+      </div>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+      <!-- ══════════════════════════════════════════
+           STEP 0 — Centre Type
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 0">
+        <div class="info-banner">
+          <span>ℹ️</span>
+          <p>Amani serves three types of organisations that support vulnerable people across South Africa. Select the type that best describes your centre.</p>
+        </div>
+
+        <div class="type-cards">
+          <label class="type-card" [class.selected]="form.get('centre_type')?.value === 'gbv_centre'">
+            <input type="radio" formControlName="centre_type" value="gbv_centre" hidden />
+            <div class="type-icon">🏠</div>
+            <h3>GBV Centre</h3>
+            <p>Organisations that support survivors of gender-based violence — including shelters, crisis centres, and support organisations.</p>
+            <div class="type-badge">Crisis Support</div>
+          </label>
+
+          <label class="type-card" [class.selected]="form.get('centre_type')?.value === 'orphanage'">
+            <input type="radio" formControlName="centre_type" value="orphanage" hidden />
+            <div class="type-icon">👶</div>
+            <h3>Orphanage / Child Care</h3>
+            <p>Registered child and youth care centres providing residential care, education, and development for children in need.</p>
+            <div class="type-badge">Child Protection</div>
+          </label>
+
+          <label class="type-card" [class.selected]="form.get('centre_type')?.value === 'old_age_home'">
+            <input type="radio" formControlName="centre_type" value="old_age_home" hidden />
+            <div class="type-icon">🌻</div>
+            <h3>Old Age Home</h3>
+            <p>Facilities providing residential care, support, and dignity for elderly South Africans.</p>
+            <div class="type-badge">Elder Care</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 1 — Legal Identity
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 1">
+        <div class="info-banner">
+          <span>🔒</span>
+          <p>This information is used to verify your centre's legal legitimacy. Survivors need to know they can trust you.</p>
+        </div>
+
+        <div class="form-group required">
+          <label>Centre / Organisation Name</label>
+          <input type="text" formControlName="centre_name" placeholder="e.g. Thistle House GBV Centre" />
+          <span class="error" *ngIf="form.get('centre_name')?.touched && form.get('centre_name')?.invalid">
+            Centre name is required (minimum 3 characters)
+          </span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>NPO Registration Number</label>
+            <input type="text" formControlName="npo_number" placeholder="e.g. 123456/NPO" />
+            <small>Issued by the Department of Social Development</small>
+          </div>
+          <div class="form-group">
+            <label>DSD Registration Number</label>
+            <input type="text" formControlName="dsd_number" placeholder="e.g. DSD/2019/001" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>CIPC / Company Registration</label>
+            <input type="text" formControlName="registration_number" placeholder="e.g. 2019/123456/08" />
+          </div>
+          <div class="form-group">
+            <label>Tax Exemption Number (SARS)</label>
+            <input type="text" formControlName="tax_exemption_number" placeholder="e.g. 930 000 123" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Year Established</label>
+          <input type="number" formControlName="year_established" placeholder="e.g. 2015" min="1900" [max]="2025" style="max-width:200px" />
+        </div>
+
+        <div class="field-note">
+          <strong>Note:</strong> At least one registration number (NPO or DSD) is strongly recommended. Centres without any registration number will face additional scrutiny during verification.
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 2 — Contact Details
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 2">
+        <div class="form-row">
+          <div class="form-group required">
+            <label>Contact Person Full Name</label>
+            <input type="text" formControlName="contact_person_name" placeholder="e.g. Nomsa Dlamini" />
+            <span class="error" *ngIf="form.get('contact_person_name')?.touched && form.get('contact_person_name')?.invalid">Required</span>
+          </div>
+          <div class="form-group required">
+            <label>Role / Title</label>
+            <input type="text" formControlName="contact_person_role" placeholder="e.g. Centre Manager, Social Worker" />
+            <span class="error" *ngIf="form.get('contact_person_role')?.touched && form.get('contact_person_role')?.invalid">Required</span>
+          </div>
+        </div>
+
+        <div class="form-group required">
+          <label>Official Email Address</label>
+          <input type="email" formControlName="contact_email" placeholder="e.g. info@thistlehouse.org.za" />
+          <small>This will be your login email and where we send your verification result</small>
+          <span class="error" *ngIf="form.get('contact_email')?.touched && form.get('contact_email')?.invalid">Valid email required</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group required">
+            <label>Phone Number</label>
+            <input type="tel" formControlName="contact_phone" placeholder="e.g. 011 123 4567 or 0821234567" />
+            <span class="error" *ngIf="form.get('contact_phone')?.touched && form.get('contact_phone')?.invalid">Valid South African number required</span>
+          </div>
+          <div class="form-group">
+            <label>WhatsApp Number <span class="optional">(optional)</span></label>
+            <input type="tel" formControlName="whatsapp_number" placeholder="e.g. 0821234567" />
+            <small>Survivors may reach out via WhatsApp</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Website URL <span class="optional">(optional)</span></label>
+          <input type="url" formControlName="website_url" placeholder="e.g. https://www.yourcentre.org.za" />
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 3 — Location
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 3">
+        <div class="info-banner amber">
+          <span>🛡️</span>
+          <p><strong>Privacy Note:</strong> For GBV shelters and safe houses, you may choose to hide your exact address from the public listing. Survivors will only see the area and contact details — your physical address will only be shared privately after contact is made.</p>
+        </div>
+
+        <div class="form-group required">
+          <label>Physical Street Address</label>
+          <input type="text" formControlName="physical_address" placeholder="e.g. 14 Hope Street" />
+          <span class="error" *ngIf="form.get('physical_address')?.touched && form.get('physical_address')?.invalid">Required</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group required">
+            <label>Suburb</label>
+            <input type="text" formControlName="suburb" placeholder="e.g. Khayelitsha" />
+            <span class="error" *ngIf="form.get('suburb')?.touched && form.get('suburb')?.invalid">Required</span>
+          </div>
+          <div class="form-group required">
+            <label>City / Town</label>
+            <input type="text" formControlName="city" placeholder="e.g. Cape Town" />
+            <span class="error" *ngIf="form.get('city')?.touched && form.get('city')?.invalid">Required</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group required">
+            <label>Province</label>
+            <select formControlName="province">
+              <option value="" disabled>Select province...</option>
+              <option *ngFor="let p of provinceOptions" [value]="p">{{ p }}</option>
+            </select>
+            <span class="error" *ngIf="form.get('province')?.touched && form.get('province')?.invalid">Required</span>
+          </div>
+          <div class="form-group required">
+            <label>Postal Code</label>
+            <input type="text" formControlName="postal_code" placeholder="e.g. 7784" maxlength="4" style="max-width:140px" />
+            <span class="error" *ngIf="form.get('postal_code')?.touched && form.get('postal_code')?.invalid">4-digit postal code required</span>
+          </div>
+        </div>
+
+        <div class="toggle-field">
+          <label class="toggle-label">
+            <input type="checkbox" formControlName="is_address_public" />
+            <span class="toggle-slider"></span>
+            <div>
+              <strong>Make full address visible on public listing</strong>
+              <small>Uncheck this for safe houses or shelters that need to protect their location</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 4 — About the Centre
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 4">
+        <div class="info-banner">
+          <span>💬</span>
+          <p>This is what survivors will read when they find your centre. Be honest, warm, and specific. Survivors need to know exactly what to expect before they reach out.</p>
+        </div>
+
+        <div class="form-group required">
+          <label>About Your Centre <span class="char-hint">(minimum 100 characters)</span></label>
+          <textarea formControlName="description" rows="6"
+            placeholder="Describe your centre — who you are, how long you've been operating, what you do day-to-day, and who you serve. Be specific and human. Survivors are deciding whether to trust you."></textarea>
+          <div class="char-count">{{ form.get('description')?.value?.length || 0 }} / 100 minimum</div>
+          <span class="error" *ngIf="form.get('description')?.touched && form.get('description')?.invalid">
+            Description is required (minimum 100 characters)
+          </span>
+        </div>
+
+        <div class="form-group required">
+          <label>Mission Statement <span class="char-hint">(minimum 50 characters)</span></label>
+          <textarea formControlName="mission_statement" rows="4"
+            placeholder="What is the core purpose of your centre? What do you exist to do?"></textarea>
+          <span class="error" *ngIf="form.get('mission_statement')?.touched && form.get('mission_statement')?.invalid">
+            Mission statement required (minimum 50 characters)
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label>Vision Statement <span class="optional">(optional)</span></label>
+          <textarea formControlName="vision_statement" rows="3"
+            placeholder="What future are you working towards?"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Core Values <span class="optional">(optional)</span></label>
+          <input type="text" formControlName="core_values"
+            placeholder="e.g. Dignity, Safety, Confidentiality, Empowerment" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Annual Beneficiaries <span class="optional">(approx.)</span></label>
+            <input type="number" formControlName="annual_beneficiaries" placeholder="e.g. 250" min="0" />
+            <small>Number of people served per year</small>
+          </div>
+          <div class="form-group">
+            <label>Key Partnerships <span class="optional">(optional)</span></label>
+            <input type="text" formControlName="key_partnerships"
+              placeholder="e.g. SAPS, Legal Aid SA, UNICEF" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Awards & Recognition <span class="optional">(optional)</span></label>
+          <input type="text" formControlName="awards_recognition"
+            placeholder="e.g. DSD Accredited Centre, DGMT Grant Recipient" />
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 5 — Services Offered
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 5">
+
+        <div class="form-group required">
+          <label>Services Offered <span class="hint">(select all that apply)</span></label>
+          <div class="chip-grid">
+            <button type="button" *ngFor="let s of serviceOptions"
+              class="chip"
+              [class.selected]="isSelected('services_offered', s)"
+              (click)="toggleArrayValue('services_offered', s)">
+              {{ s }}
+            </button>
+          </div>
+          <span class="error" *ngIf="form.get('services_offered')?.touched && form.get('services_offered')?.value?.length === 0">
+            Please select at least one service
+          </span>
+        </div>
+
+        <div class="form-group required">
+          <label>Who You Serve <span class="hint">(select all that apply)</span></label>
+          <div class="chip-grid">
+            <button type="button" *ngFor="let t of targetOptions"
+              class="chip"
+              [class.selected]="isSelected('target_population', t)"
+              (click)="toggleArrayValue('target_population', t)">
+              {{ t }}
+            </button>
+          </div>
+          <span class="error" *ngIf="form.get('target_population')?.touched && form.get('target_population')?.value?.length === 0">
+            Required
+          </span>
+        </div>
+
+        <div class="form-group required">
+          <label>Languages Spoken <span class="hint">(select all that apply)</span></label>
+          <div class="chip-grid">
+            <button type="button" *ngFor="let l of languageOptions"
+              class="chip"
+              [class.selected]="isSelected('languages_spoken', l)"
+              (click)="toggleArrayValue('languages_spoken', l)">
+              {{ l }}
+            </button>
+          </div>
+          <span class="error" *ngIf="form.get('languages_spoken')?.touched && form.get('languages_spoken')?.value?.length === 0">
+            Required
+          </span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Total Capacity</label>
+            <input type="number" formControlName="capacity_total" placeholder="e.g. 30" min="0" />
+            <small>How many people can you accommodate at once?</small>
+          </div>
+        </div>
+
+        <div class="toggle-field">
+          <label class="toggle-label">
+            <input type="checkbox" formControlName="is_24_hour" />
+            <span class="toggle-slider"></span>
+            <div>
+              <strong>24-Hour Service Available</strong>
+              <small>Can survivors reach you at any time of day or night?</small>
+            </div>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>Referral Process <span class="optional">(optional)</span></label>
+          <textarea formControlName="referral_process" rows="3"
+            placeholder="How does a survivor, social worker, or doctor refer someone to your centre?"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Intake Process <span class="optional">(optional)</span></label>
+          <textarea formControlName="intake_process" rows="3"
+            placeholder="What happens when someone first arrives or contacts you? What should they expect?"></textarea>
+        </div>
+
+        <!-- GBV-specific -->
+        <div class="conditional-section" *ngIf="isGBV">
+          <h3 class="section-subtitle">🏠 GBV Centre Details</h3>
+          <div class="toggle-field">
+            <label class="toggle-label">
+              <input type="checkbox" formControlName="has_shelter" />
+              <span class="toggle-slider"></span>
+              <div><strong>You provide emergency shelter / safe house</strong></div>
+            </label>
+          </div>
+          <div class="form-group" *ngIf="form.get('has_shelter')?.value">
+            <label>Shelter Capacity</label>
+            <input type="number" formControlName="shelter_capacity" placeholder="e.g. 20" min="0" style="max-width:160px" />
+          </div>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" formControlName="provides_legal_support" />
+              Legal Aid / Support
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" formControlName="provides_medical_support" />
+              Medical / Clinical Support
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" formControlName="provides_counselling" />
+              Trauma Counselling
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" formControlName="provides_court_support" />
+              Court Accompaniment
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Law Enforcement Partnership</label>
+            <input type="text" formControlName="law_enforcement_partnership"
+              placeholder="e.g. Formal MOU with Soweto SAPS FCS Unit" />
+          </div>
+        </div>
+
+        <!-- Orphanage-specific -->
+        <div class="conditional-section" *ngIf="isOrphanage">
+          <h3 class="section-subtitle">👶 Child Care Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Minimum Age</label>
+              <input type="number" formControlName="age_range_min" placeholder="e.g. 0" min="0" max="17" />
+            </div>
+            <div class="form-group">
+              <label>Maximum Age</label>
+              <input type="number" formControlName="age_range_max" placeholder="e.g. 17" min="0" max="21" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Education Programmes</label>
+            <textarea formControlName="education_programs" rows="3"
+              placeholder="Describe schooling, tutoring, vocational training offered at or through your centre"></textarea>
+          </div>
+        </div>
+
+        <!-- Old Age-specific -->
+        <div class="conditional-section" *ngIf="isOldAge">
+          <h3 class="section-subtitle">🌻 Elder Care Details</h3>
+          <div class="form-group">
+            <label>Level of Care</label>
+            <select formControlName="care_level">
+              <option value="">Select level...</option>
+              <option value="independent">Independent Living</option>
+              <option value="assisted">Assisted Living</option>
+              <option value="full_care">Full Nursing Care</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Medical Facilities & Staff</label>
+            <textarea formControlName="medical_facilities" rows="3"
+              placeholder="Describe on-site medical facilities, nursing staff, visiting doctors, etc."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 6 — Safety & Protocols
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 6">
+        <div class="info-banner amber">
+          <span>🛡️</span>
+          <p>Survivors choosing your centre need to know they will be safe. These details build trust and are displayed on your public profile.</p>
+        </div>
+
+        <div class="toggle-field">
+          <label class="toggle-label">
+            <input type="checkbox" formControlName="has_trained_staff" />
+            <span class="toggle-slider"></span>
+            <div>
+              <strong>Staff are formally trained in trauma-informed care</strong>
+            </div>
+          </label>
+        </div>
+
+        <div class="form-group" *ngIf="form.get('has_trained_staff')?.value">
+          <label>Describe Staff Training</label>
+          <textarea formControlName="staff_training_description" rows="3"
+            placeholder="e.g. Social workers hold SACSSP registration. All staff complete bi-annual trauma-informed care training through TEARS Foundation."></textarea>
+        </div>
+
+        <div class="toggle-field">
+          <label class="toggle-label">
+            <input type="checkbox" formControlName="has_security_measures" />
+            <span class="toggle-slider"></span>
+            <div>
+              <strong>Physical security measures are in place</strong>
+            </div>
+          </label>
+        </div>
+
+        <div class="form-group" *ngIf="form.get('has_security_measures')?.value">
+          <label>Describe Security Measures</label>
+          <textarea formControlName="security_description" rows="3"
+            placeholder="e.g. 24-hour security guard, CCTV, access-controlled entry, perimeter fence."></textarea>
+        </div>
+
+        <div class="form-group required">
+          <label>Emergency Protocol</label>
+          <textarea formControlName="emergency_protocol" rows="4"
+            placeholder="Describe exactly what happens in an emergency — who is called, what steps are taken, how a survivor is protected. e.g. All staff have SAPS speed dial. Evacuation plan is practised quarterly."></textarea>
+          <span class="error" *ngIf="form.get('emergency_protocol')?.touched && form.get('emergency_protocol')?.invalid">Required</span>
+        </div>
+
+        <div class="form-group required">
+          <label>Confidentiality Policy</label>
+          <textarea formControlName="confidentiality_policy" rows="4"
+            placeholder="How do you protect survivor identity and information? Who has access to case files? e.g. All information is strictly confidential. Case files are stored in a locked server accessible only to the assigned social worker and centre manager."></textarea>
+          <span class="error" *ngIf="form.get('confidentiality_policy')?.touched && form.get('confidentiality_policy')?.invalid">Required</span>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 7 — Documents
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 7">
+        <div class="info-banner">
+          <span>📄</span>
+          <p>Upload your verification documents. Accepted formats: <strong>PDF, JPG, PNG</strong>. Max 10MB per file. Documents marked <span class="req-star">*</span> are required.</p>
+        </div>
+
+        <div class="doc-grid">
+
+          <!-- NPO Certificate -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['npo_certificate']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">NPO Certificate <span class="req-star">*</span></span>
+                <span class="doc-desc">Issued by Department of Social Development</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['npo_certificate'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['npo_certificate']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'npo_certificate')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['npo_certificate']">
+              <span class="file-name">{{ uploadedFiles['npo_certificate']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['npo_certificate']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('npo_certificate')">✕</button>
+            </div>
+          </div>
+
+          <!-- ID Document -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['id_document']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">ID Document of Contact Person <span class="req-star">*</span></span>
+                <span class="doc-desc">South African ID or Passport of registered contact</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['id_document'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['id_document']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'id_document')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['id_document']">
+              <span class="file-name">{{ uploadedFiles['id_document']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['id_document']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('id_document')">✕</button>
+            </div>
+          </div>
+
+          <!-- Proof of Address -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['proof_of_address']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">Proof of Address <span class="req-star">*</span></span>
+                <span class="doc-desc">Utility bill or municipal account (not older than 3 months)</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['proof_of_address'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['proof_of_address']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'proof_of_address')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['proof_of_address']">
+              <span class="file-name">{{ uploadedFiles['proof_of_address']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['proof_of_address']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('proof_of_address')">✕</button>
+            </div>
+          </div>
+
+          <!-- DSD Registration -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['dsd_registration']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">DSD Registration Certificate</span>
+                <span class="doc-desc">Recommended for GBV centres and child care facilities</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['dsd_registration'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['dsd_registration']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'dsd_registration')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['dsd_registration']">
+              <span class="file-name">{{ uploadedFiles['dsd_registration']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['dsd_registration']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('dsd_registration')">✕</button>
+            </div>
+          </div>
+
+          <!-- Bank Statement -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['bank_statement']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">Bank Statement</span>
+                <span class="doc-desc">Latest 3-month bank statement in the centre's name</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['bank_statement'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['bank_statement']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'bank_statement')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['bank_statement']">
+              <span class="file-name">{{ uploadedFiles['bank_statement']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['bank_statement']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('bank_statement')">✕</button>
+            </div>
+          </div>
+
+          <!-- Constitution -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['constitution']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">Organisation Constitution</span>
+                <span class="doc-desc">Your NPO constitution or founding document</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['constitution'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['constitution']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'constitution')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['constitution']">
+              <span class="file-name">{{ uploadedFiles['constitution']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['constitution']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('constitution')">✕</button>
+            </div>
+          </div>
+
+          <!-- Reference Letter -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['reference_letter']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">Reference Letter</span>
+                <span class="doc-desc">From a government department, partner NGO, or community leader</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['reference_letter'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['reference_letter']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'reference_letter')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['reference_letter']">
+              <span class="file-name">{{ uploadedFiles['reference_letter']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['reference_letter']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('reference_letter')">✕</button>
+            </div>
+          </div>
+
+          <!-- Annual Report -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['annual_report']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">Annual Report</span>
+                <span class="doc-desc">Most recent annual report (if available)</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['annual_report'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['annual_report']">
+              <label class="upload-btn">
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelect($event, 'annual_report')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['annual_report']">
+              <span class="file-name">{{ uploadedFiles['annual_report']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['annual_report']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('annual_report')">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Site Photos -->
+        <div class="doc-section">
+          <h3 class="section-subtitle">📸 Site Photos <span class="optional">(up to 5, optional)</span></h3>
+          <p class="section-desc">Photos of your facilities help survivors know what to expect. Include entrances, common areas, and any support spaces (no faces without consent).</p>
+          <label class="upload-btn large">
+            <input type="file" accept=".jpg,.jpeg,.png" multiple (change)="onSitePhotosSelect($event)" hidden />
+            📸 Select Photos ({{ sitePhotos.length }}/5 selected)
+          </label>
+          <div class="photo-list" *ngIf="sitePhotos.length">
+            <div class="photo-item" *ngFor="let p of sitePhotos">
+              <span>🖼️ {{ p.name }}</span>
+              <span class="file-size">{{ getFileSize(p) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="required-note">
+          <span class="req-star">*</span> NPO Certificate, ID Document, and Proof of Address are required to submit your application.
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════
+           STEP 8 — Account & Confirmation
+           ══════════════════════════════════════════ -->
+      <div class="step-panel" *ngIf="currentStep === 8">
+        <div class="info-banner">
+          <span>🔐</span>
+          <p>Create a secure password for your Amani centre account. You'll use this to log in, track your application, and manage your profile once approved.</p>
+        </div>
+
+        <div class="form-group required">
+          <label>Password</label>
+          <input type="password" formControlName="password" placeholder="Minimum 8 characters" />
+          <span class="error" *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
+            Password must be at least 8 characters
+          </span>
+        </div>
+
+        <div class="form-group required">
+          <label>Confirm Password</label>
+          <input type="password" formControlName="confirm_password" placeholder="Re-enter your password" />
+          <span class="error" *ngIf="form.get('confirm_password')?.touched && form.errors?.['passwordMismatch']">
+            Passwords do not match
+          </span>
+        </div>
+
+        <div class="review-summary">
+          <h3>📋 Application Summary</h3>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="s-label">Centre Name</span>
+              <span class="s-val">{{ form.get('centre_name')?.value }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="s-label">Type</span>
+              <span class="s-val">{{ form.get('centre_type')?.value | titlecase }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="s-label">Contact</span>
+              <span class="s-val">{{ form.get('contact_email')?.value }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="s-label">Location</span>
+              <span class="s-val">{{ form.get('city')?.value }}, {{ form.get('province')?.value }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="s-label">Services</span>
+              <span class="s-val">{{ form.get('services_offered')?.value?.length }} selected</span>
+            </div>
+            <div class="summary-item">
+              <span class="s-label">Documents</span>
+              <span class="s-val">{{ (uploadedFiles | keyvalue).length + sitePhotos.length }} uploaded</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="consent-section">
+          <label class="consent-item">
+            <input type="checkbox" formControlName="agree_terms" />
+            <span>I confirm that all information provided is accurate and truthful. I understand that providing false information will result in permanent disqualification from the Amani platform.</span>
+          </label>
+
+          <label class="consent-item">
+            <input type="checkbox" formControlName="agree_popia" />
+            <span>I consent to Amani processing this data in accordance with POPIA (Protection of Personal Information Act) for the purpose of centre verification and platform listing. I understand that survivor data handled through Amani will be protected under strict confidentiality protocols.</span>
+          </label>
+        </div>
+
+        <div class="error-banner" *ngIf="submitError">
+          <span>⚠️</span> {{ submitError }}
+        </div>
+
+        <!-- Upload progress -->
+        <div class="upload-progress" *ngIf="isSubmitting">
+          <p>Uploading your application... {{ uploadProgress }}%</p>
+          <div class="progress-track">
+            <div class="progress-bar-fill" [style.width.%]="uploadProgress"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Buttons -->
+      <div class="form-nav">
+        <button type="button" class="btn-back" *ngIf="currentStep > 0" (click)="prevStep()">
+          ← Back
+        </button>
+        <button type="button" class="btn-next"
+          *ngIf="currentStep < steps.length - 1"
+          (click)="nextStep()"
+          [disabled]="!canProceed()">
+          Continue →
+        </button>
+        <button type="submit" class="btn-submit"
+          *ngIf="currentStep === steps.length - 1"
+          [disabled]="!canProceed() || isSubmitting">
+          {{ isSubmitting ? 'Submitting...' : 'Submit Application 🌿' }}
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>

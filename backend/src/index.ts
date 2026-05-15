@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
+import centreRoutes from './routes/centre.routes';
 
 dotenv.config();
 
@@ -13,6 +14,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
+app.use('/api/centres', centreRoutes);
 
 // PostgreSQL connection
 export const pool = new Pool({

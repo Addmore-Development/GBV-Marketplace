@@ -175,3 +175,36 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER centres_updated_at
   BEFORE UPDATE ON centres
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+  -- ============================================================
+-- SELLERS (Victims/Survivors) TABLE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS sellers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    alias VARCHAR(100) NOT NULL UNIQUE,
+    public_bio TEXT NOT NULL,
+    real_name VARCHAR(100) NOT NULL,
+    real_surname VARCHAR(100) NOT NULL,
+    id_number VARCHAR(13) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(20) NOT NULL,
+    centre_id UUID NOT NULL REFERENCES centres(id) ON DELETE RESTRICT,
+    product_categories TEXT[] NOT NULL,
+    skills_experience TEXT NOT NULL,
+    payout_method VARCHAR(20) NOT NULL CHECK (payout_method IN ('eft', 'cash')),
+    bank_details JSONB,  -- { bank_name, account_holder, account_number, branch_code }
+    cash_pickup_note TEXT,
+    hidden_pin_hash VARCHAR(255) NOT NULL,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_status VARCHAR(50) DEFAULT 'pending', -- pending, approved, rejected
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_sellers_email ON sellers(email);
+CREATE INDEX idx_sellers_centre_id ON sellers(centre_id);
+CREATE INDEX idx_sellers_alias ON sellers(alias);
+
+CREATE TRIGGER sellers_updated_at
+    BEFORE UPDATE ON sellers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();

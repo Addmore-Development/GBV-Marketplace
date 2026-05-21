@@ -1,0 +1,74 @@
+<div class="hidden-container">
+  <header class="hidden-header">
+    <div class="logo" (dblclick)="quickExit()">
+      <span class="logo-icon">🌿</span>
+      <span class="logo-text">Amani</span>
+      <span class="quick-hint">(double‑tap to hide)</span>
+    </div>
+    <div class="header-actions">
+      <button class="exit-btn" (click)="quickExit()">🚪 Quick Exit</button>
+      <button class="logout-btn" (click)="logout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button [class.active]="activeSection === 'case'" (click)="activeSection = 'case'">📋 Case Journey</button>
+    <button [class.active]="activeSection === 'evidence'" (click)="activeSection = 'evidence'">🔒 Evidence Vault</button>
+    <button [class.active]="activeSection === 'support'" (click)="activeSection = 'support'">🤝 Support Network</button>
+  </div>
+
+  <!-- Case Journey Tab -->
+  <div class="tab-content" *ngIf="activeSection === 'case'">
+    <h2>Your Case Journey</h2>
+    <p class="subtitle">Track your progress through the system. Tell your story once.</p>
+    <div class="journey-timeline">
+      <div class="journey-step" *ngFor="let step of caseJourney; let i = index">
+        <div class="step-marker" [class.completed]="step.completed">{{ i + 1 }}</div>
+        <div class="step-content">
+          <strong>{{ step.step }}</strong>
+          <span *ngIf="step.completed">✓ Completed on {{ step.date || '—' }}</span>
+          <button *ngIf="!step.completed" class="small-btn" (click)="requestSupport()">Need help?</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary" (click)="generateCourtPack()">Generate Court Pack (PDF)</button>
+  </div>
+
+  <!-- Evidence Vault Tab -->
+  <div class="tab-content" *ngIf="activeSection === 'evidence'">
+    <h2>Evidence Vault</h2>
+    <p class="subtitle">All files are encrypted. Only you decide who sees them.</p>
+    <button class="btn-primary" (click)="uploadEvidence()">+ Upload Evidence</button>
+    <div class="evidence-list" *ngIf="evidenceItems.length === 0">
+      <p>No evidence uploaded yet. Click above to add photos, voice notes, or WhatsApp forwards.</p>
+    </div>
+  </div>
+
+  <!-- Support Network Tab -->
+  <div class="tab-content" *ngIf="activeSection === 'support'">
+    <h2>Support Network</h2>
+    <p class="subtitle">Request a companion, pro bono lawyer, or counsellor – all free.</p>
+    <div class="support-options">
+      <button class="support-card" (click)="requestSupport()">
+        <span>👥</span>
+        <strong>Request Companion</strong>
+        <small>Someone to accompany you to police station or court</small>
+      </button>
+      <button class="support-card" (click)="requestSupport()">
+        <span>⚖️</span>
+        <strong>Pro Bono Lawyer</strong>
+        <small>Legal advice and representation</small>
+      </button>
+      <button class="support-card" (click)="requestSupport()">
+        <span>💬</span>
+        <strong>Trauma Counsellor</strong>
+        <small>Free, confidential counselling sessions</small>
+      </button>
+    </div>
+  </div>
+
+  <footer class="safety-footer">
+    <span>🛡️ In danger? Call 10111 first.</span>
+    <span>Double‑tap the Amani logo to hide this page.</span>
+  </footer>
+</div>

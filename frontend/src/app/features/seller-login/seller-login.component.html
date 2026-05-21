@@ -1,0 +1,31 @@
+<div class="login-container">
+  <div class="login-card">
+    <div class="logo">
+      <span class="logo-icon">🌿</span>
+      <span class="logo-text">Amani</span>
+    </div>
+    <h2>Seller Login</h2>
+    <p class="subtitle">Access your dashboard and hidden layer</p>
+
+    <form (ngSubmit)="login()">
+      <div class="form-group">
+        <label>Email address</label>
+        <input type="email" [(ngModel)]="email" name="email" required autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>Hidden PIN (4‑6 digits)</label>
+        <input type="password" [(ngModel)]="pin" name="pin" required autocomplete="off" placeholder="••••">
+      </div>
+      <div class="error" *ngIf="error">{{ error }}</div>
+      <button type="submit" class="btn-login" [disabled]="isLoading">
+        {{ isLoading ? 'Logging in...' : 'Login →' }}
+      </button>
+    </form>
+    <p class="register-link">
+      Don't have an account? <a routerLink="/register/seller">Register as a seller</a>
+    </p>
+    <div class="safety-note">
+      🔐 Your PIN is never stored in plain text. Double‑tap the logo anywhere to exit.
+    </div>
+  </div>
+</div>

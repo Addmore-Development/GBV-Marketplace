@@ -16,7 +16,12 @@ export const routes: Routes = [
   {
     path: 'seller/dashboard',
     loadComponent: () => import('./features/seller-dashboard/seller-dashboard.component')
-      .then(m => m.SellerDashboardComponent),
+      .then(m => m.SellerDashboardComponent),   
+  },
+    {
+    path: 'seller/hidden',
+    loadComponent: () => import('./features/seller-hidden/seller-hidden.component')
+      .then(m => m.SellerHiddenComponent),
   },
   {
     path: '',

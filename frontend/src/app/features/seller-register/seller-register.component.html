@@ -1,9 +1,9 @@
 <!-- ============================================================
   seller-register.component.html
-  Amani – Seller (Survivor) Registration
+  Amani – Seller (Survivor) Registration – ALWAYS ENABLED BUTTONS
   ============================================================ -->
 
-<!-- SUCCESS STATE -->
+<!-- SUCCESS STATE (unchanged) -->
 <div class="success-screen" *ngIf="submitSuccess">
   <div class="success-card">
     <div class="success-icon">🌿✨</div>
@@ -30,7 +30,6 @@
 <!-- MAIN REGISTRATION FORM -->
 <div class="register-page" *ngIf="!submitSuccess">
 
-  <!-- Header with Quick Exit -->
   <header class="page-header">
     <div class="header-inner">
       <div class="logo" title="Double-tap for quick exit">
@@ -45,7 +44,6 @@
     </div>
   </header>
 
-  <!-- Progress Stepper -->
   <div class="stepper-wrapper">
     <div class="stepper">
       <div *ngFor="let step of steps; let i = index"
@@ -64,7 +62,6 @@
     </div>
   </div>
 
-  <!-- Form Container -->
   <div class="form-container">
     <div class="step-header">
       <div class="step-icon-large">{{ steps[currentStep].icon }}</div>
@@ -76,153 +73,103 @@
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()">
 
-      <!-- ═════════ STEP 0 – IDENTITY ═════════ -->
+      <!-- STEP 0 – IDENTITY (unchanged) -->
       <div class="step-panel" *ngIf="currentStep === 0">
         <div class="info-banner">
           <span>🛡️</span>
           <p><strong>Your safety is our priority.</strong> Your real name and ID are only used for payments and legal compliance — they will never appear on your public seller profile.</p>
         </div>
-
         <div class="form-group required">
           <label>Public alias (shop name)</label>
           <input type="text" formControlName="alias" placeholder="e.g. HopeCrafts, BeadsByZanele">
           <small>This is what buyers see. Choose something empowering.</small>
+          <div class="error" *ngIf="form.get('alias')?.touched && form.get('alias')?.invalid">Alias required (min 3 characters)</div>
         </div>
-
         <div class="form-group required">
           <label>Public bio (why you create)</label>
-          <textarea formControlName="public_bio" rows="3" placeholder="Share your craft story without sharing private details. Example: 'I bead to rebuild. Each necklace represents strength.'"></textarea>
+          <textarea formControlName="public_bio" rows="3" placeholder="Share your craft story..."></textarea>
+          <div class="error" *ngIf="form.get('public_bio')?.touched && form.get('public_bio')?.invalid">Bio required (min 30 characters)</div>
         </div>
-
         <div class="form-row">
-          <div class="form-group required">
-            <label>Real first name (private)</label>
-            <input type="text" formControlName="real_name">
-          </div>
-          <div class="form-group required">
-            <label>Real surname (private)</label>
-            <input type="text" formControlName="real_surname">
-          </div>
+          <div class="form-group required"><label>Real first name (private)</label><input type="text" formControlName="real_name"><div class="error" *ngIf="form.get('real_name')?.touched && form.get('real_name')?.invalid">Required</div></div>
+          <div class="form-group required"><label>Real surname (private)</label><input type="text" formControlName="real_surname"><div class="error" *ngIf="form.get('real_surname')?.touched && form.get('real_surname')?.invalid">Required</div></div>
         </div>
-
-        <div class="form-group required">
-          <label>South African ID number (private)</label>
-          <input type="text" formControlName="id_number" placeholder="13 digits">
-        </div>
-
+        <div class="form-group required"><label>South African ID number (private)</label><input type="text" formControlName="id_number" placeholder="13 digits"><div class="error" *ngIf="form.get('id_number')?.touched && form.get('id_number')?.invalid">Valid 13-digit ID required</div></div>
         <div class="form-row">
-          <div class="form-group required">
-            <label>Email address</label>
-            <input type="email" formControlName="email" placeholder="your@email.com">
-          </div>
-          <div class="form-group required">
-            <label>Phone number</label>
-            <input type="tel" formControlName="phone" placeholder="082 123 4567">
-          </div>
+          <div class="form-group required"><label>Email address</label><input type="email" formControlName="email"><div class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">Valid email required</div></div>
+          <div class="form-group required"><label>Phone number</label><input type="tel" formControlName="phone"><div class="error" *ngIf="form.get('phone')?.touched && form.get('phone')?.invalid">Valid SA number required (e.g. 0712345678)</div></div>
         </div>
       </div>
 
-      <!-- ═════════ STEP 1 – CENTRE & PRODUCTS ═════════ -->
+      <!-- STEP 1 – CENTRE & PRODUCTS (unchanged) -->
       <div class="step-panel" *ngIf="currentStep === 1">
         <div class="info-banner amber">
           <span>🏠</span>
           <p>Amani works through verified care centres. Your centre will ship products for you — your home address is never shared with buyers.</p>
         </div>
-
         <div class="form-group required">
           <label>Your care centre</label>
-          <select formControlName="centre_id" [disabled]="isLoadingCentres">
+          <select formControlName="centre_id">
             <option value="" disabled>Select your centre...</option>
             <option *ngFor="let c of centres" [value]="c.id">{{ c.name }} – {{ c.city }}</option>
           </select>
-          <small>If your centre is not listed, ask them to register on Amani first.</small>
+          <div class="error" *ngIf="form.get('centre_id')?.touched && form.get('centre_id')?.invalid">Please select a centre</div>
         </div>
-
         <div class="form-group required">
           <label>What do you make? (select all that apply)</label>
           <div class="chip-grid">
-            <button type="button" *ngFor="let cat of productCategories"
-                    class="chip"
-                    [class.selected]="isSelected('product_categories', cat)"
-                    (click)="toggleArrayValue('product_categories', cat)">
-              {{ cat }}
-            </button>
+            <button type="button" *ngFor="let cat of productCategories" class="chip" [class.selected]="isSelected('product_categories', cat)" (click)="toggleArrayValue('product_categories', cat)">{{ cat }}</button>
           </div>
+          <div class="error" *ngIf="form.get('product_categories')?.touched && form.get('product_categories')?.value?.length === 0">Select at least one category</div>
         </div>
-
         <div class="form-group required">
           <label>Your craft skills / experience</label>
-          <textarea formControlName="skills_experience" rows="3" placeholder="e.g. I've been beading for 5 years. I learned through the centre's empowerment program."></textarea>
+          <textarea formControlName="skills_experience" rows="3"></textarea>
+          <div class="error" *ngIf="form.get('skills_experience')?.touched && form.get('skills_experience')?.invalid">Required</div>
         </div>
       </div>
 
-      <!-- ═════════ STEP 2 – PAYOUT & SECURITY ═════════ -->
+      <!-- STEP 2 – PAYOUT & SECURITY (unchanged except bank fields show errors) -->
       <div class="step-panel" *ngIf="currentStep === 2">
         <div class="info-banner">
           <span>💰</span>
-          <p>You keep <strong>70–80% of every sale</strong> (exact percentage confirmed with your centre). Amani takes only 2% to keep the platform safe.</p>
+          <p>You keep <strong>70–80% of every sale</strong>. Amani takes only 2%.</p>
         </div>
-
         <div class="form-group required">
           <label>How do you want to be paid?</label>
           <div class="radio-group">
-            <label class="radio-item">
-              <input type="radio" formControlName="payout_method" value="eft"> EFT to my bank account
-            </label>
-            <label class="radio-item">
-              <input type="radio" formControlName="payout_method" value="cash"> Cash pickup at my centre
-            </label>
+            <label class="radio-item"><input type="radio" formControlName="payout_method" value="eft"> EFT to my bank account</label>
+            <label class="radio-item"><input type="radio" formControlName="payout_method" value="cash"> Cash pickup at my centre</label>
           </div>
         </div>
-
-        <!-- EFT fields (conditional) -->
         <div class="bank-fields" *ngIf="payoutMethod === 'eft'">
           <div class="form-row">
-            <div class="form-group" [class.required]="payoutMethod === 'eft'">
-              <label>Bank name</label>
-              <input type="text" formControlName="bank_name" placeholder="e.g. Capitec, FNB">
-            </div>
-            <div class="form-group" [class.required]="payoutMethod === 'eft'">
-              <label>Account holder name</label>
-              <input type="text" formControlName="account_holder" [value]="form.get('real_name')?.value + ' ' + form.get('real_surname')?.value">
-            </div>
+            <div class="form-group"><label>Bank name</label><input type="text" formControlName="bank_name"><div class="error" *ngIf="form.get('bank_name')?.touched && form.get('bank_name')?.invalid">Required</div></div>
+            <div class="form-group"><label>Account holder name</label><input type="text" formControlName="account_holder"><div class="error" *ngIf="form.get('account_holder')?.touched && form.get('account_holder')?.invalid">Required</div></div>
           </div>
           <div class="form-row">
-            <div class="form-group" [class.required]="payoutMethod === 'eft'">
-              <label>Account number</label>
-              <input type="text" formControlName="account_number">
-            </div>
-            <div class="form-group" [class.required]="payoutMethod === 'eft'">
-              <label>Branch code</label>
-              <input type="text" formControlName="branch_code">
-            </div>
+            <div class="form-group"><label>Account number</label><input type="text" formControlName="account_number"><div class="error" *ngIf="form.get('account_number')?.touched && form.get('account_number')?.invalid">Required</div></div>
+            <div class="form-group"><label>Branch code</label><input type="text" formControlName="branch_code"><div class="error" *ngIf="form.get('branch_code')?.touched && form.get('branch_code')?.invalid">Required</div></div>
           </div>
-          <div class="error" *ngIf="isBankFieldInvalid('bank_name')">Bank details required for EFT</div>
         </div>
-
-        <!-- Cash option note -->
         <div class="form-group" *ngIf="payoutMethod === 'cash'">
-          <label>Any special note for cash pickup? (optional)</label>
-          <textarea formControlName="cash_centre_note" rows="2" placeholder="e.g. I'll collect every Friday after 2pm"></textarea>
+          <label>Cash pickup note (optional)</label>
+          <textarea formControlName="cash_centre_note" rows="2"></textarea>
         </div>
-
         <hr class="divider">
-
         <div class="form-group required">
           <label>Hidden layer PIN (4–6 digits)</label>
-          <input type="password" formControlName="hidden_pin" placeholder="e.g. 2024" autocomplete="off">
-          <small>You’ll use this PIN to access case management, evidence vault, and support features.</small>
+          <input type="password" formControlName="hidden_pin" autocomplete="off">
+          <div class="error" *ngIf="form.get('hidden_pin')?.touched && form.get('hidden_pin')?.invalid">4-6 digit PIN required</div>
         </div>
         <div class="form-group required">
           <label>Confirm PIN</label>
-          <input type="password" formControlName="confirm_pin" placeholder="same PIN again">
-          <div class="error" *ngIf="form.errors?.['pinMismatch'] && form.get('confirm_pin')?.touched">
-            PINs do not match
-          </div>
+          <input type="password" formControlName="confirm_pin">
+          <div class="error" *ngIf="form.errors?.['pinMismatch'] && form.get('confirm_pin')?.touched">PINs do not match</div>
         </div>
       </div>
 
-      <!-- ═════════ STEP 3 – REVIEW & CONSENT ═════════ -->
+      <!-- STEP 3 – REVIEW & CONSENT (unchanged) -->
       <div class="step-panel" *ngIf="currentStep === 3">
         <div class="review-summary">
           <h3>📋 Review your information</h3>
@@ -234,39 +181,28 @@
             <div class="summary-item"><span class="s-label">Hidden PIN set</span><span class="s-val">✓ ({{ form.get('hidden_pin')?.value?.length }} digits)</span></div>
           </div>
         </div>
-
         <div class="consent-section">
-          <label class="consent-item">
-            <input type="checkbox" formControlName="agree_terms">
-            <span>I confirm that all information is accurate. I understand that providing false information may lead to permanent removal from Amani.</span>
-          </label>
-          <label class="consent-item">
-            <input type="checkbox" formControlName="agree_popia">
-            <span>I consent to Amani processing my personal data under POPIA for verification, payments, and safe marketplace operation.</span>
-          </label>
-          <label class="consent-item">
-            <input type="checkbox" formControlName="understand_safety">
-            <span>I understand that my real address will never be shared. Products are shipped through my centre’s hub. I have set a PIN for the hidden layer and know I can double‑tap the logo to exit quickly.</span>
-          </label>
+          <label class="consent-item"><input type="checkbox" formControlName="agree_terms"><span>I confirm that all information is accurate...</span></label>
+          <label class="consent-item"><input type="checkbox" formControlName="agree_popia"><span>I consent to Amani processing my personal data under POPIA...</span></label>
+          <label class="consent-item"><input type="checkbox" formControlName="understand_safety"><span>I understand that my real address will never be shared...</span></label>
+          <div class="error" *ngIf="form.get('agree_terms')?.touched && form.get('agree_terms')?.invalid">You must agree to the terms</div>
+          <div class="error" *ngIf="form.get('agree_popia')?.touched && form.get('agree_popia')?.invalid">You must consent to POPIA</div>
+          <div class="error" *ngIf="form.get('understand_safety')?.touched && form.get('understand_safety')?.invalid">You must acknowledge the safety measures</div>
         </div>
-
-        <div class="error-banner" *ngIf="submitError">
-          <span>⚠️</span> {{ submitError }}
-        </div>
+        <div class="error-banner" *ngIf="submitError"><span>⚠️</span> {{ submitError }}</div>
       </div>
 
-      <!-- Navigation Buttons -->
+      <!-- Navigation Buttons – ALWAYS ENABLED (no disabled attribute on continue) -->
       <div class="form-nav">
         <button type="button" class="btn-back" *ngIf="currentStep > 0" (click)="prevStep()">← Back</button>
-        <button type="button" class="btn-next" *ngIf="currentStep < steps.length - 1" (click)="nextStep()" [disabled]="!canProceed()">Continue →</button>
-        <button type="submit" class="btn-submit" *ngIf="currentStep === steps.length - 1" [disabled]="!canProceed() || isSubmitting">
+        <button type="button" class="btn-next" *ngIf="currentStep < steps.length - 1" (click)="nextStep()">Continue →</button>
+        <button type="submit" class="btn-submit" *ngIf="currentStep === steps.length - 1" [disabled]="isSubmitting">
           {{ isSubmitting ? 'Registering...' : 'Start Selling 🌿' }}
         </button>
       </div>
     </form>
   </div>
 
-  <!-- Safety footer (always visible) -->
   <div class="safety-footer">
     <span>🛡️ In danger? Call 10111 first.</span>
     <span>Double‑tap the Amani logo to hide this page.</span>

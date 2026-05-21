@@ -1,6 +1,6 @@
 // ============================================================
 // seller-register.component.ts
-// Amani – Victim/Survivor (Seller) Registration
+// Amani – Victim/Survivor (Seller) Registration – VALIDATION ON CLICK + 409 HANDLING
 // ============================================================
 import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -33,7 +33,6 @@ export class SellerRegisterComponent implements OnInit {
   submitError = '';
   submitSuccess = false;
 
-  // Available care centres (fetched from API)
   centres: Centre[] = [];
   isLoadingCentres = true;
 
@@ -52,11 +51,10 @@ export class SellerRegisterComponent implements OnInit {
 
   form!: FormGroup;
 
-  // Make router public for template access
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
-    public router: Router  // Changed from private to public
+    public router: Router
   ) {}
 
   ngOnInit(): void {
@@ -66,7 +64,7 @@ export class SellerRegisterComponent implements OnInit {
 
   buildForm(): void {
     this.form = this.fb.group({
-      // Step 0 – Identity
+      // Step 0
       alias: ['', [Validators.required, Validators.minLength(3)]],
       public_bio: ['', [Validators.required, Validators.minLength(30)]],
       real_name: ['', Validators.required],
@@ -75,25 +73,22 @@ export class SellerRegisterComponent implements OnInit {
       email: ['', [Validators.required, Validators.email]],
       phone: ['', [Validators.required, Validators.pattern(/^(\+27|0)[6-8][0-9]{8}$/)]],
 
-      // Step 1 – Centre & Products
-      centre_id: ['', Validators.required],
+      // Step 1
+      centre_id: [{ value: '', disabled: true }, Validators.required],
       product_categories: [[], Validators.required],
       skills_experience: ['', Validators.required],
 
-      // Step 2 – Payout & Security
+      // Step 2
       payout_method: ['eft', Validators.required],
-      // EFT fields
       bank_name: [''],
       account_holder: [''],
       account_number: [''],
       branch_code: [''],
-      // Cash fields
       cash_centre_note: [''],
-      // Hidden layer PIN
       hidden_pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]],
       confirm_pin: ['', Validators.required],
 
-      // Step 3 – Consent
+      // Step 3
       agree_terms: [false, Validators.requiredTrue],
       agree_popia: [false, Validators.requiredTrue],
       understand_safety: [false, Validators.requiredTrue],
@@ -106,15 +101,15 @@ export class SellerRegisterComponent implements OnInit {
     return pin === confirm ? null : { pinMismatch: true };
   }
 
-  // Dynamic validation for bank fields when payout is EFT
-  get payoutMethod(): string { return this.form.get('payout_method')?.value || 'eft'; }
+  get payoutMethod(): string {
+    return this.form.get('payout_method')?.value || 'eft';
+  }
 
   isBankFieldInvalid(field: string): boolean {
     const control = this.form.get(field);
     return this.payoutMethod === 'eft' && !!control && control.invalid && control.touched;
   }
 
-  // Helper method to get centre name from ID
   getCentreName(): string {
     const centreId = this.form.get('centre_id')?.value;
     if (!centreId) return 'your centre';
@@ -123,24 +118,30 @@ export class SellerRegisterComponent implements OnInit {
   }
 
   loadCentres(): void {
-    // Backend endpoint will return verified centres
-    this.http.get<Centre[]>('http://localhost:3000/api/centres/verified')
-      .subscribe({
-        next: (data) => {
-          this.centres = data;
-          this.isLoadingCentres = false;
-        },
-        error: () => {
-          // Fallback mock data for demonstration
-          this.centres = [
-            { id: 'ct001', name: 'Thistle House GBV Centre', city: 'Cape Town' },
-            { id: 'ct002', name: 'Women of Worth', city: 'Johannesburg' },
-            { id: 'ct003', name: 'Impophoma Orphanage', city: 'Durban' },
-          ];
-          this.isLoadingCentres = false;
-        }
-      });
-  }
+  this.http.get<Centre[]>('http://localhost:3000/api/sellers/centres/verified')
+    .subscribe({
+      next: (data) => {
+        this.centres = data;
+        this.isLoadingCentres = false;
+        this.form.get('centre_id')?.enable();
+      },
+      error: (err) => {
+        console.error('Failed to load centres', err);
+        this.isLoadingCentres = false;
+        this.submitError = 'Could not load care centres. Please refresh the page.';
+        // Still enable the field so user can manually select? But no data. Better keep disabled.
+        this.form.get('centre_id')?.disable();
+      }
+    });
+
+  // Timeout fallback: after 5 seconds, enable centre_id if still disabled
+  setTimeout(() => {
+    if (this.form.get('centre_id')?.disabled) {
+      console.warn('Forcing centre_id enable after timeout');
+      this.form.get('centre_id')?.enable();
+    }
+  }, 5000);
+}
 
   toggleArrayValue(controlName: string, value: string): void {
     const control = this.form.get(controlName);
@@ -158,48 +159,67 @@ export class SellerRegisterComponent implements OnInit {
     return (this.form.get(controlName)?.value || []).includes(value);
   }
 
-  // Step validation with proper type safety (returns boolean, never undefined)
-  canProceed(): boolean {
-    switch (this.currentStep) {
-      case 0:
-        return !!(this.form.get('alias')?.valid &&
-                  this.form.get('public_bio')?.valid &&
-                  this.form.get('real_name')?.valid &&
-                  this.form.get('real_surname')?.valid &&
-                  this.form.get('id_number')?.valid &&
-                  this.form.get('email')?.valid &&
-                  this.form.get('phone')?.valid);
-      
-      case 1:
-        return !!(this.form.get('centre_id')?.value &&
-                  (this.form.get('product_categories')?.value?.length > 0) &&
-                  this.form.get('skills_experience')?.valid);
-      
-      case 2:
-        const pinOk = !!(this.form.get('hidden_pin')?.valid && !this.form.errors?.['pinMismatch']);
-        if (this.payoutMethod === 'eft') {
-          return pinOk &&
-                 !!(this.form.get('bank_name')?.valid &&
-                    this.form.get('account_holder')?.valid &&
-                    this.form.get('account_number')?.valid &&
-                    this.form.get('branch_code')?.valid);
+  // ===================== VALIDATION ON CLICK =====================
+  getStepFields(step: number): string[] {
+    const stepMap: { [key: number]: string[] } = {
+      0: ['alias', 'public_bio', 'real_name', 'real_surname', 'id_number', 'email', 'phone'],
+      1: ['centre_id', 'product_categories', 'skills_experience'],
+      2: ['hidden_pin', 'confirm_pin'],
+      3: ['agree_terms', 'agree_popia', 'understand_safety'],
+    };
+    return stepMap[step] || [];
+  }
+
+  validateCurrentStep(): boolean {
+    let isValid = true;
+    const stepFields = this.getStepFields(this.currentStep);
+
+    for (const field of stepFields) {
+      const control = this.form.get(field);
+      if (control && control.invalid) {
+        control.markAsTouched();
+        isValid = false;
+      }
+    }
+
+    // Special validation for step 2 (PIN + bank fields if EFT)
+    if (this.currentStep === 2) {
+      if (this.form.errors?.['pinMismatch']) {
+        this.form.get('confirm_pin')?.markAsTouched();
+        isValid = false;
+      }
+      if (this.payoutMethod === 'eft') {
+        const bankFields = ['bank_name', 'account_holder', 'account_number', 'branch_code'];
+        for (const field of bankFields) {
+          const control = this.form.get(field);
+          if (control && control.invalid) {
+            control.markAsTouched();
+            isValid = false;
+          }
         }
-        return pinOk;
-      
-      case 3:
-        return !!(this.form.get('agree_terms')?.value &&
-                  this.form.get('agree_popia')?.value &&
-                  this.form.get('understand_safety')?.value);
-      
-      default:
-        return false;
+      }
+    }
+
+    if (!isValid) {
+      this.scrollToFirstError();
+    }
+    return isValid;
+  }
+
+  scrollToFirstError(): void {
+    const firstError = document.querySelector('.error, .ng-invalid');
+    if (firstError) {
+      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
+  // ===================== NAVIGATION =====================
   nextStep(): void {
-    if (this.currentStep < this.steps.length - 1 && this.canProceed()) {
+    if (this.validateCurrentStep()) {
       this.currentStep++;
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      alert('Please fix the errors in the form before continuing.');
     }
   }
 
@@ -210,29 +230,54 @@ export class SellerRegisterComponent implements OnInit {
     }
   }
 
+  // ===================== SUBMIT =====================
   onSubmit(): void {
-    if (!this.canProceed() || this.isSubmitting) return;
-    this.isSubmitting = true;
-    this.submitError = '';
+  if (!this.validateCurrentStep()) {
+    alert('Please fix the errors in the form before submitting.');
+    return;
+  }
+  if (this.isSubmitting) return;
 
-    const payload = this.buildPayload();
-    this.http.post('http://localhost:3000/api/sellers/register', payload)
-      .subscribe({
-        next: (res: any) => {
-          this.submitSuccess = true;
-          this.isSubmitting = false;
-          // After success, navigate to dashboard (to be built later)
-          setTimeout(() => {
-            this.router.navigate(['/seller/dashboard'], { queryParams: { new: true } });
-          }, 2000);
-        },
-        error: (err) => {
-          this.isSubmitting = false;
+  // Ensure centre_id is enabled (in case it was disabled)
+  this.form.get('centre_id')?.enable();
+
+  this.isSubmitting = true;
+  this.submitError = '';
+
+  const payload = this.buildPayload();
+
+  // Log the payload to the console for debugging
+  console.log('📦 Submitting payload:', JSON.stringify(payload, null, 2));
+
+  this.http.post('http://localhost:3000/api/sellers/register', payload)
+    .subscribe({
+      next: (res: any) => {
+        localStorage.setItem('sellerId', res.seller_id);
+        localStorage.setItem('sellerAlias', res.alias);
+        localStorage.setItem('sellerEmail', res.email);
+        localStorage.setItem('hiddenPin', this.form.get('hidden_pin')?.value);
+        this.submitSuccess = true;
+        this.isSubmitting = false;
+        setTimeout(() => {
+          this.router.navigate(['/seller/dashboard'], { queryParams: { new: true } });
+        }, 2000);
+      },
+      error: (err) => {
+        this.isSubmitting = false;
+        // Show detailed error from backend
+        if (err.error && err.error.error) {
+          this.submitError = err.error.error;
+        } else if (err.status === 400) {
+          this.submitError = 'Bad request. Please check all fields are filled correctly.';
+        } else if (err.status === 409) {
+          this.submitError = 'An account with this email or alias already exists.';
+        } else {
           this.submitError = err.error?.message || 'Registration failed. Please try again.';
         }
-      });
-  }
-
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+}
   private buildPayload(): any {
     const val = this.form.value;
     const payload: any = {
@@ -247,7 +292,7 @@ export class SellerRegisterComponent implements OnInit {
       product_categories: val.product_categories,
       skills_experience: val.skills_experience,
       payout_method: val.payout_method,
-      hidden_pin: val.hidden_pin, // will be hashed on backend
+      hidden_pin: val.hidden_pin,
       accepted_terms: true,
       accepted_popia: true,
       safety_acknowledged: true,
@@ -266,7 +311,7 @@ export class SellerRegisterComponent implements OnInit {
     return payload;
   }
 
-  // Quick exit – double tap logo - fixed HostListener type
+  // Quick exit
   @HostListener('dblclick', ['$event'])
   onDoubleClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
@@ -276,6 +321,6 @@ export class SellerRegisterComponent implements OnInit {
   }
 
   quickExit(): void {
-    window.location.href = '/news';  // neutral news page
+    window.location.href = '/news';
   }
 }

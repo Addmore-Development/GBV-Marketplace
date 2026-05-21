@@ -194,7 +194,23 @@ async function setup() {
     `);
     console.log('✅ Sellers table ready');
 
-    // 9. Add indexes and triggers
+    // 8.5. Create PRODUCTS table (NEW)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        seller_id UUID NOT NULL REFERENCES sellers(id) ON DELETE CASCADE,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        price DECIMAL(10,2) NOT NULL,
+        category VARCHAR(100),
+        status VARCHAR(20) DEFAULT 'draft',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ Products table ready');
+
+    // 9. Add indexes and triggers (including for products)
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_centres_status ON centres(status);
       CREATE INDEX IF NOT EXISTS idx_centres_type ON centres(centre_type);
@@ -203,6 +219,7 @@ async function setup() {
       CREATE INDEX IF NOT EXISTS idx_sellers_email ON sellers(email);
       CREATE INDEX IF NOT EXISTS idx_sellers_centre_id ON sellers(centre_id);
       CREATE INDEX IF NOT EXISTS idx_sellers_alias ON sellers(alias);
+      CREATE INDEX IF NOT EXISTS idx_products_seller_id ON products(seller_id);
       
       DROP TRIGGER IF EXISTS centres_updated_at ON centres;
       CREATE TRIGGER centres_updated_at
@@ -212,6 +229,11 @@ async function setup() {
       DROP TRIGGER IF EXISTS sellers_updated_at ON sellers;
       CREATE TRIGGER sellers_updated_at
         BEFORE UPDATE ON sellers
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+        
+      DROP TRIGGER IF EXISTS products_updated_at ON products;
+      CREATE TRIGGER products_updated_at
+        BEFORE UPDATE ON products
         FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     `);
     console.log('✅ Indexes and triggers added');

@@ -1,0 +1,78 @@
+<div class="dashboard-container">
+  <!-- Header with quick exit -->
+  <header class="dashboard-header">
+    <div class="logo" (dblclick)="quickExit()">
+      <span class="logo-icon">🌿</span>
+      <span class="logo-text">Amani</span>
+      <span class="quick-hint">(double‑tap to hide)</span>
+    </div>
+    <div class="seller-info">
+      <span>Welcome, {{ seller?.alias || 'Seller' }}</span>
+      <button class="logout-btn" (click)="logout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab === 'products'" (click)="activeTab = 'products'">📦 My Products</button>
+    <button [class.active]="activeTab === 'sales'" (click)="activeTab = 'sales'">💰 Sales & Payouts</button>
+    <button [class.active]="activeTab === 'hidden'" (click)="activeTab = 'hidden'">🛡️ Hidden Layer</button>
+  </div>
+
+  <!-- Products Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'products'">
+    <div class="action-bar">
+      <button class="btn-primary" (click)="addProduct()">+ Add New Product</button>
+    </div>
+    <div class="product-grid" *ngIf="!isLoading; else loading">
+      <div class="product-card" *ngFor="let p of products">
+        <h3>{{ p.name }}</h3>
+        <p class="price">R{{ p.price }}</p>
+        <p class="category">{{ p.category }}</p>
+        <span class="status" [class.active]="p.status === 'active'">{{ p.status }}</span>
+        <div class="card-actions">
+          <button (click)="editProduct(p)">✏️ Edit</button>
+          <button (click)="deleteProduct(p.id)">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>
+    <ng-template #loading><p>Loading products...</p></ng-template>
+  </div>
+
+  <!-- Sales Tab (placeholder) -->
+  <div class="tab-content" *ngIf="activeTab === 'sales'">
+    <h3>Your earnings</h3>
+    <p>Total earned: <strong>R1,240</strong> (last 30 days)</p>
+    <p>Next payout: <strong>15 May 2025</strong> (EFT)</p>
+    <button class="btn-secondary">View payout history</button>
+  </div>
+
+  <!-- Hidden Layer Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'hidden'">
+    <div class="hidden-warning">
+      <span>🔐</span>
+      <p>This section contains sensitive case information, evidence vault, and support requests. Enter your hidden layer PIN to access.</p>
+    </div>
+    <button class="btn-hidden" (click)="requestHiddenLayer()">Enter PIN to Access</button>
+  </div>
+
+  <!-- PIN Modal -->
+  <div class="modal" *ngIf="showPinModal">
+    <div class="modal-content">
+      <h3>Enter Hidden Layer PIN</h3>
+      <input type="password" [(ngModel)]="hiddenPin" placeholder="4-6 digit PIN" autocomplete="off">
+      <div class="error" *ngIf="pinError">{{ pinError }}</div>
+      <div class="modal-actions">
+        <button (click)="closePinModal()">Cancel</button>
+        <button (click)="verifyPin()" class="btn-primary">Verify</button>
+      </div>
+      <div class="safety-note">Double‑tap the logo to exit safely.</div>
+    </div>
+  </div>
+
+  <!-- Safety footer -->
+  <footer class="safety-footer">
+    <span>🛡️ In danger? Call 10111 first.</span>
+    <span>Double‑tap the Amani logo to hide this page.</span>
+  </footer>
+</div>

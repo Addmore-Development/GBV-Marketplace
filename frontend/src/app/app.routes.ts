@@ -14,6 +14,11 @@ export const routes: Routes = [
         .then(m => m.SellerRegisterComponent),
   },
   {
+    path: 'seller/dashboard',
+    loadComponent: () => import('./features/seller-dashboard/seller-dashboard.component')
+      .then(m => m.SellerDashboardComponent),
+  },
+  {
     path: '',
     redirectTo: 'register/centre',
     pathMatch: 'full',

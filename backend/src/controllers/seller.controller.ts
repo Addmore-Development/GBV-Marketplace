@@ -137,6 +137,62 @@ export const registerSeller = async (req: Request, res: Response) => {
     }
 };
 
+// Get seller profile (for dashboard)
+export const getSellerProfile = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT id, alias, email, product_categories, payout_method, verification_status
+             FROM sellers
+             WHERE id = $1`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Seller not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Get seller's products
+export const getSellerProducts = async (req: Request, res: Response) => {
+    const { sellerId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT id, name, description, price, category, status
+             FROM products
+             WHERE seller_id = $1
+             ORDER BY created_at DESC`,
+            [sellerId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Optional: Delete a product
+export const deleteProduct = async (req: Request, res: Response) => {
+    const { productId } = req.params;
+    try {
+        const result = await pool.query(
+            `DELETE FROM products WHERE id = $1 RETURNING id`,
+            [productId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json({ message: 'Product deleted successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 // Get seller public profile (by alias) – for marketplace display
 export const getSellerPublicProfile = async (req: Request, res: Response) => {
     const { alias } = req.params;

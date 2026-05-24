@@ -1,0 +1,409 @@
+<!-- frontend/src/app/features/marketplace/marketplace.component.html -->
+
+<!-- NAV -->
+<nav class="nav" [class.scrolled]="scrolled">
+  <div class="nav-inner">
+    <a class="brand" routerLink="/marketplace">
+      <div class="brand-mark">A</div>
+      <div class="brand-text">
+        <span class="brand-name">Amani</span>
+        <span class="brand-sub">marketplace</span>
+      </div>
+    </a>
+
+    <div class="nav-search-wrap">
+      <input class="nav-search" type="text" placeholder="Search products, centres, makers…"
+        [(ngModel)]="searchQuery" />
+      <span class="search-icon">🔍</span>
+    </div>
+
+    <div class="nav-actions">
+      <button class="btn-donate" (click)="goToDonate()">❤️ Donate</button>
+      <a class="nav-cart" routerLink="/cart">
+        🛒 <span>Cart</span>
+        <span class="cart-badge" *ngIf="cartCount > 0">{{ cartCount }}</span>
+      </a>
+      <ng-container *ngIf="!currentUser">
+        <button class="btn-ghost" (click)="showAuthModal('login')">Sign In</button>
+        <button class="btn-solid" (click)="showAuthModal('register')">Register</button>
+      </ng-container>
+      <div class="user-chip" *ngIf="currentUser">
+        <div class="user-avatar">{{ currentUser.initials }}</div>
+        <span class="user-name">{{ currentUser.name.split(' ')[0] }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category strip — removed from here, lives below hero -->
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-bg">
+    <img class="hero-img" src="https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=1600&q=80" alt="Crafts" />
+    <div class="hero-overlay"></div>
+  </div>
+  <div class="hero-content">
+
+    <!-- Mission bar inside hero -->
+    <div class="hero-mission-bar">
+      <span class="hmb-text">🤝 Every purchase funds a survivor's income, a centre's counselling &amp; a young maker's future</span>
+      <div class="hmb-links">
+        <a class="hmb-link" routerLink="/for-centres">Are you a Centre? Join free →</a>
+        <span class="hmb-sep">|</span>
+        <a class="hmb-link" routerLink="/for-centres">Sell your crafts →</a>
+      </div>
+    </div>
+
+    <div class="hero-eyebrow">
+      <span class="eyebrow-dot"></span>
+      South African handmade goods
+    </div>
+    <h1 class="hero-title">Shop with <em>purpose.</em><br>Every rand tracked.</h1>
+    <p class="hero-sub">Products made by GBV survivors, youth, and the elderly — through verified centres. 70% of every sale goes directly to the maker.</p>
+
+    <!-- Three CTAs -->
+    <div class="hero-cta-row">
+      <button class="hero-cta primary" (click)="activeCategory = 'all'">Browse Products</button>
+      <button class="hero-cta secondary" (click)="goToCentres()">Sell Your Crafts</button>
+      <button class="hero-cta ghost" (click)="goToDonate()">Donate to a Centre</button>
+    </div>
+
+    <div class="hero-stats-inline">
+      <div class="hsi"><span class="hsi-num">R482K</span><span class="hsi-label">Paid to makers</span></div>
+      <div class="hsi-div"></div>
+      <div class="hsi"><span class="hsi-num">1,240</span><span class="hsi-label">Lives supported</span></div>
+      <div class="hsi-div"></div>
+      <div class="hsi"><span class="hsi-num">38</span><span class="hsi-label">Centres</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCTS SECTION -->
+<div class="products-section">
+
+  <!-- TOOLBAR: categories + count + price + sort all on one line -->
+  <div class="toolbar">
+    <!-- Left: category chips -->
+    <div class="toolbar-cats">
+      <button class="cat-chip" *ngFor="let c of categories"
+        [class.active]="activeCategory === c.key"
+        (click)="activeCategory = c.key">
+        {{ c.icon }} {{ c.label }}
+        <span class="cat-count">{{ c.count }}</span>
+      </button>
+    </div>
+
+    <!-- Right: count + price + sort -->
+    <div class="toolbar-right">
+      <span class="results-count">
+        Showing <strong>{{ filteredProducts.length }}</strong> products
+      </span>
+      <div class="price-wrap">
+        <span class="price-label">Max: R{{ maxPrice }}</span>
+        <input type="range" class="price-range" min="50" max="1000" step="10" [(ngModel)]="maxPrice" />
+      </div>
+      <select class="sort-select" [(ngModel)]="sortBy">
+        <option value="popular">Most Popular</option>
+        <option value="rating">Top Rated</option>
+        <option value="price-asc">Price ↑</option>
+        <option value="price-desc">Price ↓</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Product Grid -->
+  <div class="product-grid" *ngIf="filteredProducts.length > 0">
+    <div class="product-card" *ngFor="let p of filteredProducts" (click)="openProduct(p)">
+      <div class="card-visual">
+        <img class="card-img" [src]="p.img" [alt]="p.title" loading="lazy" />
+        <div class="card-badge" [ngClass]="p.badge || ''" *ngIf="p.badge">
+          {{ p.badge === 'bestseller' ? '⭐ Bestseller' : p.badge === 'low-stock' ? '⚠️ Low stock' : 'Out of stock' }}
+        </div>
+        <div class="card-wishlist">♡</div>
+      </div>
+      <div class="card-body">
+        <div class="card-centre">🏠 {{ p.centre_name }}</div>
+        <h3 class="card-title">{{ p.title }}</h3>
+        <div class="card-by">by <em>{{ p.seller_alias }}</em>
+          <span class="seller-type-badge" [ngClass]="p.seller_type">{{ p.seller_type }}</span>
+        </div>
+        <div class="card-rating">
+          <span class="stars">
+            <span class="star" *ngFor="let s of stars(p.rating)" [class.filled]="s">★</span>
+          </span>
+          <span class="rating-count">{{ p.rating }} ({{ p.reviews }})</span>
+          <span class="sold-count">· {{ p.sold }} sold</span>
+        </div>
+        <div class="card-impact-bar">
+          <div class="cib survivor" [style.width.%]="(p.survivor_income / p.price) * 100"></div>
+          <div class="cib centre"   [style.width.%]="(p.centre_funding / p.price) * 100"></div>
+          <div class="cib platform" style="flex:1"></div>
+        </div>
+        <div class="card-impact-hint">{{ formatSurvivorPct(p) }} to maker · 30% to centre</div>
+        <div class="card-footer">
+          <span class="card-price">{{ formatPrice(p.price) }}</span>
+          <button [class]="getButtonClass(p)"
+            [disabled]="p.stock === 0 || addingIds.has(p.id)"
+            (click)="$event.stopPropagation(); addToCart(p)">
+            {{ getButtonLabel(p) }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="filteredProducts.length === 0">
+    <div class="empty-icon">🔍</div>
+    <h3>No products found</h3>
+    <p>Try adjusting your filters or search query.</p>
+    <button class="btn-primary" (click)="searchQuery = ''; activeCategory = 'all'; maxPrice = 1000">Clear filters</button>
+  </div>
+
+</div>
+
+<!-- MARKETPLACE MODEL STRIP -->
+<div class="split-strip">
+  <div class="split-strip-inner">
+    <div class="ss-header">
+      <h2>The marketplace model</h2>
+      <p>Your purchase is tracked to the rand. Here is exactly where it goes.</p>
+    </div>
+    <div class="split-table-wrap">
+      <table class="split-table">
+        <thead>
+          <tr><th>Product type</th><th>Example items</th><th>Centre keeps</th><th>Survivor keeps</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Beaded jewellery</td><td>Necklaces, earrings</td><td class="pct centre">30%</td><td class="pct survivor">70%</td></tr>
+          <tr><td>Clothing &amp; textiles</td><td>Dresses, bags, scarves</td><td class="pct centre">30%</td><td class="pct survivor">70%</td></tr>
+          <tr><td>Food preserves</td><td>Jams, chutneys, dried herbs</td><td class="pct centre">30%</td><td class="pct survivor">70%</td></tr>
+          <tr><td>Art &amp; crafts</td><td>Pottery, wire art, candles</td><td class="pct centre">30%</td><td class="pct survivor">70%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="split-we-handle">
+      <div class="swh-col">
+        <div class="swh-label">We handle</div>
+        <div class="swh-items">
+          <span>💳 Payments</span><span>📦 Shipping</span>
+          <span>📞 Customer service</span><span>📣 Marketing</span>
+        </div>
+      </div>
+      <div class="swh-col">
+        <div class="swh-label">You handle</div>
+        <div class="swh-items">
+          <span>✅ Quality control</span>
+          <span>💛 Paying survivors</span>
+          <span>🚛 Shipping to hub</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IMPACT STRIP -->
+<div class="impact-strip">
+  <div class="impact-strip-inner">
+    <div class="is-item">
+      <span class="is-num">01</span>
+      <span class="is-icon">💛</span>
+      <div class="is-text"><strong>R482,000 paid to makers</strong><span>Directly into survivors' hands</span></div>
+    </div>
+    <div class="is-item">
+      <span class="is-num">02</span>
+      <span class="is-icon">🏠</span>
+      <div class="is-text"><strong>38 verified centres</strong><span>GBV, orphanages, elderly homes</span></div>
+    </div>
+    <div class="is-item">
+      <span class="is-num">03</span>
+      <span class="is-icon">📦</span>
+      <div class="is-text"><strong>100% anonymous shipping</strong><span>Your address never shared with seller</span></div>
+    </div>
+    <div class="is-item">
+      <span class="is-num">04</span>
+      <span class="is-icon">🔒</span>
+      <div class="is-text"><strong>POPIA compliant</strong><span>All data protected under SA law</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM ANNOUNCE BAR -->
+<div class="bottom-announce">
+  <span>🚚 Free delivery on orders over R500</span>
+  <span class="ba-dot">·</span>
+  <span>98% goes directly to makers &amp; centres</span>
+  <span class="ba-dot">·</span>
+  <span>🔒 Anonymous shipping via Centre Hub</span>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand-col">
+      <div class="footer-logo">A</div>
+      <p class="footer-tagline">Commerce with <em>conscience.</em></p>
+      <p class="footer-sub">Supporting GBV survivors, youth, and the elderly across South Africa.</p>
+    </div>
+    <div class="footer-links">
+      <div class="fl-col">
+        <h4>Marketplace</h4>
+        <a routerLink="/marketplace">All Products</a>
+        <a routerLink="/marketplace">Jewellery</a>
+        <a routerLink="/marketplace">Food &amp; Jams</a>
+        <a routerLink="/marketplace">Art &amp; Crafts</a>
+      </div>
+      <div class="fl-col">
+        <h4>Get Involved</h4>
+        <a routerLink="/for-centres">For Centres</a>
+        <a routerLink="/for-centres">Sell Your Crafts</a>
+        <a routerLink="/donate">Donate</a>
+        <a routerLink="/for-centres">Volunteer</a>
+      </div>
+      <div class="fl-col">
+        <h4>Amani</h4>
+        <a href="#">About Us</a>
+        <a href="#">Impact Report</a>
+        <a href="#">Privacy (POPIA)</a>
+        <a href="#">Contact</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Amani Platform (Pty) Ltd — NPO Partner</span>
+    <span>Made with purpose in South Africa 🇿🇦</span>
+  </div>
+</footer>
+
+<!-- PRODUCT DETAIL MODAL -->
+<div class="modal-backdrop" [class.open]="selectedProduct" (click)="closeProduct()">
+  <div class="modal modal-product" *ngIf="selectedProduct" (click)="$event.stopPropagation()">
+    <button class="modal-close" (click)="closeProduct()">✕</button>
+    <div class="product-modal-grid">
+      <div class="pm-image">
+        <img [src]="selectedProduct.img" [alt]="selectedProduct.title" />
+        <div class="pm-category-badge">{{ selectedProduct.category }}</div>
+      </div>
+      <div class="pm-info">
+        <div class="pm-centre">🏠 {{ selectedProduct.centre_name }}</div>
+        <h2 class="pm-title">{{ selectedProduct.title }}</h2>
+        <div class="pm-seller">by <em>{{ selectedProduct.seller_alias }}</em>
+          <span class="seller-badge">{{ selectedProduct.seller_type }}</span>
+        </div>
+        <div class="pm-rating">
+          <span class="stars">
+            <span class="star" *ngFor="let s of stars(selectedProduct.rating)" [class.filled]="s">★</span>
+          </span>
+          {{ selectedProduct.rating }} · {{ selectedProduct.reviews }} reviews · {{ selectedProduct.sold }} sold
+        </div>
+        <div class="pm-price-row">
+          <span class="pm-price">{{ formatPrice(selectedProduct.price) }}</span>
+          <span class="pm-stock" [class.low]="selectedProduct.stock <= 5">
+            {{ selectedProduct.stock > 5 ? 'In stock' : selectedProduct.stock > 0 ? selectedProduct.stock + ' left' : 'Out of stock' }}
+          </span>
+        </div>
+        <p class="pm-desc">{{ selectedProduct.description }}</p>
+        <div class="pm-story">
+          <div class="story-label">✦ Maker's story</div>
+          <blockquote>{{ selectedProduct.story }}</blockquote>
+        </div>
+        <div class="pm-impact-receipt">
+          <div class="ir-header">
+            <span>🧾</span>
+            <div><strong>Impact receipt</strong><small>Where your money goes</small></div>
+          </div>
+          <div class="ir-rows">
+            <div class="ir-row">
+              <span class="ir-label">Maker income</span>
+              <div class="ir-bar-wrap"><div class="ir-bar survivor" [style.width.%]="(selectedProduct.survivor_income / selectedProduct.price) * 100"></div></div>
+              <span class="ir-amount">{{ formatPrice(selectedProduct.survivor_income) }}</span>
+            </div>
+            <div class="ir-row">
+              <span class="ir-label">Centre</span>
+              <div class="ir-bar-wrap"><div class="ir-bar centre" [style.width.%]="(selectedProduct.centre_funding / selectedProduct.price) * 100"></div></div>
+              <span class="ir-amount">{{ formatPrice(selectedProduct.centre_funding) }}</span>
+            </div>
+            <div class="ir-row">
+              <span class="ir-label">Platform</span>
+              <div class="ir-bar-wrap"><div class="ir-bar platform" [style.width.%]="(selectedProduct.platform_fee / selectedProduct.price) * 100"></div></div>
+              <span class="ir-amount">{{ formatPrice(selectedProduct.platform_fee) }}</span>
+            </div>
+          </div>
+          <div class="ir-total"><span>Total</span><strong>{{ formatPrice(selectedProduct.price) }}</strong></div>
+        </div>
+        <div class="pm-purchase">
+          <div class="qty-control">
+            <button (click)="selectedQty = selectedQty > 1 ? selectedQty - 1 : 1" [disabled]="selectedQty <= 1">−</button>
+            <span>{{ selectedQty }}</span>
+            <button (click)="selectedQty = selectedQty + 1" [disabled]="selectedQty >= selectedProduct.stock">+</button>
+          </div>
+          <button class="modal-add-btn" [class.added]="addedIds.has(selectedProduct.id)"
+            [disabled]="selectedProduct.stock === 0"
+            (click)="addFromModal()">
+            {{ addedIds.has(selectedProduct.id) ? '✓ Added to cart' : '+ Add to cart — ' + formatPrice(selectedProduct.price * selectedQty) }}
+          </button>
+        </div>
+        <a class="view-cart-link" routerLink="/cart" (click)="closeProduct()">View Cart →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal-backdrop" [class.open]="authModal" (click)="closeAuthModal($event)">
+  <div class="modal" [class.open]="authModal" (click)="$event.stopPropagation()">
+    <button class="modal-close" (click)="authModal = ''">✕</button>
+
+    <div *ngIf="authModal === 'login'">
+      <div class="modal-head">
+        <div class="modal-logo">A</div>
+        <h2 class="modal-title">Welcome back</h2>
+        <p class="modal-sub">Sign in to your Amani account</p>
+      </div>
+      <div class="modal-tabs">
+        <button class="mtab" [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
+        <button class="mtab" [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
+        <button class="mtab" [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
+      </div>
+      <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
+      <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
+      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+      <button class="modal-cta" (click)="doLogin()">Sign In →</button>
+      <div class="modal-switch">No account? <span (click)="authModal = 'register'">Register here</span></div>
+    </div>
+
+    <div *ngIf="authModal === 'register'">
+      <div class="modal-head">
+        <div class="modal-logo">A</div>
+        <h2 class="modal-title">Join Amani</h2>
+        <p class="modal-sub">Create your account</p>
+      </div>
+      <div class="role-grid">
+        <div class="role-card" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
+          <div class="rc-icon">🛒</div><div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
+        </div>
+        <div class="role-card" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
+          <div class="rc-icon">🎨</div><div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
+        </div>
+        <div class="role-card" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
+          <div class="rc-icon">🏠</div><div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
+        </div>
+      </div>
+      <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
+      <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
+      <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
+      <div class="mf-note" [class.vetting]="registerRole !== 'buyer'">
+        <span *ngIf="registerRole === 'buyer'">ℹ️ Buyer accounts activate immediately.</span>
+        <span *ngIf="registerRole === 'seller'">⚠️ Seller accounts require NRSO vetting (7–14 days).</span>
+        <span *ngIf="registerRole === 'centre'">⚠️ Centre registration requires NPO docs &amp; site visit.</span>
+      </div>
+      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+      <button class="modal-cta" (click)="doRegister()">Create Account →</button>
+      <div class="modal-switch">Have an account? <span (click)="authModal = 'login'">Sign in</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" [class.show]="toastVisible">✓ {{ toastMsg }}</div>

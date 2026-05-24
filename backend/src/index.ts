@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import centreRoutes from './routes/centre.routes';
+import marketplaceRoutes from './routes/marketplace.routes';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(helmet());
 app.use(express.json());
 app.use('/api/centres', centreRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 // PostgreSQL connection
 export const pool = new Pool({

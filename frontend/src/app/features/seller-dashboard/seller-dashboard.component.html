@@ -1,0 +1,99 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="logo" (dblclick)="quickExit()">
+      <span class="logo-icon">🌿</span>
+      <span class="logo-text">Amani</span>
+      <span class="quick-hint">(double‑tap to hide)</span>
+    </div>
+    <div class="seller-info">
+      <span>Welcome, {{ seller?.alias || 'Seller' }}</span>
+      <button class="logout-btn" (click)="logout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab === 'products'" (click)="activeTab = 'products'">📦 My Products</button>
+    <button [class.active]="activeTab === 'sales'" (click)="activeTab = 'sales'">💰 Sales & Payouts</button>
+    <button [class.active]="activeTab === 'hidden'" (click)="activeTab = 'hidden'">🛡️ Hidden Layer</button>
+  </div>
+
+  <!-- Products Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'products'">
+    <div class="action-bar">
+      <button class="btn-primary" (click)="openAddProductModal()">+ Add New Product</button>
+    </div>
+    <div class="product-grid" *ngIf="!isLoading; else loading">
+      <div class="product-card" *ngFor="let p of products">
+        <h3>{{ p.name }}</h3>
+        <p class="price">R{{ p.price }}</p>
+        <p class="category">{{ p.category }}</p>
+        <span class="status" [class.active]="p.status === 'active'">{{ p.status }}</span>
+        <div class="card-actions">
+          <button (click)="editProduct(p)">✏️ Edit</button>
+          <button (click)="deleteProduct(p.id)">🗑️ Delete</button>
+        </div>
+      </div>
+      <div class="empty-state" *ngIf="products.length === 0 && !isLoading">
+        <p>No products yet. Click "+ Add New Product" to start selling.</p>
+      </div>
+    </div>
+    <ng-template #loading><p>Loading products...</p></ng-template>
+  </div>
+
+  <!-- Sales Tab (placeholder) -->
+  <div class="tab-content" *ngIf="activeTab === 'sales'">
+    <h3>Your earnings</h3>
+    <p>Total earned: <strong>R0</strong> (coming soon)</p>
+    <p>Next payout: —</p>
+  </div>
+
+  <!-- Hidden Layer Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'hidden'">
+    <div class="hidden-warning">
+      <span>🔐</span>
+      <p>This section contains sensitive case information, evidence vault, and support requests. Enter your hidden layer PIN to access.</p>
+    </div>
+    <button class="btn-hidden" (click)="requestHiddenLayer()">Enter PIN to Access</button>
+  </div>
+
+  <!-- Product Modal (Add / Edit) -->
+  <div class="modal-overlay" *ngIf="showProductModal">
+    <div class="modal-container">
+      <h3>{{ isEditing ? 'Edit Product' : 'Add New Product' }}</h3>
+      <input type="text" [(ngModel)]="currentProduct.name" placeholder="Product name" required>
+      <textarea [(ngModel)]="currentProduct.description" placeholder="Description (optional)"></textarea>
+      <input type="number" [(ngModel)]="currentProduct.price" placeholder="Price (R)" step="0.01" min="0">
+      <input type="text" [(ngModel)]="currentProduct.category" placeholder="Category (e.g. Beaded jewellery)">
+      <select [(ngModel)]="currentProduct.status">
+        <option value="active">Active</option>
+        <option value="draft">Draft</option>
+      </select>
+      <div class="modal-buttons">
+        <button (click)="closeProductModal()">Cancel</button>
+        <button (click)="saveProduct()" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN Modal -->
+  <div class="modal-overlay" *ngIf="showPinModal">
+    <div class="modal-container">
+      <h3>Enter Hidden Layer PIN</h3>
+      <input type="password" [(ngModel)]="hiddenPin" placeholder="4-6 digit PIN" autocomplete="off">
+      <div class="error" *ngIf="pinError">{{ pinError }}</div>
+      <div class="modal-buttons">
+        <button (click)="closePinModal()">Cancel</button>
+        <button (click)="verifyPin()" class="btn-primary">Verify</button>
+      </div>
+      <div class="safety-note">Double‑tap the logo to exit safely.</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="safety-footer">
+    <span>🛡️ In danger? Call 10111 first.</span>
+    <span>Double‑tap the Amani logo to hide this page.</span>
+  </footer>
+</div>

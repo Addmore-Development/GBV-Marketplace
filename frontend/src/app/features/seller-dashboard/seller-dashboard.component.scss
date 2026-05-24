@@ -1,0 +1,205 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=DM+Sans:wght@400;500;600&display=swap');
+
+:host {
+  --forest: #2D5016;
+  --sage: #5A7A3A;
+  --gold: #C49A3C;
+  --teal: #1A6B5A;
+  --bg: #F7F9F5;
+  --white: #FFFFFF;
+  --border: #D8E4D4;
+  --text-dark: #1C2B1A;
+  --text-light: #7A8C77;
+  --red: #C0392B;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.dashboard-container {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.dashboard-header {
+  background: linear-gradient(135deg, var(--forest), var(--teal));
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  .logo {
+    cursor: pointer;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    .logo-icon { font-size: 1.8rem; }
+    .logo-text { font-family: 'Lora', serif; font-size: 1.4rem; font-weight: 700; }
+    .quick-hint { font-size: 0.7rem; opacity: 0.6; }
+  }
+  .seller-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    .logout-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      color: white;
+      cursor: pointer;
+    }
+  }
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  background: white;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  button {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 30px;
+    &.active {
+      background: var(--forest);
+      color: white;
+    }
+  }
+}
+
+.tab-content {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.action-bar {
+  margin-bottom: 24px;
+  text-align: right;
+}
+
+.btn-primary, .btn-secondary, .btn-hidden {
+  padding: 10px 20px;
+  border-radius: 30px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--forest);
+  color: white;
+  &:hover { background: var(--sage); }
+}
+.btn-secondary { background: var(--gold); }
+.btn-hidden { background: var(--teal); }
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+.product-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  h3 { margin: 0 0 8px; font-size: 1.2rem; }
+  .price { font-weight: bold; color: var(--gold); font-size: 1.3rem; }
+  .status {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #eee;
+    &.active { background: var(--sage); color: white; }
+  }
+  .card-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    button {
+      background: none;
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-light);
+  padding: 40px;
+  font-style: italic;
+}
+
+.hidden-warning {
+  background: #FEF3E2;
+  border-left: 4px solid var(--gold);
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-container {
+  background: white;
+  padding: 24px;
+  border-radius: 20px;
+  width: 400px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  input, textarea, select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  .safety-note {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    text-align: center;
+    margin-top: 8px;
+  }
+}
+
+.safety-footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 0.75rem;
+  color: var(--text-light);
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+.error {
+  color: var(--red);
+  font-size: 0.8rem;
+  text-align: center;
+}

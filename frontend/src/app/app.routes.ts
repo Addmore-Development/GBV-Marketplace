@@ -5,8 +5,6 @@ import { Routes } from '@angular/router';
 
 export const routes: Routes = [
   {
-<<<<<<< HEAD
-=======
     path: 'register/centre',
     loadComponent: () =>
       import('./features/centre-register/centre-register.component')
@@ -19,6 +17,11 @@ export const routes: Routes = [
         .then(m => m.SellerRegisterComponent),
   },
   {
+    path: 'login',
+    loadComponent: () => import('./features/seller-login/seller-login.component')
+      .then(m => m.SellerLoginComponent),
+  },
+  {
     path: 'seller/dashboard',
     loadComponent: () => import('./features/seller-dashboard/seller-dashboard.component')
       .then(m => m.SellerDashboardComponent),   
@@ -29,7 +32,6 @@ export const routes: Routes = [
       .then(m => m.SellerHiddenComponent),
   },
   {
->>>>>>> a7e0a5023192993af9fca2f6f0177ef4dc4ba57c
     path: '',
     redirectTo: 'marketplace',
     pathMatch: 'full',

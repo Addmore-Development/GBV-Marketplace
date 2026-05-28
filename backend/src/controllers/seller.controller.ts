@@ -264,3 +264,21 @@ export const deleteProduct = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to delete product' });
     }
 };
+
+// ==================== GRANT HIDDEN LAYER ACCESS (VOLUNTEER) ====================
+export const grantHiddenLayer = async (req: Request, res: Response) => {
+  const { sellerId } = req.body;
+  if (!sellerId) {
+    return res.status(400).json({ error: 'Seller ID required' });
+  }
+  try {
+    await pool.query(
+      `UPDATE sellers SET hidden_layer_granted = TRUE WHERE id = $1`,
+      [sellerId]
+    );
+    res.json({ message: 'Hidden layer access granted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to grant access' });
+  }
+};

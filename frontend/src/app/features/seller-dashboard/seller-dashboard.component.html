@@ -50,26 +50,41 @@
   </div>
 
   <!-- Hidden Layer Tab -->
-  <div class="tab-content" *ngIf="activeTab === 'hidden'">
-    <div class="hidden-warning">
-      <span>🔐</span>
-      <p>This section contains sensitive case information, evidence vault, and support requests. Enter your hidden layer PIN to access.</p>
-    </div>
-    <button class="btn-hidden" (click)="requestHiddenLayer()">Enter PIN to Access</button>
+<div class="tab-content" *ngIf="activeTab === 'hidden'">
+  <div class="hidden-warning">
+    <span>🔐</span>
+    <p>This section contains sensitive case information, evidence vault, and support requests. Enter your hidden layer PIN to access.</p>
   </div>
+
+  <!-- Volunteer banner (only if not approved and not yet granted) -->
+  <div *ngIf="!(seller?.verification_status === 'approved' || seller?.hidden_layer_granted || volunteerRequested)" class="volunteer-banner">
+    <p>⚠️ Your centre has not yet approved you. Click below to volunteer and get immediate access to the hidden layer support tools.</p>
+    <button class="btn-volunteer" (click)="requestVolunteerAccess()">🤝 Volunteer Now – Unlock Hidden Layer</button>
+  </div>
+
+  <button class="btn-hidden" (click)="requestHiddenLayer()" [disabled]="!(seller?.verification_status === 'approved' || seller?.hidden_layer_granted || volunteerRequested)">Enter PIN to Access</button>
+</div>
 
   <!-- Product Modal (Add / Edit) -->
   <div class="modal-overlay" *ngIf="showProductModal">
     <div class="modal-container">
       <h3>{{ isEditing ? 'Edit Product' : 'Add New Product' }}</h3>
       <input type="text" [(ngModel)]="currentProduct.name" placeholder="Product name" required>
-      <textarea [(ngModel)]="currentProduct.description" placeholder="Description (optional)"></textarea>
-      <input type="number" [(ngModel)]="currentProduct.price" placeholder="Price (R)" step="0.01" min="0">
-      <input type="text" [(ngModel)]="currentProduct.category" placeholder="Category (e.g. Beaded jewellery)">
-      <select [(ngModel)]="currentProduct.status">
-        <option value="active">Active</option>
-        <option value="draft">Draft</option>
-      </select>
+<textarea [(ngModel)]="currentProduct.description" placeholder="Description"></textarea>
+<input type="number" [(ngModel)]="currentProduct.price" placeholder="Price (R)" step="0.01" min="0">
+<input type="text" [(ngModel)]="currentProduct.category" placeholder="Category (e.g. Beaded jewellery)">
+<input type="text" [(ngModel)]="currentProduct.image_url" placeholder="Image URL (optional)">
+<input type="number" [(ngModel)]="currentProduct.stock" placeholder="Stock quantity" min="0">
+<select [(ngModel)]="currentProduct.seller_type">
+  <option value="survivor">Survivor</option>
+  <option value="youth">Youth</option>
+  <option value="elderly">Elderly</option>
+</select>
+<textarea [(ngModel)]="currentProduct.story" placeholder="Maker's story (optional)"></textarea>
+<select [(ngModel)]="currentProduct.status">
+  <option value="active">Active (visible in marketplace)</option>
+  <option value="draft">Draft (hidden)</option>
+</select>
       <div class="modal-buttons">
         <button (click)="closeProductModal()">Cancel</button>
         <button (click)="saveProduct()" class="btn-primary">Save</button>

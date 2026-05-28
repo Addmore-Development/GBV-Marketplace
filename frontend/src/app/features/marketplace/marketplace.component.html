@@ -1,5 +1,3 @@
-<!-- frontend/src/app/features/marketplace/marketplace.component.html -->
-
 <!-- NAV -->
 <nav class="nav" [class.scrolled]="scrolled">
   <div class="nav-inner">
@@ -33,8 +31,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Category strip — removed from here, lives below hero -->
 </nav>
 
 <!-- HERO -->
@@ -45,7 +41,6 @@
   </div>
   <div class="hero-content">
 
-    <!-- Mission bar inside hero -->
     <div class="hero-mission-bar">
       <span class="hmb-text">🤝 Every purchase funds a survivor's income, a centre's counselling &amp; a young maker's future</span>
       <div class="hmb-links">
@@ -62,7 +57,6 @@
     <h1 class="hero-title">Shop with <em>purpose.</em><br>Every rand tracked.</h1>
     <p class="hero-sub">Products made by GBV survivors, youth, and the elderly — through verified centres. 70% of every sale goes directly to the maker.</p>
 
-    <!-- Three CTAs -->
     <div class="hero-cta-row">
       <button class="hero-cta primary" (click)="activeCategory = 'all'">Browse Products</button>
       <button class="hero-cta secondary" (click)="goToCentres()">Sell Your Crafts</button>
@@ -82,9 +76,7 @@
 <!-- PRODUCTS SECTION -->
 <div class="products-section">
 
-  <!-- TOOLBAR: categories + count + price + sort all on one line -->
   <div class="toolbar">
-    <!-- Left: category chips -->
     <div class="toolbar-cats">
       <button class="cat-chip" *ngFor="let c of categories"
         [class.active]="activeCategory === c.key"
@@ -94,7 +86,6 @@
       </button>
     </div>
 
-    <!-- Right: count + price + sort -->
     <div class="toolbar-right">
       <span class="results-count">
         Showing <strong>{{ filteredProducts.length }}</strong> products
@@ -112,7 +103,6 @@
     </div>
   </div>
 
-  <!-- Product Grid -->
   <div class="product-grid" *ngIf="filteredProducts.length > 0">
     <div class="product-card" *ngFor="let p of filteredProducts" (click)="openProduct(p)">
       <div class="card-visual">
@@ -153,7 +143,6 @@
     </div>
   </div>
 
-  <!-- Empty -->
   <div class="empty-state" *ngIf="filteredProducts.length === 0">
     <div class="empty-icon">🔍</div>
     <h3>No products found</h3>
@@ -276,81 +265,7 @@
   </div>
 </footer>
 
-<!-- PRODUCT DETAIL MODAL -->
-<div class="modal-backdrop" [class.open]="selectedProduct" (click)="closeProduct()">
-  <div class="modal modal-product" *ngIf="selectedProduct" (click)="$event.stopPropagation()">
-    <button class="modal-close" (click)="closeProduct()">✕</button>
-    <div class="product-modal-grid">
-      <div class="pm-image">
-        <img [src]="selectedProduct.img" [alt]="selectedProduct.title" />
-        <div class="pm-category-badge">{{ selectedProduct.category }}</div>
-      </div>
-      <div class="pm-info">
-        <div class="pm-centre">🏠 {{ selectedProduct.centre_name }}</div>
-        <h2 class="pm-title">{{ selectedProduct.title }}</h2>
-        <div class="pm-seller">by <em>{{ selectedProduct.seller_alias }}</em>
-          <span class="seller-badge">{{ selectedProduct.seller_type }}</span>
-        </div>
-        <div class="pm-rating">
-          <span class="stars">
-            <span class="star" *ngFor="let s of stars(selectedProduct.rating)" [class.filled]="s">★</span>
-          </span>
-          {{ selectedProduct.rating }} · {{ selectedProduct.reviews }} reviews · {{ selectedProduct.sold }} sold
-        </div>
-        <div class="pm-price-row">
-          <span class="pm-price">{{ formatPrice(selectedProduct.price) }}</span>
-          <span class="pm-stock" [class.low]="selectedProduct.stock <= 5">
-            {{ selectedProduct.stock > 5 ? 'In stock' : selectedProduct.stock > 0 ? selectedProduct.stock + ' left' : 'Out of stock' }}
-          </span>
-        </div>
-        <p class="pm-desc">{{ selectedProduct.description }}</p>
-        <div class="pm-story">
-          <div class="story-label">✦ Maker's story</div>
-          <blockquote>{{ selectedProduct.story }}</blockquote>
-        </div>
-        <div class="pm-impact-receipt">
-          <div class="ir-header">
-            <span>🧾</span>
-            <div><strong>Impact receipt</strong><small>Where your money goes</small></div>
-          </div>
-          <div class="ir-rows">
-            <div class="ir-row">
-              <span class="ir-label">Maker income</span>
-              <div class="ir-bar-wrap"><div class="ir-bar survivor" [style.width.%]="(selectedProduct.survivor_income / selectedProduct.price) * 100"></div></div>
-              <span class="ir-amount">{{ formatPrice(selectedProduct.survivor_income) }}</span>
-            </div>
-            <div class="ir-row">
-              <span class="ir-label">Centre</span>
-              <div class="ir-bar-wrap"><div class="ir-bar centre" [style.width.%]="(selectedProduct.centre_funding / selectedProduct.price) * 100"></div></div>
-              <span class="ir-amount">{{ formatPrice(selectedProduct.centre_funding) }}</span>
-            </div>
-            <div class="ir-row">
-              <span class="ir-label">Platform</span>
-              <div class="ir-bar-wrap"><div class="ir-bar platform" [style.width.%]="(selectedProduct.platform_fee / selectedProduct.price) * 100"></div></div>
-              <span class="ir-amount">{{ formatPrice(selectedProduct.platform_fee) }}</span>
-            </div>
-          </div>
-          <div class="ir-total"><span>Total</span><strong>{{ formatPrice(selectedProduct.price) }}</strong></div>
-        </div>
-        <div class="pm-purchase">
-          <div class="qty-control">
-            <button (click)="selectedQty = selectedQty > 1 ? selectedQty - 1 : 1" [disabled]="selectedQty <= 1">−</button>
-            <span>{{ selectedQty }}</span>
-            <button (click)="selectedQty = selectedQty + 1" [disabled]="selectedQty >= selectedProduct.stock">+</button>
-          </div>
-          <button class="modal-add-btn" [class.added]="addedIds.has(selectedProduct.id)"
-            [disabled]="selectedProduct.stock === 0"
-            (click)="addFromModal()">
-            {{ addedIds.has(selectedProduct.id) ? '✓ Added to cart' : '+ Add to cart — ' + formatPrice(selectedProduct.price * selectedQty) }}
-          </button>
-        </div>
-        <a class="view-cart-link" routerLink="/cart" (click)="closeProduct()">View Cart →</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- AUTH MODAL -->
+<!-- REDIRECT MODAL (only one) -->
 <div class="modal-backdrop" [class.open]="authModal" (click)="closeAuthModal($event)">
   <div class="modal" [class.open]="authModal" (click)="$event.stopPropagation()">
     <button class="modal-close" (click)="authModal = ''">✕</button>
@@ -359,18 +274,26 @@
       <div class="modal-head">
         <div class="modal-logo">A</div>
         <h2 class="modal-title">Welcome back</h2>
-        <p class="modal-sub">Sign in to your Amani account</p>
+        <p class="modal-sub">Choose your account type to sign in</p>
       </div>
-      <div class="modal-tabs">
-        <button class="mtab" [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
-        <button class="mtab" [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
-        <button class="mtab" [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
+      <div class="role-cards">
+        <div class="role-card" (click)="redirectTo('seller', 'login')">
+          <div class="rc-icon">🎨</div>
+          <div class="rc-label">Seller (Survivor)</div>
+          <div class="rc-desc">Access your dashboard & hidden layer</div>
+        </div>
+        <div class="role-card" (click)="redirectTo('centre', 'login')">
+          <div class="rc-icon">🏠</div>
+          <div class="rc-label">Centre</div>
+          <div class="rc-desc">Manage your centre profile</div>
+        </div>
+        <div class="role-card" (click)="redirectTo('buyer', 'login')">
+          <div class="rc-icon">🛒</div>
+          <div class="rc-label">Buyer</div>
+          <div class="rc-desc">Shop as guest (no account needed)</div>
+        </div>
       </div>
-      <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
-      <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
-      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
-      <button class="modal-cta" (click)="doLogin()">Sign In →</button>
-      <div class="modal-switch">No account? <span (click)="authModal = 'register'">Register here</span></div>
+      <div class="modal-switch">Don't have an account? <span (click)="authModal = 'register'">Register here</span></div>
     </div>
 
     <div *ngIf="authModal === 'register'">
@@ -379,28 +302,24 @@
         <h2 class="modal-title">Join Amani</h2>
         <p class="modal-sub">Create your account</p>
       </div>
-      <div class="role-grid">
-        <div class="role-card" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
-          <div class="rc-icon">🛒</div><div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
+      <div class="role-cards">
+        <div class="role-card" (click)="redirectTo('seller', 'register')">
+          <div class="rc-icon">🎨</div>
+          <div class="rc-label">Seller (Survivor)</div>
+          <div class="rc-desc">Sell your crafts & access support</div>
         </div>
-        <div class="role-card" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
-          <div class="rc-icon">🎨</div><div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
+        <div class="role-card" (click)="redirectTo('centre', 'register')">
+          <div class="rc-icon">🏠</div>
+          <div class="rc-label">Centre</div>
+          <div class="rc-desc">Register your GBV centre / orphanage / old age home</div>
         </div>
-        <div class="role-card" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
-          <div class="rc-icon">🏠</div><div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
+        <div class="role-card" (click)="redirectTo('buyer', 'register')">
+          <div class="rc-icon">🛒</div>
+          <div class="rc-label">Buyer</div>
+          <div class="rc-desc">Shop without an account (guest checkout)</div>
         </div>
       </div>
-      <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
-      <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
-      <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
-      <div class="mf-note" [class.vetting]="registerRole !== 'buyer'">
-        <span *ngIf="registerRole === 'buyer'">ℹ️ Buyer accounts activate immediately.</span>
-        <span *ngIf="registerRole === 'seller'">⚠️ Seller accounts require NRSO vetting (7–14 days).</span>
-        <span *ngIf="registerRole === 'centre'">⚠️ Centre registration requires NPO docs &amp; site visit.</span>
-      </div>
-      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
-      <button class="modal-cta" (click)="doRegister()">Create Account →</button>
-      <div class="modal-switch">Have an account? <span (click)="authModal = 'login'">Sign in</span></div>
+      <div class="modal-switch">Already have an account? <span (click)="authModal = 'login'">Sign in</span></div>
     </div>
   </div>
 </div>

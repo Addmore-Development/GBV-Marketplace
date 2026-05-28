@@ -11,6 +11,7 @@ interface SellerProfile {
   product_categories: string[];
   payout_method: string;
   verification_status: string;
+  hidden_layer_granted?: boolean;   // <-- ADDED
 }
 
 interface Product {
@@ -20,6 +21,10 @@ interface Product {
   price: number;
   category: string;
   status: string;
+  image_url?: string;
+  stock?: number;
+  seller_type?: string;
+  story?: string;
 }
 
 @Component({
@@ -53,6 +58,8 @@ export class SellerDashboardComponent implements OnInit {
     status: 'active'
   };
 
+  volunteerRequested = false;   // <-- ADDED
+
   constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
@@ -69,7 +76,13 @@ export class SellerDashboardComponent implements OnInit {
     }
     this.http.get<SellerProfile>(`http://localhost:3000/api/sellers/profile/${sellerId}`)
       .subscribe({
-        next: (data) => (this.seller = data),
+        next: (data) => {
+          this.seller = data;
+          // If hidden_layer_granted is not returned, default to false
+          if (this.seller && this.seller.hidden_layer_granted === undefined) {
+            this.seller.hidden_layer_granted = false;
+          }
+        },
         error: () => {
           this.seller = {
             id: sellerId,
@@ -77,9 +90,25 @@ export class SellerDashboardComponent implements OnInit {
             email: localStorage.getItem('sellerEmail') || '',
             product_categories: [],
             payout_method: 'eft',
-            verification_status: 'pending'
+            verification_status: 'pending',
+            hidden_layer_granted: false
           };
         }
+      });
+  }
+
+  // ==================== VOLUNTEER (Grant Hidden Layer) ====================
+  requestVolunteerAccess(): void {
+    const sellerId = localStorage.getItem('sellerId');
+    if (!sellerId) return;
+    this.http.post('http://localhost:3000/api/sellers/volunteer', { sellerId })
+      .subscribe({
+        next: () => {
+          if (this.seller) this.seller.hidden_layer_granted = true;
+          alert('Hidden layer access granted! You can now enter your PIN to access support tools.');
+          this.volunteerRequested = true;
+        },
+        error: () => alert('Failed to grant access. Please try again.')
       });
   }
 
@@ -103,14 +132,18 @@ export class SellerDashboardComponent implements OnInit {
   // ==================== CREATE PRODUCT ====================
   openAddProductModal(): void {
     this.isEditing = false;
-    this.currentProduct = {
-      id: '',
-      name: '',
-      description: '',
-      price: 0,
-      category: '',
-      status: 'active'
-    };
+this.currentProduct = {
+  id: '',
+  name: '',
+  description: '',
+  price: 0,
+  category: '',
+  status: 'active',
+  image_url: '',
+  stock: 0,
+  seller_type: 'survivor',
+  story: ''
+};
     this.showProductModal = true;
   }
 
@@ -185,16 +218,17 @@ export class SellerDashboardComponent implements OnInit {
   }
 
   verifyPin(): void {
-  const storedPin = localStorage.getItem('hiddenPin');
-  if (this.hiddenPin === storedPin) {
-    this.hiddenLayerAccess = true;
-    localStorage.setItem('hiddenLayerAccess', 'true');  // <-- add this line
-    this.showPinModal = false;
-    this.router.navigate(['/seller/hidden']);
-  } else {
-    this.pinError = 'Incorrect PIN. Please try again.';
+    const storedPin = localStorage.getItem('hiddenPin');
+    if (this.hiddenPin === storedPin) {
+      this.hiddenLayerAccess = true;
+      localStorage.setItem('hiddenLayerAccess', 'true');
+      this.showPinModal = false;
+      this.router.navigate(['/seller/hidden']);
+    } else {
+      this.pinError = 'Incorrect PIN. Please try again.';
+    }
   }
-}
+
   closePinModal(): void {
     this.showPinModal = false;
   }

@@ -9,6 +9,7 @@ import {
     updateProduct,
     deleteProduct,
     loginSeller,
+    grantHiddenLayer
 } from '../controllers/seller.controller';
 
 const router = Router();
@@ -25,5 +26,8 @@ router.get('/products/:sellerId', getSellerProducts);
 router.post('/products', createProduct);
 router.put('/products/:id', updateProduct);
 router.delete('/products/:productId', deleteProduct);
+
+// Volunteer / hidden layer grant
+router.post('/volunteer', grantHiddenLayer);   // <-- ADD THIS
 
 export default router;

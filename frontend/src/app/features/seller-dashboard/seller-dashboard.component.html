@@ -1,114 +1,752 @@
-<div class="dashboard-container">
-  <!-- Header -->
-  <header class="dashboard-header">
-    <div class="logo" (dblclick)="quickExit()">
-      <span class="logo-icon">🌿</span>
-      <span class="logo-text">Amani</span>
-      <span class="quick-hint">(double‑tap to hide)</span>
+<!-- ============================================================
+  frontend/src/app/features/seller-dashboard/seller-dashboard.component.html
+  Amani — Maker Dashboard (disguised as artisan marketplace dashboard)
+  ============================================================ -->
+
+<!-- LOADING STATE -->
+<!-- LOADING STATE -->
+<div class="sd-loading" *ngIf="isLoading">
+  <div class="sd-spinner"></div>
+  <p>Getting things ready…</p>
+</div>
+
+<!-- MAIN DASHBOARD -->
+<div class="sd-page" *ngIf="!isLoading && seller && !sanctuaryOpen">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────── -->
+  <aside class="sd-sidebar">
+    <div class="sb-brand" (dblclick)="handleLogoDblTap()" title="Double-tap to leave safely">
+      <span class="sb-leaf">🌿</span>
+      <span class="sb-name">Amani</span>
     </div>
-    <div class="seller-info">
-      <span>Welcome, {{ seller?.alias || 'Seller' }}</span>
-      <button class="logout-btn" (click)="logout()">Logout</button>
+
+    <div class="sb-maker">
+      <div class="sb-avatar">{{ seller.alias.charAt(0).toUpperCase() }}</div>
+      <div class="sb-maker-info">
+        <div class="sb-alias">{{ seller.alias }}</div>
+        <div class="sb-status" [class.verified]="seller.verification_status === 'approved'">
+          {{ seller.verification_status === 'approved' ? '✓ Verified maker' : '⏳ Pending review' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile completeness nudge -->
+    <div class="sb-progress-wrap" *ngIf="!seller.profile_complete">
+      <div class="sb-progress-label">Profile {{ profileCompletePct }}% complete</div>
+      <div class="sb-progress-bar">
+        <div class="sb-progress-fill" [style.width.%]="profileCompletePct"></div>
+      </div>
+      <span class="sb-progress-note">Complete to start selling</span>
+    </div>
+
+    <nav class="sb-nav">
+      <button class="sb-link" [class.active]="activeTab === 'home'"     (click)="activeTab = 'home'">
+        <span class="sb-icon">🏡</span><span class="sb-label">My Studio</span>
+      </button>
+      <button class="sb-link" [class.active]="activeTab === 'listings'" (click)="activeTab = 'listings'">
+        <span class="sb-icon">🛍️</span><span class="sb-label">My Listings</span>
+        <span class="sb-badge" *ngIf="activeListings > 0">{{ activeListings }}</span>
+      </button>
+      <button class="sb-link" [class.active]="activeTab === 'earnings'" (click)="activeTab = 'earnings'">
+        <span class="sb-icon">💛</span><span class="sb-label">My Earnings</span>
+      </button>
+      <button class="sb-link" [class.active]="activeTab === 'learn'"    (click)="activeTab = 'learn'">
+        <span class="sb-icon">🌱</span><span class="sb-label">Grow & Learn</span>
+      </button>
+      <button class="sb-link" [class.active]="activeTab === 'contacts'" (click)="activeTab = 'contacts'">
+        <span class="sb-icon">🤝</span><span class="sb-label">My Circle</span>
+        <span class="sb-badge warn" *ngIf="contacts.length === 0">!</span>
+      </button>
+      <button class="sb-link" [class.active]="activeTab === 'profile'"  (click)="activeTab = 'profile'">
+        <span class="sb-icon">✍️</span><span class="sb-label">My Story</span>
+      </button>
+      <div class="sb-divider"></div>
+      <button class="sb-link sanctuary-link" (click)="requestSanctuary()">
+        <span class="sb-icon">🔐</span><span class="sb-label">My Sanctuary</span>
+      </button>
+    </nav>
+
+    <div class="sb-bottom">
+      <!-- DISGUISED EMERGENCY BUTTON -->
+      <button class="sb-suppliers-btn" (click)="openSuppliersPanel()">
+        📦 Check Suppliers
+      </button>
+      <button class="sb-signout" (click)="logout()">Sign out</button>
+      <div class="sb-exit-hint">Double-tap logo to leave safely</div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ────────────────────────────────────── -->
+  <main class="sd-main">
+
+    <!-- Top bar -->
+    <div class="sd-topbar">
+      <div class="tb-left">
+        <h1>{{ activeTab === 'home' ? 'My Studio' :
+               activeTab === 'listings' ? 'My Listings' :
+               activeTab === 'earnings' ? 'My Earnings' :
+               activeTab === 'learn' ? 'Grow & Learn' :
+               activeTab === 'contacts' ? 'My Circle' :
+               activeTab === 'profile' ? 'My Story' : 'Dashboard' }}</h1>
+      </div>
+      <div class="tb-right">
+        <button class="tb-exit" (click)="quickExit()" title="Quick exit">🚪</button>
+        <div class="tb-avatar">{{ seller.alias.charAt(0).toUpperCase() }}</div>
+      </div>
+    </div>
+
+    <!-- Profile incomplete banner -->
+    <div class="incomplete-banner" *ngIf="!seller.profile_complete && activeTab !== 'profile'">
+      <span>✍️</span>
+      <span>Your story isn't complete yet — <strong>complete your profile</strong> to start listing your work.</span>
+      <button (click)="activeTab = 'profile'">Complete now →</button>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: HOME / MY STUDIO
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'home'">
+      <!-- home content – abbreviated for brevity, but you have the full version -->
+      <div class="home-welcome">
+        <div class="hw-copy">
+          <h2>Good to see you, <span class="hw-name">{{ seller.alias }}</span> 🌿</h2>
+          <p>Your craft is your power. Every piece you make tells a story — and this is where that story grows.</p>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card gold">
+          <div class="sc-num">{{ formatCurrency(earningsSummary.total_paid) }}</div>
+          <div class="sc-label">Total earned</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-num">{{ formatCurrency(earningsSummary.pending) }}</div>
+          <div class="sc-label">Coming your way</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-num">{{ products.length }}</div>
+          <div class="sc-label">Listings</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-num">{{ totalSold }}</div>
+          <div class="sc-label">Items sold</div>
+        </div>
+      </div>
+
+      <!-- Two-col overview (quick actions, recent listings, training, circle) -->
+      <div class="home-grid">
+        <!-- Quick actions -->
+        <div class="hg-card">
+          <h3>Quick actions</h3>
+          <div class="quick-actions">
+            <button class="qa-btn" (click)="openAddProduct()">
+              <span>➕</span>
+              <strong>Add a listing</strong>
+              <small>Share your latest creation</small>
+            </button>
+            <button class="qa-btn" (click)="activeTab = 'learn'">
+              <span>🌱</span>
+              <strong>Continue learning</strong>
+              <small>{{ trainingModules.filter(m => m.progress === 'in_progress').length }} modules in progress</small>
+            </button>
+            <button class="qa-btn" (click)="activeTab = 'earnings'">
+              <span>💛</span>
+              <strong>View earnings</strong>
+              <small>{{ earningsSummary.paid_count }} payouts received</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recent listings preview -->
+        <div class="hg-card">
+          <div class="hgc-header">
+            <h3>Recent listings</h3>
+            <button class="hgc-link" (click)="activeTab = 'listings'">See all →</button>
+          </div>
+          <div class="recent-products">
+            <div class="rp-item" *ngFor="let p of products.slice(0, 4)">
+              <div class="rp-thumb" [style.background-image]="p.image_url ? 'url(' + p.image_url + ')' : ''">
+                <span *ngIf="!p.image_url">{{ p.category?.charAt(0) || '🎨' }}</span>
+              </div>
+              <div class="rp-info">
+                <div class="rp-name">{{ p.name }}</div>
+                <div class="rp-price">{{ formatCurrency(p.price) }}</div>
+              </div>
+              <span class="rp-status" [class.active]="p.status === 'active'">{{ p.status }}</span>
+            </div>
+            <div class="rp-empty" *ngIf="products.length === 0">
+              <p>Nothing listed yet. Add your first piece today.</p>
+              <button class="btn-sm-green" (click)="openAddProduct()">Add listing →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Training progress -->
+        <div class="hg-card">
+          <div class="hgc-header">
+            <h3>Learning path</h3>
+            <button class="hgc-link" (click)="activeTab = 'learn'">All modules →</button>
+          </div>
+          <div class="learn-mini">
+            <div class="lm-item" *ngFor="let m of trainingModules.slice(0,4)">
+              <span class="lm-icon">{{ categoryIcon(m.category) }}</span>
+              <div class="lm-info">
+                <div class="lm-title">{{ m.title }}</div>
+                <div class="lm-meta">{{ m.duration_mins }} min · {{ m.level }}</div>
+              </div>
+              <span class="lm-prog" [ngClass]="m.progress">
+                {{ m.progress === 'completed' ? '✓' : m.progress === 'in_progress' ? '▶' : '○' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- My circle nudge -->
+        <div class="hg-card circle-nudge" *ngIf="contacts.length === 0">
+          <div class="cn-icon">🤝</div>
+          <h3>Build your circle</h3>
+          <p>Add people you trust — people who will know if you need them. It takes two minutes and can mean everything.</p>
+          <button class="btn-sm-gold" (click)="activeTab = 'contacts'">Add someone now →</button>
+        </div>
+        <div class="hg-card" *ngIf="contacts.length > 0">
+          <div class="hgc-header">
+            <h3>My circle ({{ contacts.length }})</h3>
+            <button class="hgc-link" (click)="activeTab = 'contacts'">Manage →</button>
+          </div>
+          <div class="contacts-mini">
+            <div class="cm-item" *ngFor="let c of contacts.slice(0,3)">
+              <div class="cm-avatar">{{ c.name.charAt(0) }}</div>
+              <div class="cm-info">
+                <div class="cm-name">{{ c.name }}</div>
+                <div class="cm-rel">{{ c.relationship || 'Trusted person' }}</div>
+              </div>
+              <span class="cm-wa" *ngIf="c.whatsapp">📱</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: LISTINGS
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'listings'">
+      <div class="section-bar">
+        <div class="sb-info">
+          <span>{{ products.length }} listing{{ products.length !== 1 ? 's' : '' }}</span>
+          <span class="sb-dot">·</span>
+          <span>{{ activeListings }} active</span>
+        </div>
+        <button class="btn-primary" (click)="openAddProduct()" [class.locked]="!seller.profile_complete">
+          <span>+</span> Add listing
+          <span class="locked-hint" *ngIf="!seller.profile_complete"> (complete profile first)</span>
+        </button>
+      </div>
+
+      <div class="product-grid" *ngIf="products.length > 0">
+        <div class="product-card" *ngFor="let p of products">
+          <div class="pc-image" [style.background-image]="p.image_url ? 'url(' + p.image_url + ')' : ''">
+            <span class="pc-placeholder" *ngIf="!p.image_url">🎨</span>
+            <span class="pc-status-badge" [ngClass]="p.status">{{ p.status }}</span>
+          </div>
+          <div class="pc-body">
+            <div class="pc-name">{{ p.name }}</div>
+            <div class="pc-cat">{{ p.category }}</div>
+            <div class="pc-price">{{ formatCurrency(p.price) }}</div>
+            <div class="pc-stock">{{ p.stock || 0 }} in stock · {{ p.total_sold || 0 }} sold</div>
+          </div>
+          <div class="pc-actions">
+            <button class="pc-btn edit" (click)="editProduct(p)">✏️ Edit</button>
+            <button class="pc-btn del" (click)="deleteProduct(p.id)">Remove</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="products.length === 0">
+        <div class="es-icon">🧵</div>
+        <h3>Your shop is empty</h3>
+        <p>Add your first listing and let the world find your craft.</p>
+        <button class="btn-primary" (click)="openAddProduct()">Add your first listing</button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: EARNINGS
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'earnings'">
+      <div class="earnings-summary">
+        <div class="es-card gold">
+          <div class="esc-label">Total received</div>
+          <div class="esc-val">{{ formatCurrency(earningsSummary.total_paid) }}</div>
+        </div>
+        <div class="es-card">
+          <div class="esc-label">Waiting to be paid</div>
+          <div class="esc-val">{{ formatCurrency(earningsSummary.pending) }}</div>
+        </div>
+        <div class="es-card">
+          <div class="esc-label">Successful payouts</div>
+          <div class="esc-val">{{ earningsSummary.paid_count }}</div>
+        </div>
+      </div>
+
+      <div class="earnings-info">
+        <span>💡</span>
+        <p>You keep <strong>70% of every sale</strong>. Amani takes only 2%. Your centre receives 28% to keep the workshop running for everyone.</p>
+      </div>
+
+      <div class="transactions-card" *ngIf="transactions.length > 0">
+        <h3>Payment history</h3>
+        <div class="tx-list">
+          <div class="tx-row" *ngFor="let t of transactions">
+            <div class="tx-left">
+              <div class="tx-product">{{ t.product_title || 'Product sale' }}</div>
+              <div class="tx-date">{{ t.payout_date || t.created_at | date:'d MMM y' }}</div>
+            </div>
+            <div class="tx-right">
+              <div class="tx-amount">{{ formatCurrency(t.amount) }}</div>
+              <div class="tx-status" [ngClass]="t.status">{{ t.status }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="transactions.length === 0">
+        <div class="es-icon">💛</div>
+        <h3>No transactions yet</h3>
+        <p>Once your first listing sells, your earnings will appear here.</p>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: LEARN
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'learn'">
+      <div class="learn-intro">
+        <h2>Grow your skills, grow your income</h2>
+        <p>Short, practical lessons — on your phone, at your pace, in your language.</p>
+      </div>
+
+      <div class="learn-filters">
+        <button [class.active]="trainingFilter === 'all'"      (click)="trainingFilter = 'all'">All</button>
+        <button [class.active]="trainingFilter === 'craft'"    (click)="trainingFilter = 'craft'">🧵 Craft</button>
+        <button [class.active]="trainingFilter === 'business'" (click)="trainingFilter = 'business'">📊 Business</button>
+        <button [class.active]="trainingFilter === 'legal'"    (click)="trainingFilter = 'legal'">⚖️ Legal rights</button>
+        <button [class.active]="trainingFilter === 'financial'"(click)="trainingFilter = 'financial'">💰 Money</button>
+        <button [class.active]="trainingFilter === 'wellness'" (click)="trainingFilter = 'wellness'">🌿 Wellness</button>
+        <button [class.active]="trainingFilter === 'progress'" (click)="trainingFilter = 'progress'">▶ In progress</button>
+      </div>
+
+      <div class="modules-grid">
+        <div class="module-card" *ngFor="let m of filteredModules" [ngClass]="m.progress">
+          <div class="mc-top">
+            <span class="mc-cat-icon">{{ categoryIcon(m.category) }}</span>
+            <span class="mc-level" [ngClass]="m.level">{{ m.level }}</span>
+          </div>
+          <h3 class="mc-title">{{ m.title }}</h3>
+          <p class="mc-desc">{{ m.description }}</p>
+          <div class="mc-bottom">
+            <span class="mc-mins">{{ m.duration_mins }} min</span>
+            <div class="mc-actions">
+              <button class="mc-btn start"    *ngIf="m.progress === 'not_started'" (click)="markModuleStarted(m)">Start →</button>
+              <button class="mc-btn continue" *ngIf="m.progress === 'in_progress'" (click)="markModuleComplete(m)">Mark done ✓</button>
+              <span   class="mc-done"         *ngIf="m.progress === 'completed'">✓ Completed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: CONTACTS / MY CIRCLE
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'contacts'">
+      <div class="contacts-intro">
+        <div class="ci-text">
+          <h2>My circle</h2>
+          <p>These are the people who will be contacted if you ever click "Check Suppliers" while you need help. Add people you genuinely trust — a sister, a friend, someone at your centre.</p>
+        </div>
+        <button class="btn-primary" (click)="showAddContact = true">+ Add someone</button>
+      </div>
+
+      <!-- Add contact form -->
+      <div class="add-contact-form" *ngIf="showAddContact">
+        <h4>Add a trusted person</h4>
+        <div class="acf-row">
+          <div class="acf-group">
+            <label>Their name</label>
+            <input type="text" [(ngModel)]="newContact.name" placeholder="e.g. Zanele, Mama, Thandi">
+          </div>
+          <div class="acf-group">
+            <label>Their phone number</label>
+            <input type="tel" [(ngModel)]="newContact.phone" placeholder="0712345678">
+          </div>
+          <div class="acf-group">
+            <label>Relationship (optional)</label>
+            <input type="text" [(ngModel)]="newContact.relationship" placeholder="e.g. Sister, Friend, Counsellor">
+          </div>
+        </div>
+        <label class="acf-wa">
+          <input type="checkbox" [(ngModel)]="newContact.whatsapp">
+          They have WhatsApp on this number
+        </label>
+        <div class="error" *ngIf="contactSaveError">{{ contactSaveError }}</div>
+        <div class="acf-actions">
+          <button class="btn-primary" (click)="saveContact()">Save</button>
+          <button class="btn-cancel" (click)="showAddContact = false; contactSaveError = ''">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Contacts list -->
+      <div class="contacts-list" *ngIf="contacts.length > 0">
+        <div class="contact-card" *ngFor="let c of contacts">
+          <div class="cc-avatar">{{ c.name.charAt(0) }}</div>
+          <div class="cc-info">
+            <div class="cc-name">{{ c.name }}</div>
+            <div class="cc-phone">{{ c.phone }}</div>
+            <div class="cc-rel">{{ c.relationship || 'Trusted person' }}</div>
+          </div>
+          <div class="cc-tags">
+            <span class="cc-wa" *ngIf="c.whatsapp">📱 WhatsApp</span>
+          </div>
+          <button class="cc-remove" (click)="removeContact(c.id)">Remove</button>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="contacts.length === 0 && !showAddContact">
+        <div class="es-icon">🤝</div>
+        <h3>No one added yet</h3>
+        <p>Your circle is your safety net. Add at least one person you trust.</p>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: PROFILE / MY STORY
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'profile'">
+      <div class="profile-intro">
+        <h2>My story</h2>
+        <p>This is how buyers will find and understand you. The more you share, the more people will connect with your work.</p>
+        <div class="profile-status" [class.complete]="seller.profile_complete">
+          {{ seller.profile_complete ? '✓ Profile complete — you can list products' : '⚠️ Complete your profile to start selling' }}
+        </div>
+      </div>
+
+      <div class="profile-form">
+        <div class="pf-section">
+          <h3>Public information <span class="pf-badge public">Visible to buyers</span></h3>
+          <div class="pf-group">
+            <label>Your maker name</label>
+            <input type="text" [(ngModel)]="profileForm.alias" placeholder="e.g. BeadsByZanele">
+            <small>This is what buyers see — not your real name</small>
+          </div>
+          <div class="pf-group">
+            <label>Why you create</label>
+            <textarea rows="3" [(ngModel)]="profileForm.public_bio" placeholder="Tell buyers a little about yourself and your work…"></textarea>
+          </div>
+          <div class="pf-group">
+            <label>Your craft story</label>
+            <textarea rows="4" [(ngModel)]="profileForm.craft_story" placeholder="Where did you learn? What drives you? What makes your work special?"></textarea>
+          </div>
+          <div class="pf-group">
+            <label>Social handle (optional)</label>
+            <input type="text" [(ngModel)]="profileForm.social_handle" placeholder="@yourusername">
+          </div>
+        </div>
+
+        <div class="pf-section">
+          <h3>Private details <span class="pf-badge private">Only for payments & safety</span></h3>
+          <div class="pf-row">
+            <div class="pf-group">
+              <label>Phone number</label>
+              <input type="tel" [(ngModel)]="profileForm.phone">
+            </div>
+            <div class="pf-group">
+              <label>Your city / town</label>
+              <input type="text" [(ngModel)]="profileForm.city" placeholder="e.g. Cape Town, Soweto">
+            </div>
+          </div>
+          <div class="pf-group">
+            <label>Your skills & experience</label>
+            <textarea rows="3" [(ngModel)]="profileForm.skills_experience" placeholder="What can you make? How long have you been crafting?"></textarea>
+          </div>
+          <div class="pf-group">
+            <label>Your availability</label>
+            <div class="radio-group">
+              <label class="radio-item"><input type="radio" [(ngModel)]="profileForm.availability" value="full_time"> Full time</label>
+              <label class="radio-item"><input type="radio" [(ngModel)]="profileForm.availability" value="part_time"> Part time</label>
+              <label class="radio-item"><input type="radio" [(ngModel)]="profileForm.availability" value="weekends"> Weekends only</label>
+            </div>
+          </div>
+          <div class="pf-group">
+            <label>Languages you speak</label>
+            <div class="language-chips">
+              <button type="button" *ngFor="let lang of languages" class="lang-chip"
+                [class.selected]="profileForm.languages?.includes(lang)"
+                (click)="toggleLanguage(lang)">{{ lang }}</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pf-actions">
+          <button class="btn-save" (click)="saveProfile()">Save my story</button>
+          <div class="save-success" *ngIf="profileSaved">✓ Saved!</div>
+          <div class="error" *ngIf="profileSaveError">{{ profileSaveError }}</div>
+        </div>
+      </div>
+    </div>
+
+  </main><!-- /sd-main -->
+</div><!-- /sd-page -->
+
+<!-- ════════════════════════════════════════════════════════
+     SANCTUARY MODE (hidden layer)
+════════════════════════════════════════════════════════ -->
+<div class="sanctuary-page" *ngIf="sanctuaryOpen && !isLoading">
+  <header class="sanc-header">
+    <div class="sanc-brand" (dblclick)="quickExit()">
+      <span>🌿</span>
+      <span class="sanc-name">Amani</span>
+      <span class="sanc-hint">(double-tap to leave)</span>
+    </div>
+    <div class="sanc-tabs">
+      <button [class.active]="sanctuaryTab === 'journey'"  (click)="sanctuaryTab = 'journey'">📋 My Journey</button>
+      <button [class.active]="sanctuaryTab === 'vault'"    (click)="sanctuaryTab = 'vault'">🔒 Safe Space</button>
+      <button [class.active]="sanctuaryTab === 'support'"  (click)="sanctuaryTab = 'support'">🤝 Find Help</button>
+    </div>
+    <div class="sanc-actions">
+      <button class="sanc-exit-btn" (click)="quickExit()">🚪 Leave quickly</button>
+      <button class="sanc-close-btn" (click)="exitSanctuary()">Close sanctuary</button>
     </div>
   </header>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button [class.active]="activeTab === 'products'" (click)="activeTab = 'products'">📦 My Products</button>
-    <button [class.active]="activeTab === 'sales'" (click)="activeTab = 'sales'">💰 Sales & Payouts</button>
-    <button [class.active]="activeTab === 'hidden'" (click)="activeTab = 'hidden'">🛡️ Hidden Layer</button>
-  </div>
-
-  <!-- Products Tab -->
-  <div class="tab-content" *ngIf="activeTab === 'products'">
-    <div class="action-bar">
-      <button class="btn-primary" (click)="openAddProductModal()">+ Add New Product</button>
-    </div>
-    <div class="product-grid" *ngIf="!isLoading; else loading">
-      <div class="product-card" *ngFor="let p of products">
-        <h3>{{ p.name }}</h3>
-        <p class="price">R{{ p.price }}</p>
-        <p class="category">{{ p.category }}</p>
-        <span class="status" [class.active]="p.status === 'active'">{{ p.status }}</span>
-        <div class="card-actions">
-          <button (click)="editProduct(p)">✏️ Edit</button>
-          <button (click)="deleteProduct(p.id)">🗑️ Delete</button>
+  <!-- Journey tab -->
+  <div class="sanc-content" *ngIf="sanctuaryTab === 'journey'">
+    <h2>Your journey</h2>
+    <p class="sanc-sub">You only have to tell your story once. Check off each step as you go — we'll keep track for you.</p>
+    <div class="journey-steps">
+      <div class="js-item" *ngFor="let step of journeySteps" [class.done]="step.done">
+        <div class="js-check" (click)="step.done = !step.done">
+          <span *ngIf="step.done">✓</span>
+          <span *ngIf="!step.done">{{ step.icon }}</span>
+        </div>
+        <div class="js-info">
+          <div class="js-label">{{ step.label }}</div>
+          <div class="js-date" *ngIf="step.done && step.date">Done on {{ step.date }}</div>
+          <div class="js-date pending" *ngIf="!step.done">Not yet — tap when done</div>
         </div>
       </div>
-      <div class="empty-state" *ngIf="products.length === 0 && !isLoading">
-        <p>No products yet. Click "+ Add New Product" to start selling.</p>
+    </div>
+    <div class="journey-notes">
+      <label>Notes (private — only you can see this)</label>
+      <textarea rows="3" [(ngModel)]="caseJourney.notes" placeholder="Anything you want to remember…"></textarea>
+    </div>
+    <button class="sanc-btn" (click)="saveJourney()" [disabled]="journeySaving">
+      {{ journeySaving ? 'Saving…' : 'Save journey' }}
+    </button>
+    <button class="sanc-btn secondary" (click)="generateCourtPack()">Generate court documents PDF</button>
+  </div>
+
+  <!-- Vault tab -->
+  <div class="sanc-content" *ngIf="sanctuaryTab === 'vault'">
+    <h2>Safe space</h2>
+    <p class="sanc-sub">Everything here is encrypted. Only you decide who sees it.</p>
+    <button class="sanc-btn" (click)="showAddEvidence = !showAddEvidence">+ Add something</button>
+
+    <div class="add-evidence-form" *ngIf="showAddEvidence">
+      <div class="aef-row">
+        <div class="aef-group">
+          <label>What is it?</label>
+          <select [(ngModel)]="newEvidence.item_type">
+            <option value="photo">Photo</option>
+            <option value="voice_note">Voice recording</option>
+            <option value="whatsapp">WhatsApp message</option>
+            <option value="medical">Medical record</option>
+            <option value="document">Document</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="aef-group">
+          <label>Date it happened (if known)</label>
+          <input type="date" [(ngModel)]="newEvidence.date_of_incident">
+        </div>
+      </div>
+      <div class="aef-group full">
+        <label>Description (optional — helps you remember)</label>
+        <textarea rows="2" [(ngModel)]="newEvidence.description" placeholder="A brief note about this item…"></textarea>
+      </div>
+      <div class="aef-actions">
+        <button class="sanc-btn" (click)="addEvidence()">Save to safe space</button>
+        <button class="sanc-btn cancel" (click)="showAddEvidence = false">Cancel</button>
       </div>
     </div>
-    <ng-template #loading><p>Loading products...</p></ng-template>
+
+    <div class="evidence-list" *ngIf="evidenceItems.length > 0">
+      <div class="ev-item" *ngFor="let e of evidenceItems">
+        <div class="ev-icon">{{ evidenceIcon(e.item_type) }}</div>
+        <div class="ev-info">
+          <div class="ev-type">{{ e.item_type.replace('_', ' ') | titlecase }}</div>
+          <div class="ev-desc" *ngIf="e.description">{{ e.description }}</div>
+          <div class="ev-date">Added {{ e.created_at | date:'d MMM y' }}</div>
+        </div>
+        <span class="ev-court" *ngIf="e.is_court_ready">✓ Court ready</span>
+      </div>
+    </div>
+    <div class="sanc-empty" *ngIf="evidenceItems.length === 0 && !showAddEvidence">
+      <p>Nothing added yet. This is your private, encrypted space.</p>
+    </div>
   </div>
 
-  <!-- Sales Tab (placeholder) -->
-  <div class="tab-content" *ngIf="activeTab === 'sales'">
-    <h3>Your earnings</h3>
-    <p>Total earned: <strong>R0</strong> (coming soon)</p>
-    <p>Next payout: —</p>
+  <!-- Support tab -->
+  <div class="sanc-content" *ngIf="sanctuaryTab === 'support'">
+    <h2>Find help</h2>
+    <p class="sanc-sub">All of the following are free and confidential. You don't have to face anything alone.</p>
+    <div class="support-cards">
+      <button class="support-card" (click)="requestSupport('companion')">
+        <span class="spc-icon">👥</span>
+        <strong>Someone to walk with you</strong>
+        <small>A trained companion who will go with you to the police station or court — so you're never alone.</small>
+        <span class="spc-cta">Request →</span>
+      </button>
+      <button class="support-card" (click)="requestSupport('legal')">
+        <span class="spc-icon">⚖️</span>
+        <strong>Free legal advice</strong>
+        <small>A qualified advocate will contact you to explain your rights and help with your protection order.</small>
+        <span class="spc-cta">Request →</span>
+      </button>
+      <button class="support-card" (click)="requestSupport('counselling')">
+        <span class="spc-icon">💬</span>
+        <strong>Speak to someone</strong>
+        <small>Free, private counselling sessions — in person or over the phone. No judgment. Just support.</small>
+        <span class="spc-cta">Request →</span>
+      </button>
+      <button class="support-card" (click)="requestSupport('medical')">
+        <span class="spc-icon">🏥</span>
+        <strong>Medical referral</strong>
+        <small>We'll help you access a Thuthuzela Care Centre or doctor near you — free of charge.</small>
+        <span class="spc-cta">Request →</span>
+      </button>
+    </div>
+    <div class="sanc-emergency-note">
+      🛡️ <strong>If you are in immediate danger, call 10111 first.</strong> Then come back here.
+    </div>
   </div>
 
-  <!-- Hidden Layer Tab -->
-<div class="tab-content" *ngIf="activeTab === 'hidden'">
-  <div class="hidden-warning">
-    <span>🔐</span>
-    <p>This section contains sensitive case information, evidence vault, and support requests. Enter your hidden layer PIN to access.</p>
-  </div>
-
-  <!-- Volunteer banner (only if not approved and not yet granted) -->
-  <div *ngIf="!(seller?.verification_status === 'approved' || seller?.hidden_layer_granted || volunteerRequested)" class="volunteer-banner">
-    <p>⚠️ Your centre has not yet approved you. Click below to volunteer and get immediate access to the hidden layer support tools.</p>
-    <button class="btn-volunteer" (click)="requestVolunteerAccess()">🤝 Volunteer Now – Unlock Hidden Layer</button>
-  </div>
-
-  <button class="btn-hidden" (click)="requestHiddenLayer()" [disabled]="!(seller?.verification_status === 'approved' || seller?.hidden_layer_granted || volunteerRequested)">Enter PIN to Access</button>
+  <footer class="sanc-footer">
+    <span>🛡️ In danger now? Call 10111 first.</span>
+    <span>Double-tap the Amani leaf to leave immediately.</span>
+  </footer>
 </div>
 
-  <!-- Product Modal (Add / Edit) -->
-  <div class="modal-overlay" *ngIf="showProductModal">
-    <div class="modal-container">
-      <h3>{{ isEditing ? 'Edit Product' : 'Add New Product' }}</h3>
-      <input type="text" [(ngModel)]="currentProduct.name" placeholder="Product name" required>
-<textarea [(ngModel)]="currentProduct.description" placeholder="Description"></textarea>
-<input type="number" [(ngModel)]="currentProduct.price" placeholder="Price (R)" step="0.01" min="0">
-<input type="text" [(ngModel)]="currentProduct.category" placeholder="Category (e.g. Beaded jewellery)">
-<input type="text" [(ngModel)]="currentProduct.image_url" placeholder="Image URL (optional)">
-<input type="number" [(ngModel)]="currentProduct.stock" placeholder="Stock quantity" min="0">
-<select [(ngModel)]="currentProduct.seller_type">
-  <option value="survivor">Survivor</option>
-  <option value="youth">Youth</option>
-  <option value="elderly">Elderly</option>
-</select>
-<textarea [(ngModel)]="currentProduct.story" placeholder="Maker's story (optional)"></textarea>
-<select [(ngModel)]="currentProduct.status">
-  <option value="active">Active (visible in marketplace)</option>
-  <option value="draft">Draft (hidden)</option>
-</select>
-      <div class="modal-buttons">
-        <button (click)="closeProductModal()">Cancel</button>
-        <button (click)="saveProduct()" class="btn-primary">Save</button>
+<!-- ════════════════════════════════════════════════════════
+     MODALS
+════════════════════════════════════════════════════════ -->
+
+<!-- PIN Modal -->
+<div class="modal-overlay" *ngIf="showPinModal">
+  <div class="modal-card">
+    <div class="mc-icon">🔐</div>
+    <h3>Enter your private PIN</h3>
+    <p>This section is for you only. Enter the PIN you set when you joined.</p>
+    <input type="password" [(ngModel)]="hiddenPin" placeholder="4–6 digits" autocomplete="off" (keyup.enter)="verifyPin()">
+    <div class="error" *ngIf="pinError">{{ pinError }}</div>
+    <div class="mc-btns">
+      <button class="btn-primary" (click)="verifyPin()">Open sanctuary</button>
+      <button class="btn-cancel" (click)="closePinModal()">Not now</button>
+    </div>
+    <p class="mc-note">Double-tap the Amani logo at any time to leave immediately.</p>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal-overlay" *ngIf="showProductModal">
+  <div class="modal-card wide">
+    <h3>{{ isEditing ? 'Edit listing' : 'Add a listing' }}</h3>
+    <div class="pm-row">
+      <div class="pm-group">
+        <label>Name of your piece *</label>
+        <input type="text" [(ngModel)]="currentProduct.name" placeholder="e.g. Beaded sunrise necklace">
+      </div>
+      <div class="pm-group">
+        <label>Category</label>
+        <select [(ngModel)]="currentProduct.category">
+          <option *ngFor="let c of productCategories" [value]="c">{{ c }}</option>
+        </select>
       </div>
     </div>
-  </div>
-
-  <!-- PIN Modal -->
-  <div class="modal-overlay" *ngIf="showPinModal">
-    <div class="modal-container">
-      <h3>Enter Hidden Layer PIN</h3>
-      <input type="password" [(ngModel)]="hiddenPin" placeholder="4-6 digit PIN" autocomplete="off">
-      <div class="error" *ngIf="pinError">{{ pinError }}</div>
-      <div class="modal-buttons">
-        <button (click)="closePinModal()">Cancel</button>
-        <button (click)="verifyPin()" class="btn-primary">Verify</button>
+    <div class="pm-group full">
+      <label>Description</label>
+      <textarea rows="2" [(ngModel)]="currentProduct.description" placeholder="What makes this piece special?"></textarea>
+    </div>
+    <div class="pm-group full">
+      <label>Your story behind this piece (optional)</label>
+      <textarea rows="2" [(ngModel)]="currentProduct.story" placeholder="Buyers love knowing the story behind what they buy…"></textarea>
+    </div>
+    <div class="pm-row">
+      <div class="pm-group">
+        <label>Price (R) *</label>
+        <input type="number" [(ngModel)]="currentProduct.price" min="0" step="5">
       </div>
-      <div class="safety-note">Double‑tap the logo to exit safely.</div>
+      <div class="pm-group">
+        <label>Stock quantity</label>
+        <input type="number" [(ngModel)]="currentProduct.stock" min="0">
+      </div>
+      <div class="pm-group">
+        <label>Status</label>
+        <select [(ngModel)]="currentProduct.status">
+          <option value="active">Live — visible to buyers</option>
+          <option value="draft">Draft — hidden for now</option>
+        </select>
+      </div>
+    </div>
+    <div class="pm-group full">
+      <label>Image URL (optional)</label>
+      <input type="url" [(ngModel)]="currentProduct.image_url" placeholder="https://…">
+    </div>
+    <div class="error" *ngIf="productSaveError">{{ productSaveError }}</div>
+    <div class="mc-btns">
+      <button class="btn-primary" (click)="saveProduct()">{{ isEditing ? 'Save changes' : 'List this piece' }}</button>
+      <button class="btn-cancel" (click)="showProductModal = false; productSaveError = ''">Cancel</button>
     </div>
   </div>
+</div>
 
-  <!-- Footer -->
-  <footer class="safety-footer">
-    <span>🛡️ In danger? Call 10111 first.</span>
-    <span>Double‑tap the Amani logo to hide this page.</span>
-  </footer>
+<!-- SUPPLIERS / Emergency disguise panel -->
+<div class="modal-overlay" *ngIf="showSuppliersPanel">
+  <div class="modal-card wide suppliers-modal">
+    <div class="sm-header">
+      <h3>📦 Supplier directory</h3>
+      <button class="sm-close" (click)="showSuppliersPanel = false">✕</button>
+    </div>
+    <p class="sm-sub">Craft material suppliers across South Africa. Updated monthly.</p>
+
+    <!-- Fake supplier list (cover) -->
+    <div class="supplier-list" *ngIf="!alertSent">
+      <div class="supplier-row" *ngFor="let s of fakeSuppliers">
+        <div class="sr-info">
+          <div class="sr-name">{{ s.name }}</div>
+          <div class="sr-city">📍 {{ s.city }}</div>
+          <div class="sr-stock">{{ s.stock }}</div>
+        </div>
+        <div class="sr-price">{{ s.price }}</div>
+      </div>
+    </div>
+
+    <!-- Hidden emergency trigger button (blends in as "contact supplier") -->
+    <div class="sm-footer" *ngIf="!alertSent">
+      <button class="sm-contact-btn" (click)="sendEmergencyAlert()" [disabled]="alertLoading">
+        {{ alertLoading ? 'Contacting…' : '📞 Contact all suppliers' }}
+      </button>
+      <span class="sm-note">Sends your details to your preferred contact list</span>
+    </div>
+
+    <!-- Alert sent confirmation -->
+    <div class="alert-sent" *ngIf="alertSent">
+      <div class="as-icon">✓</div>
+      <h3>Your people have been contacted</h3>
+      <p>Everyone in your circle has been notified. Help is on the way.</p>
+      <p class="as-emergency">🛡️ If you are in immediate danger — <strong>call 10111 now</strong>.</p>
+      <button class="btn-primary" (click)="showSuppliersPanel = false; alertSent = false">Close</button>
+    </div>
+  </div>
 </div>

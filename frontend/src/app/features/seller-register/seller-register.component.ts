@@ -1,323 +1,180 @@
-// ============================================================
-// seller-register.component.ts
-// Amani – Victim/Survivor (Seller) Registration – VALIDATION ON CLICK + 409 HANDLING
-// ============================================================
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { Router } from '@angular/router';
-
-interface Step {
-  label: string;
-  icon: string;
-  description: string;
-}
+import { Router, RouterModule } from '@angular/router';
 
 interface Centre {
   id: string;
   name: string;
   city: string;
+  province: string;
 }
 
 @Component({
   selector: 'app-seller-register',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule, HttpClientModule, RouterModule],
   templateUrl: './seller-register.component.html',
   styleUrls: ['./seller-register.component.scss'],
 })
 export class SellerRegisterComponent implements OnInit {
-  currentStep = 0;
-  isSubmitting = false;
-  submitError = '';
-  submitSuccess = false;
+  private readonly API = 'http://localhost:3000/api/sellers';
 
-  centres: Centre[] = [];
-  isLoadingCentres = true;
+  // Form fields
+  idNumber = '';
+  fullName = '';
+  email = '';
+  pin = '';
+  selectedCentreId = '';
+  selectedCentreName = '';
 
-  steps: Step[] = [
-    { label: 'Your Identity', icon: '🌿', description: 'Public seller profile & private details' },
-    { label: 'Centre & Products', icon: '🏠', description: 'Link to your care centre and what you make' },
-    { label: 'Payout & Security', icon: '💰', description: 'How you get paid + hidden layer PIN' },
-    { label: 'Review & Consent', icon: '✅', description: 'Finalise your seller account' },
-  ];
+  // Centres data
+  allCentres: Centre[] = [];
+  filteredCentres: Centre[] = [];
 
-  productCategories = [
-    'Beaded jewellery', 'Clothing & textiles', 'Food preserves',
-    'Candles & soaps', 'Pottery & ceramics', 'Wire art',
-    'Baked goods', 'Hand-dyed scarves', 'Other crafts'
-  ];
+  // State
+  isLoading = false;
+  error = '';
+  idVerified = false;
+  idError = '';
+  idCheckTimeout: any;
 
-  form!: FormGroup;
-
-  constructor(
-    private fb: FormBuilder,
-    private http: HttpClient,
-    public router: Router
-  ) {}
+  constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
-    this.buildForm();
     this.loadCentres();
   }
 
-  buildForm(): void {
-    this.form = this.fb.group({
-      // Step 0
-      alias: ['', [Validators.required, Validators.minLength(3)]],
-      public_bio: ['', [Validators.required, Validators.minLength(30)]],
-      real_name: ['', Validators.required],
-      real_surname: ['', Validators.required],
-      id_number: ['', [Validators.required, Validators.pattern(/^\d{13}$/)]],
-      email: ['', [Validators.required, Validators.email]],
-      phone: ['', [Validators.required, Validators.pattern(/^(\+27|0)[6-8][0-9]{8}$/)]],
-
-      // Step 1
-      centre_id: [{ value: '', disabled: true }, Validators.required],
-      product_categories: [[], Validators.required],
-      skills_experience: ['', Validators.required],
-
-      // Step 2
-      payout_method: ['eft', Validators.required],
-      bank_name: [''],
-      account_holder: [''],
-      account_number: [''],
-      branch_code: [''],
-      cash_centre_note: [''],
-      hidden_pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]],
-      confirm_pin: ['', Validators.required],
-
-      // Step 3
-      agree_terms: [false, Validators.requiredTrue],
-      agree_popia: [false, Validators.requiredTrue],
-      understand_safety: [false, Validators.requiredTrue],
-    }, { validators: this.pinMatchValidator });
-  }
-
-  pinMatchValidator(group: AbstractControl): { [key: string]: boolean } | null {
-    const pin = group.get('hidden_pin')?.value;
-    const confirm = group.get('confirm_pin')?.value;
-    return pin === confirm ? null : { pinMismatch: true };
-  }
-
-  get payoutMethod(): string {
-    return this.form.get('payout_method')?.value || 'eft';
-  }
-
-  isBankFieldInvalid(field: string): boolean {
-    const control = this.form.get(field);
-    return this.payoutMethod === 'eft' && !!control && control.invalid && control.touched;
-  }
-
-  getCentreName(): string {
-    const centreId = this.form.get('centre_id')?.value;
-    if (!centreId) return 'your centre';
-    const centre = this.centres.find(c => c.id === centreId);
-    return centre ? centre.name : 'your centre';
-  }
-
   loadCentres(): void {
-  this.http.get<Centre[]>('http://localhost:3000/api/sellers/centres/verified')
-    .subscribe({
-      next: (data) => {
-        this.centres = data;
-        this.isLoadingCentres = false;
-        this.form.get('centre_id')?.enable();
+    this.http.get<Centre[]>(`${this.API}/centres/verified`).subscribe({
+      next: (centres) => {
+        this.allCentres = centres;
+        this.filteredCentres = centres;
       },
-      error: (err) => {
-        console.error('Failed to load centres', err);
-        this.isLoadingCentres = false;
-        this.submitError = 'Could not load care centres. Please refresh the page.';
-        // Still enable the field so user can manually select? But no data. Better keep disabled.
-        this.form.get('centre_id')?.disable();
+      error: () => {
+        this.error = 'Could not load centres. Please refresh the page.';
       }
     });
+  }
 
-  // Timeout fallback: after 5 seconds, enable centre_id if still disabled
-  setTimeout(() => {
-    if (this.form.get('centre_id')?.disabled) {
-      console.warn('Forcing centre_id enable after timeout');
-      this.form.get('centre_id')?.enable();
-    }
-  }, 5000);
-}
-
-  toggleArrayValue(controlName: string, value: string): void {
-    const control = this.form.get(controlName);
-    const current: string[] = control?.value || [];
-    const idx = current.indexOf(value);
-    if (idx > -1) {
-      control?.setValue(current.filter((v) => v !== value));
+  onCentreSearch(): void {
+    const search = this.selectedCentreName.toLowerCase();
+    this.filteredCentres = this.allCentres.filter(c =>
+      c.name.toLowerCase().includes(search) || c.city.toLowerCase().includes(search)
+    );
+    // If exact match by name, auto-set the ID
+    const match = this.allCentres.find(c => c.name === this.selectedCentreName);
+    if (match) {
+      this.selectedCentreId = match.id;
     } else {
-      control?.setValue([...current, value]);
-    }
-    control?.markAsTouched();
-  }
-
-  isSelected(controlName: string, value: string): boolean {
-    return (this.form.get(controlName)?.value || []).includes(value);
-  }
-
-  // ===================== VALIDATION ON CLICK =====================
-  getStepFields(step: number): string[] {
-    const stepMap: { [key: number]: string[] } = {
-      0: ['alias', 'public_bio', 'real_name', 'real_surname', 'id_number', 'email', 'phone'],
-      1: ['centre_id', 'product_categories', 'skills_experience'],
-      2: ['hidden_pin', 'confirm_pin'],
-      3: ['agree_terms', 'agree_popia', 'understand_safety'],
-    };
-    return stepMap[step] || [];
-  }
-
-  validateCurrentStep(): boolean {
-    let isValid = true;
-    const stepFields = this.getStepFields(this.currentStep);
-
-    for (const field of stepFields) {
-      const control = this.form.get(field);
-      if (control && control.invalid) {
-        control.markAsTouched();
-        isValid = false;
-      }
-    }
-
-    // Special validation for step 2 (PIN + bank fields if EFT)
-    if (this.currentStep === 2) {
-      if (this.form.errors?.['pinMismatch']) {
-        this.form.get('confirm_pin')?.markAsTouched();
-        isValid = false;
-      }
-      if (this.payoutMethod === 'eft') {
-        const bankFields = ['bank_name', 'account_holder', 'account_number', 'branch_code'];
-        for (const field of bankFields) {
-          const control = this.form.get(field);
-          if (control && control.invalid) {
-            control.markAsTouched();
-            isValid = false;
-          }
-        }
-      }
-    }
-
-    if (!isValid) {
-      this.scrollToFirstError();
-    }
-    return isValid;
-  }
-
-  scrollToFirstError(): void {
-    const firstError = document.querySelector('.error, .ng-invalid');
-    if (firstError) {
-      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.selectedCentreId = '';
     }
   }
 
-  // ===================== NAVIGATION =====================
-  nextStep(): void {
-    if (this.validateCurrentStep()) {
-      this.currentStep++;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      alert('Please fix the errors in the form before continuing.');
+  // ── ID verification ──
+  onIdInput(): void {
+    this.idVerified = false;
+    this.idError = '';
+    clearTimeout(this.idCheckTimeout);
+    if (this.idNumber.length === 13) {
+      this.idCheckTimeout = setTimeout(() => this.verifyId(), 400);
     }
   }
 
-  prevStep(): void {
-    if (this.currentStep > 0) {
-      this.currentStep--;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }
-
-  // ===================== SUBMIT =====================
-  onSubmit(): void {
-  if (!this.validateCurrentStep()) {
-    alert('Please fix the errors in the form before submitting.');
-    return;
-  }
-  if (this.isSubmitting) return;
-
-  // Ensure centre_id is enabled (in case it was disabled)
-  this.form.get('centre_id')?.enable();
-
-  this.isSubmitting = true;
-  this.submitError = '';
-
-  const payload = this.buildPayload();
-
-  // Log the payload to the console for debugging
-  console.log('📦 Submitting payload:', JSON.stringify(payload, null, 2));
-
-  this.http.post('http://localhost:3000/api/sellers/register', payload)
-    .subscribe({
-      next: (res: any) => {
-        localStorage.setItem('sellerId', res.seller_id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.form.get('hidden_pin')?.value);
-        this.submitSuccess = true;
-        this.isSubmitting = false;
-        setTimeout(() => {
-          this.router.navigate(['/seller/dashboard'], { queryParams: { new: true } });
-        }, 2000);
+  verifyId(): void {
+    this.isLoading = true;
+    this.http.post<any>(`${this.API}/verify-id`, { id_number: this.idNumber }).subscribe({
+      next: () => {
+        this.idVerified = true;
+        this.idError = '';
+        this.isLoading = false;
       },
       error: (err) => {
-        this.isSubmitting = false;
-        // Show detailed error from backend
-        if (err.error && err.error.error) {
-          this.submitError = err.error.error;
-        } else if (err.status === 400) {
-          this.submitError = 'Bad request. Please check all fields are filled correctly.';
-        } else if (err.status === 409) {
-          this.submitError = 'An account with this email or alias already exists.';
+        this.isLoading = false;
+        this.idVerified = false;
+        if (err.error?.code === 'ALREADY_EXISTS') {
+          this.idError = 'This ID is already registered. Please sign in instead.';
+        } else if (err.error?.code === 'NOT_FEMALE') {
+          this.idError = 'This platform is currently available to female-identifying individuals.';
         } else {
-          this.submitError = err.error?.message || 'Registration failed. Please try again.';
+          this.idError = err.error?.error || 'Please check your ID number and try again.';
         }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     });
-}
-  private buildPayload(): any {
-    const val = this.form.value;
-    const payload: any = {
-      alias: val.alias,
-      public_bio: val.public_bio,
-      real_name: val.real_name,
-      real_surname: val.real_surname,
-      id_number: val.id_number,
-      email: val.email,
-      phone: val.phone,
-      centre_id: val.centre_id,
-      product_categories: val.product_categories,
-      skills_experience: val.skills_experience,
-      payout_method: val.payout_method,
-      hidden_pin: val.hidden_pin,
+  }
+
+  // ── Registration ──
+  register(): void {
+    this.error = '';
+
+    if (!this.idVerified) {
+      this.error = 'Please enter a valid ID number.';
+      return;
+    }
+    if (!this.fullName.trim()) {
+      this.error = 'Please enter your full name.';
+      return;
+    }
+    if (!this.email.trim()) {
+      this.error = 'Email address is required.';
+      return;
+    }
+    if (!this.pin || this.pin.length < 4) {
+      this.error = 'PIN must be at least 4 digits.';
+      return;
+    }
+    if (!/^\d{4,6}$/.test(this.pin)) {
+      this.error = 'PIN must be 4–6 digits only.';
+      return;
+    }
+    if (!this.selectedCentreId) {
+      this.error = 'Please select a nearest Amani workshop from the list.';
+      return;
+    }
+
+    const nameParts = this.fullName.trim().split(/\s+/);
+    const real_name = nameParts[0];
+    const real_surname = nameParts.slice(1).join(' ') || '';
+
+    let alias = this.email.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    if (!alias) alias = `maker_${Date.now()}`;
+
+    this.isLoading = true;
+
+    const payload = {
+      id_number: this.idNumber,
+      real_name,
+      real_surname,
+      email: this.email,
+      pin: this.pin,
+      alias,
+      phone: '0000000000',
+      centre_id: this.selectedCentreId,
       accepted_terms: true,
       accepted_popia: true,
       safety_acknowledged: true,
     };
 
-    if (val.payout_method === 'eft') {
-      payload.bank_details = {
-        bank_name: val.bank_name,
-        account_holder: val.account_holder,
-        account_number: val.account_number,
-        branch_code: val.branch_code,
-      };
-    } else {
-      payload.cash_pickup_note = val.cash_centre_note || 'Will collect at centre';
-    }
-    return payload;
-  }
-
-  // Quick exit
-  @HostListener('dblclick', ['$event'])
-  onDoubleClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    if (target && target.closest('.logo')) {
-      this.quickExit();
-    }
+    this.http.post<any>(`${this.API}/register`, payload).subscribe({
+      next: (res) => {
+        localStorage.setItem('sellerId', res.seller_id);
+        localStorage.setItem('sellerAlias', res.alias);
+        localStorage.setItem('sellerEmail', res.email);
+        localStorage.setItem('hiddenPin', this.pin);
+        localStorage.setItem('hiddenLayerAccess', 'false');
+        this.isLoading = false;
+        this.router.navigate(['/seller/dashboard']);
+      },
+      error: (err) => {
+        this.isLoading = false;
+        if (err.error?.code === 'ALREADY_EXISTS' || err.status === 409) {
+          this.error = 'This email or maker name is already taken. Please try a different email.';
+        } else {
+          this.error = err.error?.error || 'Something went wrong. Please try again.';
+        }
+      }
+    });
   }
 
   quickExit(): void {

@@ -1,31 +1,67 @@
-<div class="login-container">
-  <div class="login-card">
-    <div class="logo">
-      <span class="logo-icon">🌿</span>
-      <span class="logo-text">Amani</span>
-    </div>
-    <h2>Seller Login</h2>
-    <p class="subtitle">Access your dashboard and hidden layer</p>
+<!-- ============================================================
+  frontend/src/app/features/seller-login/seller-login.component.html
+  Amani — disguised as "Maker Login"
+  ============================================================ -->
 
-    <form (ngSubmit)="login()">
+<div class="login-page">
+  <div class="login-card">
+
+    <div class="logo" (dblclick)="quickExit()" title="Double-tap to leave">
+      <span class="logo-leaf">🌿</span>
+      <span class="logo-name">Amani</span>
+    </div>
+
+    <h2>Welcome back</h2>
+    <p class="subtitle">Sign in to your maker account</p>
+
+    <div class="form-body">
+
       <div class="form-group">
         <label>Email address</label>
-        <input type="email" [(ngModel)]="email" name="email" required autocomplete="email" placeholder="you@example.com">
+        <input
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          autocomplete="email"
+          placeholder="you@example.com"
+          (keyup.enter)="login()"
+        >
       </div>
+
       <div class="form-group">
-        <label>Hidden PIN (4‑6 digits)</label>
-        <input type="password" [(ngModel)]="pin" name="pin" required autocomplete="off" placeholder="••••">
+        <label>Your private PIN</label>
+        <input
+          type="password"
+          [(ngModel)]="pin"
+          name="pin"
+          autocomplete="off"
+          placeholder="4–6 digits"
+          (keyup.enter)="login()"
+        >
+        <small>The same PIN you set when you joined Amani.</small>
       </div>
-      <div class="error" *ngIf="error">{{ error }}</div>
-      <button type="submit" class="btn-login" [disabled]="isLoading">
-        {{ isLoading ? 'Logging in...' : 'Login →' }}
+
+      <div class="error-msg" *ngIf="error">
+        <span>⚠️</span> {{ error }}
+      </div>
+
+      <button class="btn-login" (click)="login()" [disabled]="isLoading">
+        <span *ngIf="!isLoading">Sign in →</span>
+        <span *ngIf="isLoading" class="loading-dots">
+          <span></span><span></span><span></span>
+        </span>
       </button>
-    </form>
-    <p class="register-link">
-      Don't have an account? <a routerLink="/register/seller">Register as a seller</a>
-    </p>
-    <div class="safety-note">
-      🔐 Your PIN is never stored in plain text. Double‑tap the logo anywhere to exit.
+
+      <p class="register-link">
+        New here? <a routerLink="/register/maker">Join as a maker</a>
+      </p>
+
     </div>
+
+    <div class="safety-strip">
+      <span>🔐 Your PIN is never stored in plain text.</span>
+      <span>Double-tap the leaf to leave safely.</span>
+    </div>
+
   </div>
 </div>

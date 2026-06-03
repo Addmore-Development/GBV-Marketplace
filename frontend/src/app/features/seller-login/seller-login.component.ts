@@ -1,3 +1,6 @@
+// ============================================================
+// frontend/src/app/features/seller-login/seller-login.component.ts
+// ============================================================
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -27,23 +30,28 @@ export class SellerLoginComponent {
     this.isLoading = true;
     this.error = '';
 
-    this.http.post('http://localhost:3000/api/sellers/login', {
+    this.http.post<any>('http://localhost:3000/api/sellers/login', {
       email: this.email,
       pin: this.pin,
     }).subscribe({
-      next: (res: any) => {
-        localStorage.setItem('sellerId', res.seller_id);
+      next: (res) => {
+        // Store all session keys needed by dashboard
+        localStorage.setItem('sellerId', res.id);
         localStorage.setItem('sellerAlias', res.alias);
         localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.pin);  // store for hidden layer
+        localStorage.setItem('hiddenPin', this.pin);
         localStorage.setItem('hiddenLayerAccess', 'false');
         this.isLoading = false;
         this.router.navigate(['/seller/dashboard']);
       },
       error: (err) => {
         this.isLoading = false;
-        this.error = err.error?.error || 'Login failed. Please check your email and PIN.';
+        this.error = err.error?.error || 'Sign in failed. Please check your email and PIN.';
       }
     });
+  }
+
+  quickExit(): void {
+    window.location.href = '/news';
   }
 }

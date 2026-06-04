@@ -1,9 +1,8 @@
 <!-- ============================================================
   frontend/src/app/features/seller-dashboard/seller-dashboard.component.html
-  Amani — Maker Dashboard (disguised as artisan marketplace dashboard)
+  Amani — Maker Dashboard (clean, modern UI/UX)
   ============================================================ -->
 
-<!-- LOADING STATE -->
 <!-- LOADING STATE -->
 <div class="sd-loading" *ngIf="isLoading">
   <div class="sd-spinner"></div>
@@ -40,7 +39,7 @@
     </div>
 
     <nav class="sb-nav">
-      <button class="sb-link" [class.active]="activeTab === 'home'"     (click)="activeTab = 'home'">
+      <button class="sb-link" [class.active]="activeTab === 'home'" (click)="activeTab = 'home'">
         <span class="sb-icon">🏡</span><span class="sb-label">My Studio</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'listings'" (click)="activeTab = 'listings'">
@@ -50,14 +49,17 @@
       <button class="sb-link" [class.active]="activeTab === 'earnings'" (click)="activeTab = 'earnings'">
         <span class="sb-icon">💛</span><span class="sb-label">My Earnings</span>
       </button>
-      <button class="sb-link" [class.active]="activeTab === 'learn'"    (click)="activeTab = 'learn'">
+      <button class="sb-link" [class.active]="activeTab === 'centre'" (click)="activeTab = 'centre'">
+        <span class="sb-icon">🏢</span><span class="sb-label">My Centre</span>
+      </button>
+      <button class="sb-link" [class.active]="activeTab === 'learn'" (click)="activeTab = 'learn'">
         <span class="sb-icon">🌱</span><span class="sb-label">Grow & Learn</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'contacts'" (click)="activeTab = 'contacts'">
         <span class="sb-icon">🤝</span><span class="sb-label">My Circle</span>
         <span class="sb-badge warn" *ngIf="contacts.length === 0">!</span>
       </button>
-      <button class="sb-link" [class.active]="activeTab === 'profile'"  (click)="activeTab = 'profile'">
+      <button class="sb-link" [class.active]="activeTab === 'profile'" (click)="activeTab = 'profile'">
         <span class="sb-icon">✍️</span><span class="sb-label">My Story</span>
       </button>
       <div class="sb-divider"></div>
@@ -67,7 +69,6 @@
     </nav>
 
     <div class="sb-bottom">
-      <!-- DISGUISED EMERGENCY BUTTON -->
       <button class="sb-suppliers-btn" (click)="openSuppliersPanel()">
         📦 Check Suppliers
       </button>
@@ -85,6 +86,7 @@
         <h1>{{ activeTab === 'home' ? 'My Studio' :
                activeTab === 'listings' ? 'My Listings' :
                activeTab === 'earnings' ? 'My Earnings' :
+               activeTab === 'centre' ? 'My Centre' :
                activeTab === 'learn' ? 'Grow & Learn' :
                activeTab === 'contacts' ? 'My Circle' :
                activeTab === 'profile' ? 'My Story' : 'Dashboard' }}</h1>
@@ -106,7 +108,6 @@
          TAB: HOME / MY STUDIO
     ════════════════════════════════════ -->
     <div class="tab-content" *ngIf="activeTab === 'home'">
-      <!-- home content – abbreviated for brevity, but you have the full version -->
       <div class="home-welcome">
         <div class="hw-copy">
           <h2>Good to see you, <span class="hw-name">{{ seller.alias }}</span> 🌿</h2>
@@ -134,7 +135,7 @@
         </div>
       </div>
 
-      <!-- Two-col overview (quick actions, recent listings, training, circle) -->
+      <!-- Two-col overview -->
       <div class="home-grid">
         <!-- Quick actions -->
         <div class="hg-card">
@@ -319,6 +320,50 @@
     </div>
 
     <!-- ════════════════════════════════════
+         TAB: MY CENTRE
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'centre'">
+      <div class="profile-intro">
+        <h2>My Centre</h2>
+        <p>Information about the Amani workshop you are connected to.</p>
+      </div>
+
+      <div class="pf-section" *ngIf="seller?.centre_id; else noCentre">
+        <h3>Centre Details</h3>
+        <div class="centre-info-card">
+          <div class="ci-row">
+            <strong>Name:</strong> {{ centreInfo?.centre_name || seller?.centre_name || 'Loading...' }}
+          </div>
+          <div class="ci-row">
+            <strong>Location:</strong> {{ centreInfo?.city || seller?.centre_city || 'Unknown' }}, {{ centreInfo?.province || '' }}
+          </div>
+          <div class="ci-row">
+            <strong>Status:</strong>
+            <span class="centre-status" [class.approved]="centreInfo?.status === 'approved'" [class.pending]="centreInfo?.status !== 'approved'">
+              {{ centreStatusText }}
+            </span>
+          </div>
+          <div class="ci-row" *ngIf="centreInfo?.status !== 'approved'">
+            <small>Your centre must be verified before you can fully participate. Please contact the centre manager for updates.</small>
+          </div>
+        </div>
+        <div class="pf-group" style="margin-top: 20px;">
+          <label>Need help?</label>
+          <p>If you have questions about your centre, please speak to the centre manager or contact Amani support.</p>
+          <button class="btn-primary" (click)="requestSupport('centre')">Contact Support</button>
+        </div>
+      </div>
+
+      <ng-template #noCentre>
+        <div class="empty-state">
+          <div class="es-icon">🏢</div>
+          <h3>No centre assigned yet</h3>
+          <p>You haven't been assigned to a centre. Please complete your registration or contact Amani support.</p>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- ════════════════════════════════════
          TAB: LEARN
     ════════════════════════════════════ -->
     <div class="tab-content" *ngIf="activeTab === 'learn'">
@@ -328,11 +373,11 @@
       </div>
 
       <div class="learn-filters">
-        <button [class.active]="trainingFilter === 'all'"      (click)="trainingFilter = 'all'">All</button>
-        <button [class.active]="trainingFilter === 'craft'"    (click)="trainingFilter = 'craft'">🧵 Craft</button>
+        <button [class.active]="trainingFilter === 'all'" (click)="trainingFilter = 'all'">All</button>
+        <button [class.active]="trainingFilter === 'craft'" (click)="trainingFilter = 'craft'">🧵 Craft</button>
         <button [class.active]="trainingFilter === 'business'" (click)="trainingFilter = 'business'">📊 Business</button>
-        <button [class.active]="trainingFilter === 'legal'"    (click)="trainingFilter = 'legal'">⚖️ Legal rights</button>
-        <button [class.active]="trainingFilter === 'financial'"(click)="trainingFilter = 'financial'">💰 Money</button>
+        <button [class.active]="trainingFilter === 'legal'" (click)="trainingFilter = 'legal'">⚖️ Legal rights</button>
+        <button [class.active]="trainingFilter === 'financial'" (click)="trainingFilter = 'financial'">💰 Money</button>
         <button [class.active]="trainingFilter === 'wellness'" (click)="trainingFilter = 'wellness'">🌿 Wellness</button>
         <button [class.active]="trainingFilter === 'progress'" (click)="trainingFilter = 'progress'">▶ In progress</button>
       </div>
@@ -348,9 +393,9 @@
           <div class="mc-bottom">
             <span class="mc-mins">{{ m.duration_mins }} min</span>
             <div class="mc-actions">
-              <button class="mc-btn start"    *ngIf="m.progress === 'not_started'" (click)="markModuleStarted(m)">Start →</button>
+              <button class="mc-btn start" *ngIf="m.progress === 'not_started'" (click)="markModuleStarted(m)">Start →</button>
               <button class="mc-btn continue" *ngIf="m.progress === 'in_progress'" (click)="markModuleComplete(m)">Mark done ✓</button>
-              <span   class="mc-done"         *ngIf="m.progress === 'completed'">✓ Completed</span>
+              <span class="mc-done" *ngIf="m.progress === 'completed'">✓ Completed</span>
             </div>
           </div>
         </div>
@@ -369,7 +414,6 @@
         <button class="btn-primary" (click)="showAddContact = true">+ Add someone</button>
       </div>
 
-      <!-- Add contact form -->
       <div class="add-contact-form" *ngIf="showAddContact">
         <h4>Add a trusted person</h4>
         <div class="acf-row">
@@ -397,7 +441,6 @@
         </div>
       </div>
 
-      <!-- Contacts list -->
       <div class="contacts-list" *ngIf="contacts.length > 0">
         <div class="contact-card" *ngFor="let c of contacts">
           <div class="cc-avatar">{{ c.name.charAt(0) }}</div>
@@ -496,8 +539,8 @@
       </div>
     </div>
 
-  </main><!-- /sd-main -->
-</div><!-- /sd-page -->
+  </main>
+</div>
 
 <!-- ════════════════════════════════════════════════════════
      SANCTUARY MODE (hidden layer)

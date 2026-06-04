@@ -7,7 +7,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary';
+type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary' | 'centre';
 
 interface SellerProfile {
     id: string;
@@ -31,6 +31,7 @@ interface SellerProfile {
     social_handle?: string;
     centre_name?: string;
     centre_city?: string;
+    centre_id?: string;
 }
 
 interface Product {
@@ -98,6 +99,14 @@ interface EvidenceItem {
     created_at: string;
 }
 
+interface CentreInfo {
+    id: string;
+    centre_name: string;
+    city: string;
+    province: string;
+    status: string;
+}
+
 @Component({
     selector: 'app-seller-dashboard',
     standalone: true,
@@ -114,6 +123,9 @@ export class SellerDashboardComponent implements OnInit {
     isLoading = true;
     dblTapTimer: any = null;
     private loadTimeout: any;
+
+    // Centre info
+    centreInfo: CentreInfo | null = null;
 
     // ── Products / Listings ───────────────────────────────────
     products: Product[] = [];
@@ -176,7 +188,7 @@ export class SellerDashboardComponent implements OnInit {
     constructor(
         private http: HttpClient,
         private router: Router,
-        private cdr: ChangeDetectorRef  // <-- ADDED
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit(): void {
@@ -190,7 +202,7 @@ export class SellerDashboardComponent implements OnInit {
             return;
         }
 
-        // Fallback: force hide spinner after 8 seconds (prevents infinite loading)
+        // Fallback: force hide spinner after 8 seconds
         setTimeout(() => {
             if (this.isLoading) {
                 console.warn('[Dashboard] Fallback: forcing isLoading = false after 8s');
@@ -228,26 +240,38 @@ export class SellerDashboardComponent implements OnInit {
                     languages: s.languages || [],
                 };
                 this.isLoading = false;
-                this.cdr.detectChanges();  // Force view update
+                this.cdr.detectChanges();
                 // Load secondary data
                 this.loadProducts();
                 this.loadEarnings();
                 this.loadTraining();
                 this.loadContacts();
+                this.loadCentreInfo();   // NEW: load centre details
             },
             error: (err) => {
                 console.error('[Dashboard] Error loading profile:', err);
                 this.isLoading = false;
                 this.cdr.detectChanges();
-                // Only redirect if we have no seller and the error is not due to missing data
                 if (err.status === 404 || err.status === 401) {
                     localStorage.removeItem('sellerId');
                     this.router.navigate(['/login/maker']);
                 } else {
-                    // For other errors, stay but show empty dashboard
                     this.seller = null;
                 }
             }
+        });
+    }
+
+    loadCentreInfo(): void {
+        if (!this.seller?.centre_id) return;
+        console.log('[Dashboard] Loading centre info for ID:', this.seller.centre_id);
+        // Use the same API endpoint that returns centre details (we assume exists)
+        this.http.get<CentreInfo>(`${this.API}/centres/${this.seller.centre_id}`).subscribe({
+            next: (c) => {
+                this.centreInfo = c;
+                this.cdr.detectChanges();
+            },
+            error: (err) => console.error('[Dashboard] Error loading centre info:', err)
         });
     }
 
@@ -338,6 +362,13 @@ export class SellerDashboardComponent implements OnInit {
         return Math.round((done / fields.length) * 100);
     }
 
+    get centreStatusText(): string {
+        if (!this.seller?.centre_id) return 'Not assigned';
+        if (this.centreInfo?.status === 'approved') return '✓ Approved centre';
+        if (this.centreInfo?.status === 'pending') return '⏳ Pending verification';
+        return 'Awaiting approval';
+    }
+
     get journeySteps() {
         return [
             { key: 'medical',    label: 'Medical check-up',      icon: '🏥', done: this.caseJourney.medical_done,    date: this.caseJourney.medical_date },
@@ -364,6 +395,7 @@ export class SellerDashboardComponent implements OnInit {
     openAddProduct(): void {
         if (!this.seller?.profile_complete) {
             this.activeTab = 'profile';
+            alert('Please complete your profile before adding a listing.');
             return;
         }
         this.isEditing = false;
@@ -385,10 +417,30 @@ export class SellerDashboardComponent implements OnInit {
         this.productSaveError = '';
         if (this.isEditing && this.currentProduct.id) {
             this.http.put<any>(`${this.API}/products/${this.currentProduct.id}`, this.currentProduct)
-                .subscribe({ next: () => { this.showProductModal = false; this.loadProducts(); }, error: () => this.productSaveError = 'Could not save' });
+                .subscribe({ 
+                    next: () => { this.showProductModal = false; this.loadProducts(); }, 
+                    error: (err) => {
+                        console.error('[Dashboard] Error updating product:', err);
+                        this.productSaveError = err.error?.error || 'Could not save';
+                        if (err.error?.code === 'PROFILE_INCOMPLETE') {
+                            alert('Your profile is not complete. Please complete it first.');
+                            this.activeTab = 'profile';
+                        }
+                    }
+                });
         } else {
             this.http.post<any>(`${this.API}/products`, { ...this.currentProduct, seller_id: this.seller?.id })
-                .subscribe({ next: () => { this.showProductModal = false; this.loadProducts(); }, error: (e) => this.productSaveError = e.error?.error || 'Could not save' });
+                .subscribe({ 
+                    next: () => { this.showProductModal = false; this.loadProducts(); }, 
+                    error: (err) => {
+                        console.error('[Dashboard] Error creating product:', err);
+                        this.productSaveError = err.error?.error || 'Could not save';
+                        if (err.error?.code === 'PROFILE_INCOMPLETE') {
+                            alert('Your profile is not complete. Please complete it first.');
+                            this.activeTab = 'profile';
+                        }
+                    }
+                });
         }
     }
 
@@ -411,18 +463,27 @@ export class SellerDashboardComponent implements OnInit {
 
     // ── Profile ───────────────────────────────────────────────
     saveProfile(): void {
-        this.profileSaveError = '';
-        this.http.put<any>(`${this.API}/profile/${this.seller?.id}`, this.profileForm).subscribe({
-            next: (res) => {
-                this.profileSaved = true;
-                if (this.seller) this.seller.profile_complete = res.profile_complete;
-                setTimeout(() => this.profileSaved = false, 3000);
-                this.cdr.detectChanges();
-            },
-            error: (e) => this.profileSaveError = e.error?.error || 'Could not save'
-        });
-    }
-
+    this.profileSaveError = '';
+    // Ensure payout_method is sent (required for profile_complete calculation)
+    const updateData = {
+        ...this.profileForm,
+        payout_method: this.seller?.payout_method  // <-- add this line
+    };
+    this.http.put<any>(`${this.API}/profile/${this.seller?.id}`, updateData).subscribe({
+        next: (res) => {
+            this.profileSaved = true;
+            if (this.seller) this.seller.profile_complete = res.profile_complete;
+            setTimeout(() => this.profileSaved = false, 3000);
+            this.cdr.detectChanges();
+            if (res.profile_complete) {
+                alert('Profile complete! You can now add listings.');
+            } else {
+                console.warn('Profile still incomplete – check that all fields (including payout method) are filled.');
+            }
+        },
+        error: (e) => this.profileSaveError = e.error?.error || 'Could not save'
+    });
+}
     toggleLanguage(lang: string): void {
         const langs = this.profileForm.languages || [];
         const idx = langs.indexOf(lang);

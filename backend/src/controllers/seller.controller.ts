@@ -5,6 +5,28 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../index';
 
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import PDFDocument from 'pdfkit';
+
+// Ensure upload directory exists
+const evidenceDir = path.join(__dirname, '../../uploads/evidence');
+if (!fs.existsSync(evidenceDir)) {
+  fs.mkdirSync(evidenceDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, evidenceDir);
+  },
+  filename: (req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    cb(null, unique);
+  }
+});
+export const uploadEvidence = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
+
 // ── HELPER: Verify SA ID Number ─────────────────────────────
 // South African ID format: YYMMDD SSSS G CCC
 // Position 6 (0-indexed) of SSSS group determines sex:
@@ -53,7 +75,7 @@ export const verifySAID = (idNumber: string): { valid: boolean; isFemale: boolea
     return { valid: true, isFemale, dob };
 };
 
-// ── GET VERIFIED CENTRES ─────────────────────────────────────
+
 // ── GET VERIFIED CENTRES ─────────────────────────────────────
 export const getVerifiedCentres = async (req: Request, res: Response) => {
     try {
@@ -67,6 +89,26 @@ export const getVerifiedCentres = async (req: Request, res: Response) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch centres' });
+    }
+};
+
+// ── GET CENTRE BY ID (for seller dashboard) ─────────────────
+export const getCentreById = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT id, centre_name, city, province, status
+             FROM centres
+             WHERE id = $1`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Centre not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch centre' });
     }
 };
 
@@ -424,13 +466,17 @@ export const getSellerEarnings = async (req: Request, res: Response) => {
              FROM seller_earnings WHERE seller_id = $1`,
             [sellerId]
         );
-        // Modified query: use se.created_at instead of oi.created_at
+        // Safe query: no join, just seller_earnings data
         const recent = await pool.query(
-            `SELECT se.amount, se.status, se.payout_date, oi.product_title, se.created_at
-             FROM seller_earnings se
-             LEFT JOIN order_items oi ON oi.id = se.order_item_id
-             WHERE se.seller_id = $1
-             ORDER BY se.created_at DESC LIMIT 20`,
+            `SELECT 
+                amount, 
+                status, 
+                payout_date, 
+                'Sale' AS product_title,
+                created_at
+             FROM seller_earnings
+             WHERE seller_id = $1
+             ORDER BY created_at DESC LIMIT 20`,
             [sellerId]
         );
         res.json({ summary: summary.rows[0], transactions: recent.rows });
@@ -439,7 +485,6 @@ export const getSellerEarnings = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Could not load earnings' });
     }
 };
-
 
 // ── TRAINING ─────────────────────────────────────────────────
 export const getTrainingModules = async (req: Request, res: Response) => {
@@ -601,8 +646,8 @@ export const getEvidence = async (req: Request, res: Response) => {
     const { sellerId } = req.params;
     try {
         const result = await pool.query(
-            `SELECT id, item_type, filename, description, date_of_incident, is_court_ready, created_at
-             FROM evidence_items WHERE seller_id=$1 ORDER BY created_at DESC`,
+            `SELECT id, item_type, filename, file_url, description, date_of_incident, is_court_ready, created_at
+             FROM evidence_items WHERE seller_id = $1 ORDER BY created_at DESC`,
             [sellerId]
         );
         res.json(result.rows);
@@ -612,20 +657,80 @@ export const getEvidence = async (req: Request, res: Response) => {
     }
 };
 
+
 export const addEvidence = async (req: Request, res: Response) => {
-    const { seller_id, item_type, filename, description, date_of_incident } = req.body;
     try {
+        const { seller_id, item_type, description, date_of_incident } = req.body;
+        const file = (req as any).file;
+        if (!seller_id || !item_type) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        const filename = file ? file.filename : null;
+        const file_url = file ? `/uploads/evidence/${filename}` : null;
+
         const result = await pool.query(
-            `INSERT INTO evidence_items (seller_id, item_type, filename, description, date_of_incident)
-             VALUES ($1,$2,$3,$4,$5) RETURNING id, item_type, filename, description, created_at`,
-            [seller_id, item_type || 'document', filename || null, description || null, date_of_incident || null]
+            `INSERT INTO evidence_items (seller_id, item_type, filename, file_url, description, date_of_incident)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, item_type, filename, file_url, description, created_at`,
+            [seller_id, item_type, filename, file_url, description || null, date_of_incident || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Could not add item' });
+        res.status(500).json({ error: 'Could not add evidence' });
     }
 };
+
+export const generateCourtPack = async (req: Request, res: Response) => {
+    const { sellerId } = req.params;
+    try {
+        const journey = await pool.query(`SELECT * FROM case_journeys WHERE seller_id = $1`, [sellerId]);
+        const evidence = await pool.query(`SELECT * FROM evidence_items WHERE seller_id = $1 ORDER BY created_at DESC`, [sellerId]);
+
+        const doc = new PDFDocument();
+        res.setHeader('Content-Disposition', 'attachment; filename=court-pack.pdf');
+        res.setHeader('Content-Type', 'application/pdf');
+        doc.pipe(res);
+
+        doc.fontSize(20).text('Amani Court Pack', { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(12).text(`Generated on: ${new Date().toLocaleString()}`);
+        doc.moveDown();
+
+        doc.fontSize(16).text('Case Journey', { underline: true });
+        doc.moveDown();
+        if (journey.rows.length) {
+            const j = journey.rows[0];
+            doc.text(`Medical done: ${j.medical_done ? 'Yes' : 'No'} ${j.medical_date ? `on ${j.medical_date}` : ''}`);
+            doc.text(`Police statement: ${j.police_done ? 'Yes' : 'No'} ${j.police_date ? `on ${j.police_date}` : ''}`);
+            doc.text(`Protection order: ${j.protection_done ? 'Yes' : 'No'} ${j.protection_date ? `on ${j.protection_date}` : ''}`);
+            doc.text(`Court proceedings: ${j.court_done ? 'Yes' : 'No'} ${j.court_date ? `on ${j.court_date}` : ''}`);
+            doc.text(`Counselling: ${j.counselling_done ? 'Yes' : 'No'} ${j.counselling_date ? `on ${j.counselling_date}` : ''}`);
+            if (j.notes) doc.text(`Notes: ${j.notes}`);
+        } else {
+            doc.text('No journey data found.');
+        }
+        doc.moveDown();
+
+        doc.fontSize(16).text('Evidence Items', { underline: true });
+        doc.moveDown();
+        if (evidence.rows.length) {
+            evidence.rows.forEach((e, idx) => {
+                doc.text(`${idx + 1}. Type: ${e.item_type} | Added: ${new Date(e.created_at).toLocaleDateString()}`);
+                if (e.description) doc.text(`   Description: ${e.description}`);
+                if (e.file_url) doc.text(`   File: ${e.file_url}`);
+                doc.moveDown(0.5);
+            });
+        } else {
+            doc.text('No evidence uploaded.');
+        }
+
+        doc.end();
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not generate PDF' });
+    }
+};
+
 
 // ── SUPPORT REQUESTS ─────────────────────────────────────────
 export const createSupportRequest = async (req: Request, res: Response) => {

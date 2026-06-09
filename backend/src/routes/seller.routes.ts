@@ -4,6 +4,9 @@
 import { Router } from 'express';
 import {
     getVerifiedCentres,
+    getCentreById,
+    uploadEvidence, 
+    generateCourtPack,
     verifyID,
     registerSeller,
     loginSeller,
@@ -33,6 +36,7 @@ const router = Router();
 
 // ── Public ──────────────────────────────────────────────────
 router.get('/centres/verified', getVerifiedCentres);
+router.get('/centres/:id', getCentreById);
 router.post('/verify-id', verifyID);
 router.post('/register', registerSeller);
 router.post('/login', loginSeller);
@@ -65,8 +69,13 @@ router.post('/emergency', triggerEmergencyAlert);
 router.get('/journey/:sellerId', getCaseJourney);
 router.put('/journey/:sellerId', updateCaseJourney);
 router.get('/evidence/:sellerId', getEvidence);
+// Evidence upload with file
+router.post('/evidence', uploadEvidence.single('file'), addEvidence);
+// Court pack generation
+router.post('/generate-court-pack/:sellerId', generateCourtPack);
 router.post('/evidence', addEvidence);
 router.post('/support', createSupportRequest);
 router.post('/volunteer', grantHiddenLayer);
+
 
 export default router;

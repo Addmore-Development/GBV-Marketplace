@@ -282,7 +282,6 @@ async function initDatabase() {
 
     // ──────────────────────────────────────────────────────────────────────
     // Fix any existing NOT NULL constraints on columns that should be nullable
-    // This prevents registration errors from legacy constraints
     // ──────────────────────────────────────────────────────────────────────
     const nullableTextCols = [
       'public_bio', 'skills_experience', 'craft_story', 'photo_url',
@@ -569,7 +568,36 @@ async function initDatabase() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    console.log('✅ Evidence items table ready');
+    // ──────────────────────────────────────────────────────────────────────
+    // Ensure all required columns exist and clean up obsolete ones
+    // ──────────────────────────────────────────────────────────────────────
+    console.log('✅ Ensuring evidence_items columns are complete...');
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS seller_id UUID;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(50);`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS filename VARCHAR(255);`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS file_url VARCHAR(500);`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS description TEXT;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS date_of_incident DATE;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS is_court_ready BOOLEAN DEFAULT FALSE;`).catch(e => console.log(e.message));
+    // Remove obsolete columns that cause conflicts
+    await dbClient.query(`ALTER TABLE evidence_items DROP COLUMN IF EXISTS case_id;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items DROP COLUMN IF EXISTS evidence_type;`).catch(e => console.log(e.message));
+    // Add foreign key constraint if missing
+    await dbClient.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints 
+                       WHERE constraint_name = 'evidence_items_seller_id_fkey' 
+                       AND table_name = 'evidence_items') THEN
+          ALTER TABLE evidence_items ADD CONSTRAINT evidence_items_seller_id_fkey 
+            FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `).catch(e => console.log(e.message));
+    // Set NOT NULL constraints (safe)
+    await dbClient.query(`ALTER TABLE evidence_items ALTER COLUMN item_type SET NOT NULL;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE evidence_items ALTER COLUMN seller_id SET NOT NULL;`).catch(e => console.log(e.message));
+    console.log('✅ Evidence items table ready with all columns');
 
     // ══════════════════════════════════════════════════════════════════════
     // HIDDEN LAYER — SUPPORT REQUESTS

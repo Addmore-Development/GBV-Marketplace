@@ -19,6 +19,7 @@ app.use(express.json());
 app.use('/api/centres', centreRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/sellers', sellerRoutes);
+app.use('/uploads', express.static('uploads'));
 
 // PostgreSQL connection
 export const pool = new Pool({

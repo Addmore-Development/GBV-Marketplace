@@ -38,7 +38,6 @@ export const getProducts = async (req: Request, res: Response) => {
       idx++;
     }
     if (centre_id) {
-      // Use seller's centre_id because products may not have direct centre_id
       where += ` AND s.centre_id = $${idx++}`;
       params.push(centre_id);
     }
@@ -51,18 +50,18 @@ export const getProducts = async (req: Request, res: Response) => {
       params.push(parseFloat(max_price as string));
     }
 
-    const allowedSort  = ['created_at', 'price', 'total_sold', 'rating_avg'];
+    const allowedSort  = ['created_at', 'price', 'total_sold'];
     const allowedOrder = ['ASC', 'DESC'];
     const safeSort  = allowedSort.includes(sort as string)  ? sort  : 'created_at';
     const safeOrder = allowedOrder.includes((order as string).toUpperCase()) ? order : 'DESC';
 
-    // Count query (no need to join for count)
+    // Count query
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM products p ${where}`,
       params
     );
 
-    // Main query with joins and correct field aliasing
+    // Main query – removed rating_avg and rating_count, using static defaults
     const result = await pool.query(
       `SELECT
         p.id,
@@ -75,8 +74,8 @@ export const getProducts = async (req: Request, res: Response) => {
         COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS img,
         p.seller_alias,
         COALESCE(p.seller_type, 'survivor') AS seller_type,
-        COALESCE(p.rating_avg, 5.0) AS rating,
-        COALESCE(p.rating_count, 0) AS reviews,
+        5.0 AS rating,
+        0 AS reviews,
         COALESCE(p.total_sold, 0) AS sold,
         c.centre_name,
         c.city,
@@ -95,7 +94,6 @@ export const getProducts = async (req: Request, res: Response) => {
       [...params, parseInt(limit as string), offset]
     );
 
-    // Return products directly – fields already match frontend interface
     return res.json({
       products: result.rows,
       total: parseInt(countResult.rows[0].count),
@@ -130,15 +128,22 @@ export const getProduct = async (req: Request, res: Response) => {
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Product not found' });
 
-    // Get reviews
-    const reviews = await pool.query(
-      `SELECT buyer_name, rating, comment, created_at
-       FROM product_reviews WHERE product_id = $1
-       ORDER BY created_at DESC LIMIT 10`,
-      [id]
-    );
+    // Get reviews – if table exists, otherwise return empty array
+    let reviews = [];
+    try {
+      const reviewsResult = await pool.query(
+        `SELECT buyer_name, rating, comment, created_at
+         FROM product_reviews WHERE product_id = $1
+         ORDER BY created_at DESC LIMIT 10`,
+        [id]
+      );
+      reviews = reviewsResult.rows;
+    } catch (err) {
+      // Ignore – table may not exist yet
+      console.warn('product_reviews table not found, returning empty reviews');
+    }
 
-    return res.json({ ...result.rows[0], reviews: reviews.rows });
+    return res.json({ ...result.rows[0], reviews });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });

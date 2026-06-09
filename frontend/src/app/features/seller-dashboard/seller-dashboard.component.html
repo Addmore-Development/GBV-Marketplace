@@ -1,6 +1,6 @@
 <!-- ============================================================
   frontend/src/app/features/seller-dashboard/seller-dashboard.component.html
-  Amani — Maker Dashboard (clean, modern UI/UX)
+  Amani — Maker Dashboard (full, production‑ready)
   ============================================================ -->
 
 <!-- LOADING STATE -->
@@ -70,7 +70,7 @@
 
     <div class="sb-bottom">
       <button class="sb-suppliers-btn" (click)="openSuppliersPanel()">
-        📦 Check Suppliers
+        📦 Checkout Suppliers
       </button>
       <button class="sb-signout" (click)="logout()">Sign out</button>
       <div class="sb-exit-hint">Double-tap logo to leave safely</div>
@@ -115,7 +115,6 @@
         </div>
       </div>
 
-      <!-- Stats row -->
       <div class="stats-row">
         <div class="stat-card gold">
           <div class="sc-num">{{ formatCurrency(earningsSummary.total_paid) }}</div>
@@ -135,9 +134,7 @@
         </div>
       </div>
 
-      <!-- Two-col overview -->
       <div class="home-grid">
-        <!-- Quick actions -->
         <div class="hg-card">
           <h3>Quick actions</h3>
           <div class="quick-actions">
@@ -159,7 +156,6 @@
           </div>
         </div>
 
-        <!-- Recent listings preview -->
         <div class="hg-card">
           <div class="hgc-header">
             <h3>Recent listings</h3>
@@ -183,7 +179,6 @@
           </div>
         </div>
 
-        <!-- Training progress -->
         <div class="hg-card">
           <div class="hgc-header">
             <h3>Learning path</h3>
@@ -203,7 +198,6 @@
           </div>
         </div>
 
-        <!-- My circle nudge -->
         <div class="hg-card circle-nudge" *ngIf="contacts.length === 0">
           <div class="cn-icon">🤝</div>
           <h3>Build your circle</h3>
@@ -328,14 +322,14 @@
         <p>Information about the Amani workshop you are connected to.</p>
       </div>
 
-      <div class="pf-section" *ngIf="seller?.centre_id; else noCentre">
+      <div class="pf-section" *ngIf="seller.centre_id; else noCentre">
         <h3>Centre Details</h3>
         <div class="centre-info-card">
           <div class="ci-row">
-            <strong>Name:</strong> {{ centreInfo?.centre_name || seller?.centre_name || 'Loading...' }}
+            <strong>Name:</strong> {{ centreInfo?.centre_name || seller.centre_name || 'Loading...' }}
           </div>
           <div class="ci-row">
-            <strong>Location:</strong> {{ centreInfo?.city || seller?.centre_city || 'Unknown' }}, {{ centreInfo?.province || '' }}
+            <strong>Location:</strong> {{ centreInfo?.city || seller.centre_city || 'Unknown' }}, {{ centreInfo?.province || '' }}
           </div>
           <div class="ci-row">
             <strong>Status:</strong>
@@ -409,7 +403,7 @@
       <div class="contacts-intro">
         <div class="ci-text">
           <h2>My circle</h2>
-          <p>These are the people who will be contacted if you ever click "Check Suppliers" while you need help. Add people you genuinely trust — a sister, a friend, someone at your centre.</p>
+          <p>These are the people who will be contacted if you ever click "Checkout Suppliers" while you need help. Add people you genuinely trust — a sister, a friend, someone at your centre.</p>
         </div>
         <button class="btn-primary" (click)="showAddContact = true">+ Add someone</button>
       </div>
@@ -590,7 +584,7 @@
     <button class="sanc-btn secondary" (click)="generateCourtPack()">Generate court documents PDF</button>
   </div>
 
-  <!-- Vault tab -->
+  <!-- Vault tab (with file upload) -->
   <div class="sanc-content" *ngIf="sanctuaryTab === 'vault'">
     <h2>Safe space</h2>
     <p class="sanc-sub">Everything here is encrypted. Only you decide who sees it.</p>
@@ -618,9 +612,15 @@
         <label>Description (optional — helps you remember)</label>
         <textarea rows="2" [(ngModel)]="newEvidence.description" placeholder="A brief note about this item…"></textarea>
       </div>
+      <!-- FILE UPLOAD INPUT -->
+      <div class="aef-group full">
+        <label>Upload file (photo, voice note, PDF, etc.)</label>
+        <input type="file" (change)="onEvidenceFileSelected($event)" accept="image/*,audio/*,application/pdf,text/plain">
+        <small *ngIf="selectedEvidenceFile">Selected: {{ selectedEvidenceFile.name }}</small>
+      </div>
       <div class="aef-actions">
         <button class="sanc-btn" (click)="addEvidence()">Save to safe space</button>
-        <button class="sanc-btn cancel" (click)="showAddEvidence = false">Cancel</button>
+        <button class="sanc-btn cancel" (click)="showAddEvidence = false; selectedEvidenceFile = null">Cancel</button>
       </div>
     </div>
 
@@ -631,6 +631,9 @@
           <div class="ev-type">{{ e.item_type.replace('_', ' ') | titlecase }}</div>
           <div class="ev-desc" *ngIf="e.description">{{ e.description }}</div>
           <div class="ev-date">Added {{ e.created_at | date:'d MMM y' }}</div>
+          <div class="ev-file" *ngIf="e.file_url">
+            <a [href]="e.file_url" target="_blank">View file ↗</a>
+          </div>
         </div>
         <span class="ev-court" *ngIf="e.is_court_ready">✓ Court ready</span>
       </div>
@@ -763,7 +766,6 @@
     </div>
     <p class="sm-sub">Craft material suppliers across South Africa. Updated monthly.</p>
 
-    <!-- Fake supplier list (cover) -->
     <div class="supplier-list" *ngIf="!alertSent">
       <div class="supplier-row" *ngFor="let s of fakeSuppliers">
         <div class="sr-info">
@@ -775,7 +777,6 @@
       </div>
     </div>
 
-    <!-- Hidden emergency trigger button (blends in as "contact supplier") -->
     <div class="sm-footer" *ngIf="!alertSent">
       <button class="sm-contact-btn" (click)="sendEmergencyAlert()" [disabled]="alertLoading">
         {{ alertLoading ? 'Contacting…' : '📞 Contact all suppliers' }}
@@ -783,12 +784,11 @@
       <span class="sm-note">Sends your details to your preferred contact list</span>
     </div>
 
-    <!-- Alert sent confirmation -->
     <div class="alert-sent" *ngIf="alertSent">
       <div class="as-icon">✓</div>
       <h3>Your people have been contacted</h3>
-      <p>Everyone in your circle has been notified. Help is on the way.</p>
-      <p class="as-emergency">🛡️ If you are in immediate danger — <strong>call 10111 now</strong>.</p>
+      <p>Everyone in your circle has been notified.</p>
+      <!-- <p class="as-emergency">🛡️ If you are in immediate danger — <strong>call 10111 now</strong>.</p> -->
       <button class="btn-primary" (click)="showSuppliersPanel = false; alertSent = false">Close</button>
     </div>
   </div>

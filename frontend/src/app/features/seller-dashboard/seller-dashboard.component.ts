@@ -93,6 +93,7 @@ interface EvidenceItem {
     id: string;
     item_type: string;
     filename?: string;
+    file_url?: string;      // ADDED
     description?: string;
     date_of_incident?: string;
     is_court_ready: boolean;
@@ -117,17 +118,14 @@ interface CentreInfo {
 export class SellerDashboardComponent implements OnInit {
     private readonly API = 'http://localhost:3000/api/sellers';
 
-    // ── State ─────────────────────────────────────────────────
     seller: SellerProfile | null = null;
     activeTab: DashTab = 'home';
     isLoading = true;
     dblTapTimer: any = null;
     private loadTimeout: any;
 
-    // Centre info
     centreInfo: CentreInfo | null = null;
 
-    // ── Products / Listings ───────────────────────────────────
     products: Product[] = [];
     showProductModal = false;
     isEditing = false;
@@ -139,27 +137,22 @@ export class SellerDashboardComponent implements OnInit {
         'Pottery','Bags & accessories','Other',
     ];
 
-    // ── Earnings ──────────────────────────────────────────────
     earningsSummary: EarningsSummary = { total_paid: 0, pending: 0, paid_count: 0 };
     transactions: Transaction[] = [];
 
-    // ── Training ──────────────────────────────────────────────
     trainingModules: TrainingModule[] = [];
     trainingFilter = 'all';
 
-    // ── Profile form ──────────────────────────────────────────
     profileForm: Partial<SellerProfile> & { bank_name?: string; account_holder?: string; account_number?: string; branch_code?: string } = {};
     profileSaved = false;
     profileSaveError = '';
     readonly languages = ['English','Zulu','Xhosa','Afrikaans','Sotho','Tswana','Tsonga','Venda','Ndebele','Swati'];
 
-    // ── Trusted contacts ──────────────────────────────────────
     contacts: TrustedContact[] = [];
     showAddContact = false;
     newContact = { name: '', phone: '', relationship: '', whatsapp: true };
     contactSaveError = '';
 
-    // ── Emergency (disguised as "Check Suppliers") ─────────────
     showSuppliersPanel = false;
     alertSent = false;
     alertLoading = false;
@@ -170,7 +163,6 @@ export class SellerDashboardComponent implements OnInit {
         { name: 'Eastern Textiles Direct', city: 'Gqeberha', stock: 'Shweshwe, linen, jersey', price: 'R95/m' },
     ];
 
-    // ── Hidden layer / Sanctuary ──────────────────────────────
     showPinModal = false;
     hiddenPin = '';
     pinError = '';
@@ -184,6 +176,9 @@ export class SellerDashboardComponent implements OnInit {
     showAddEvidence = false;
     newEvidence = { item_type: 'photo', filename: '', description: '', date_of_incident: '' };
     journeySaving = false;
+
+    // File upload property
+    selectedEvidenceFile: File | null = null;
 
     constructor(
         private http: HttpClient,
@@ -202,7 +197,6 @@ export class SellerDashboardComponent implements OnInit {
             return;
         }
 
-        // Fallback: force hide spinner after 8 seconds
         setTimeout(() => {
             if (this.isLoading) {
                 console.warn('[Dashboard] Fallback: forcing isLoading = false after 8s');
@@ -214,14 +208,12 @@ export class SellerDashboardComponent implements OnInit {
         this.loadProfile(id);
     }
 
-    // ── Logo double-tap (quick exit) ─────────────────────────
     handleLogoDblTap(): void { this.quickExit(); }
     quickExit(): void {
         localStorage.removeItem('hiddenLayerAccess');
         window.location.href = '/news';
     }
 
-    // ── Data loading ──────────────────────────────────────────
     loadProfile(id: string): void {
         console.log('[Dashboard] loadProfile called for id:', id);
         this.http.get<SellerProfile>(`${this.API}/profile/${id}`).subscribe({
@@ -241,12 +233,11 @@ export class SellerDashboardComponent implements OnInit {
                 };
                 this.isLoading = false;
                 this.cdr.detectChanges();
-                // Load secondary data
                 this.loadProducts();
                 this.loadEarnings();
                 this.loadTraining();
                 this.loadContacts();
-                this.loadCentreInfo();   // NEW: load centre details
+                this.loadCentreInfo();
             },
             error: (err) => {
                 console.error('[Dashboard] Error loading profile:', err);
@@ -265,7 +256,6 @@ export class SellerDashboardComponent implements OnInit {
     loadCentreInfo(): void {
         if (!this.seller?.centre_id) return;
         console.log('[Dashboard] Loading centre info for ID:', this.seller.centre_id);
-        // Use the same API endpoint that returns centre details (we assume exists)
         this.http.get<CentreInfo>(`${this.API}/centres/${this.seller.centre_id}`).subscribe({
             next: (c) => {
                 this.centreInfo = c;
@@ -354,7 +344,6 @@ export class SellerDashboardComponent implements OnInit {
         });
     }
 
-    // ── Computed ──────────────────────────────────────────────
     get profileCompletePct(): number {
         if (!this.seller) return 0;
         const fields = ['alias','public_bio','craft_story','phone','city','payout_method','skills_experience'];
@@ -391,7 +380,6 @@ export class SellerDashboardComponent implements OnInit {
     get activeListings(): number { return this.products.filter(p => p.status === 'active').length; }
     get totalSold(): number { return this.products.reduce((s, p) => s + (p.total_sold || 0), 0); }
 
-    // ── Products ──────────────────────────────────────────────
     openAddProduct(): void {
         if (!this.seller?.profile_complete) {
             this.activeTab = 'profile';
@@ -449,7 +437,6 @@ export class SellerDashboardComponent implements OnInit {
         this.http.delete(`${this.API}/products/${id}`).subscribe({ next: () => this.loadProducts(), error: () => {} });
     }
 
-    // ── Training ──────────────────────────────────────────────
     markModuleStarted(mod: TrainingModule): void {
         if (mod.progress !== 'not_started') return;
         this.http.put(`${this.API}/training/${this.seller?.id}/${mod.id}`, { status: 'in_progress' })
@@ -461,29 +448,28 @@ export class SellerDashboardComponent implements OnInit {
             .subscribe({ next: () => mod.progress = 'completed', error: () => {} });
     }
 
-    // ── Profile ───────────────────────────────────────────────
     saveProfile(): void {
-    this.profileSaveError = '';
-    // Ensure payout_method is sent (required for profile_complete calculation)
-    const updateData = {
-        ...this.profileForm,
-        payout_method: this.seller?.payout_method  // <-- add this line
-    };
-    this.http.put<any>(`${this.API}/profile/${this.seller?.id}`, updateData).subscribe({
-        next: (res) => {
-            this.profileSaved = true;
-            if (this.seller) this.seller.profile_complete = res.profile_complete;
-            setTimeout(() => this.profileSaved = false, 3000);
-            this.cdr.detectChanges();
-            if (res.profile_complete) {
-                alert('Profile complete! You can now add listings.');
-            } else {
-                console.warn('Profile still incomplete – check that all fields (including payout method) are filled.');
-            }
-        },
-        error: (e) => this.profileSaveError = e.error?.error || 'Could not save'
-    });
-}
+        this.profileSaveError = '';
+        const updateData = {
+            ...this.profileForm,
+            payout_method: this.seller?.payout_method
+        };
+        this.http.put<any>(`${this.API}/profile/${this.seller?.id}`, updateData).subscribe({
+            next: (res) => {
+                this.profileSaved = true;
+                if (this.seller) this.seller.profile_complete = res.profile_complete;
+                setTimeout(() => this.profileSaved = false, 3000);
+                this.cdr.detectChanges();
+                if (res.profile_complete) {
+                    alert('Profile complete! You can now add listings.');
+                } else {
+                    console.warn('Profile still incomplete – check that all fields (including payout method) are filled.');
+                }
+            },
+            error: (e) => this.profileSaveError = e.error?.error || 'Could not save'
+        });
+    }
+
     toggleLanguage(lang: string): void {
         const langs = this.profileForm.languages || [];
         const idx = langs.indexOf(lang);
@@ -492,7 +478,6 @@ export class SellerDashboardComponent implements OnInit {
         this.profileForm.languages = [...langs];
     }
 
-    // ── Trusted contacts ──────────────────────────────────────
     saveContact(): void {
         if (!this.newContact.name || !this.newContact.phone) {
             this.contactSaveError = 'Name and number required';
@@ -522,7 +507,6 @@ export class SellerDashboardComponent implements OnInit {
         });
     }
 
-    // ── Emergency / Suppliers disguise ────────────────────────
     openSuppliersPanel(): void {
         this.showSuppliersPanel = true;
         this.alertSent = false;
@@ -547,7 +531,6 @@ export class SellerDashboardComponent implements OnInit {
         });
     }
 
-    // ── Hidden layer / Sanctuary access ──────────────────────
     requestSanctuary(): void {
         const hasAccess = this.seller?.verification_status === 'approved' || this.seller?.hidden_layer_granted;
         if (!hasAccess) {
@@ -611,17 +594,33 @@ export class SellerDashboardComponent implements OnInit {
         });
     }
 
+    onEvidenceFileSelected(event: any): void {
+        const file = event.target.files[0];
+        if (file) {
+            this.selectedEvidenceFile = file;
+        }
+    }
+
     addEvidence(): void {
-        this.http.post<EvidenceItem>(`${this.API}/evidence`, {
-            ...this.newEvidence, seller_id: this.seller?.id
-        }).subscribe({
+        const formData = new FormData();
+        formData.append('seller_id', this.seller?.id || '');
+        formData.append('item_type', this.newEvidence.item_type);
+        if (this.newEvidence.description) formData.append('description', this.newEvidence.description);
+        if (this.newEvidence.date_of_incident) formData.append('date_of_incident', this.newEvidence.date_of_incident);
+        if (this.selectedEvidenceFile) formData.append('file', this.selectedEvidenceFile);
+
+        this.http.post<EvidenceItem>(`${this.API}/evidence`, formData).subscribe({
             next: (e) => {
                 this.evidenceItems.unshift(e);
                 this.showAddEvidence = false;
                 this.newEvidence = { item_type: 'photo', filename: '', description: '', date_of_incident: '' };
+                this.selectedEvidenceFile = null;
                 this.cdr.detectChanges();
             },
-            error: () => {}
+            error: (err) => {
+                console.error('Upload error:', err);
+                alert('Failed to upload evidence. Please try again.');
+            }
         });
     }
 
@@ -640,7 +639,6 @@ export class SellerDashboardComponent implements OnInit {
         alert('Preparing your documents. Your court pack will be ready to download in a moment.');
     }
 
-    // ── Helpers ───────────────────────────────────────────────
     logout(): void {
         localStorage.clear();
         this.router.navigate(['/login/maker']);

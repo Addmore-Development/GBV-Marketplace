@@ -1,0 +1,404 @@
+// ============================================================
+// frontend/src/app/features/centres/centres.component.ts
+// ============================================================
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { RouterModule, Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
+import { AuthService, User } from '../../services/auth.service';
+
+export interface Centre {
+  id: string;
+  name: string;
+  type: 'gbv_centre' | 'orphanage' | 'old_age_home';
+  city: string;
+  province: string;
+  suburb: string;
+  description: string;
+  mission: string;
+  services: string[];
+  languages: string[];
+  is_24_hour: boolean;
+  has_shelter: boolean;
+  provides_counselling: boolean;
+  provides_legal_support: boolean;
+  capacity: number;
+  img: string;
+  contact_email?: string;
+  contact_phone?: string;
+  whatsapp?: string;
+  website?: string;
+  verified: boolean;
+  year_established: number;
+  beneficiaries_per_year: number;
+}
+
+export interface NoticePost {
+  id: string;
+  centre_id: string;
+  centre_name: string;
+  type: 'achievement' | 'job' | 'update' | 'appeal' | 'image';
+  title: string;
+  body: string;
+  img?: string;
+  date: string;
+  badge_color: string;
+}
+
+@Component({
+  selector: 'app-centres',
+  standalone: true,
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule],
+  templateUrl: './centres.component.html',
+  styleUrls: ['./centres.component.scss'],
+})
+export class CentresComponent implements OnInit, OnDestroy {
+
+  currentUser: User | null = null;
+  searchQuery = '';
+  selectedProvince = '';
+  selectedType = '';
+  selectedCentre: Centre | null = null;
+  activeModal = ''; // 'auth' | 'donate' | 'volunteer' | 'centre-detail'
+  pendingModal = ''; // modal to open after auth
+  authTab: 'login' | 'register' = 'login';
+  toastMsg = '';
+  toastVisible = false;
+
+  // Slideshow
+  currentSlide = 0;
+  private slideInterval: any;
+
+  // Auth form state
+  loginRole: 'buyer' | 'seller' | 'centre' = 'buyer';
+  loginEmail = '';
+  loginPassword = '';
+  authError = '';
+  registerRole: 'buyer' | 'seller' | 'centre' = 'buyer';
+  registerName = '';
+  registerEmail = '';
+  registerPassword = '';
+
+  // Donate form
+  donateForm!: FormGroup;
+  donateType: 'money' | 'goods' | 'time' = 'money';
+
+  // Volunteer form
+  volunteerForm!: FormGroup;
+
+  private destroy$ = new Subject<void>();
+
+  readonly provinces = [
+    'Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape',
+    'Limpopo', 'Mpumalanga', 'North West', 'Free State', 'Northern Cape',
+  ];
+
+  readonly centreTypes = [
+    { value: 'gbv_centre',   label: 'GBV Centres' },
+    { value: 'orphanage',    label: 'Orphanages' },
+    { value: 'old_age_home', label: 'Old Age Homes' },
+  ];
+
+  readonly noticePosts: NoticePost[] = [
+    {
+      id: 'n1', centre_id: 'c1', centre_name: 'Thistle House GBV Centre',
+      type: 'achievement', title: '500 survivors supported this year',
+      body: 'We are proud to announce that Thistle House has supported over 500 survivors in 2025 — our highest number since opening in 2012. Thank you to every donor, volunteer, and partner who made this possible.',
+      date: '2025-05-20', badge_color: '#2D6A4F',
+    },
+    {
+      id: 'n2', centre_id: 'c3', centre_name: 'Ubuntu Youth Programme',
+      type: 'job', title: 'Hiring: Social Worker (Johannesburg)',
+      body: 'We are looking for a registered social worker with experience in child and youth development. SACSSP registration required. Position is full-time with competitive salary. Send CV to jobs@ubuntuyouth.org.za',
+      img: 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=1200&q=80',
+      date: '2025-05-18', badge_color: '#1A3A6B',
+    },
+    {
+      id: 'n3', centre_id: 'c5', centre_name: 'Khayelitsha Women\'s Hub',
+      type: 'appeal', title: 'Urgent: Winter blankets needed',
+      body: 'We have 42 women and children in our shelter this winter. We urgently need warm blankets, toiletries, and non-perishable food. Drop-off at 14 Mew Way, Khayelitsha, or donate via our page.',
+      img: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=1200&q=80',
+      date: '2025-05-15', badge_color: '#8B2635',
+    },
+    {
+      id: 'n4', centre_id: 'c4', centre_name: 'Khanya Elderly Home',
+      type: 'update', title: 'New activities programme launched',
+      body: 'Our residents now enjoy weekly gardening, art therapy, and a new digital literacy class teaching smartphones and video calling so they can stay connected with family. Huge thanks to our volunteer facilitators.',
+      img: 'https://images.unsplash.com/photo-1566127444979-b3d2b654e3d7?w=1200&q=80',
+      date: '2025-05-10', badge_color: '#B8860B',
+    },
+    {
+      id: 'n5', centre_id: 'c2', centre_name: 'New Beginnings NPO',
+      type: 'achievement', title: 'DSD Accreditation received',
+      body: 'New Beginnings has officially received DSD accreditation after 18 months of audits and improvements. This means we can now accommodate more survivors and access government funding.',
+      img: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=1200&q=80',
+      date: '2025-05-05', badge_color: '#2D6A4F',
+    },
+    {
+      id: 'n6', centre_id: 'c6', centre_name: 'Empilweni Care Centre',
+      type: 'job', title: 'Volunteer drivers needed',
+      body: 'We need volunteer drivers on weekday mornings to transport children to school and elderly residents to medical appointments. Must have valid licence and own vehicle. Contact us to sign up.',
+      img: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1200&q=80',
+      date: '2025-04-28', badge_color: '#1A3A6B',
+    },
+  ];
+
+  readonly allCentres: Centre[] = [
+    {
+      id: 'c1', name: 'Thistle House GBV Centre',
+      type: 'gbv_centre', city: 'Cape Town', province: 'Western Cape', suburb: 'Observatory',
+      description: 'Thistle House has been a sanctuary for survivors of gender-based violence in Cape Town since 2012. We provide emergency shelter, trauma counselling, legal support, and long-term reintegration programmes for women and children.',
+      mission: 'To restore dignity, safety, and hope to every survivor who walks through our doors.',
+      services: ['Emergency Shelter', 'Counselling', 'Legal Aid', 'Court Support', 'Skills Training'],
+      languages: ['English', 'Afrikaans', 'Xhosa'],
+      is_24_hour: true, has_shelter: true, provides_counselling: true, provides_legal_support: true,
+      capacity: 45, img: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&q=80',
+      contact_email: 'info@thistlehouse.org.za', contact_phone: '021 448 1720',
+      whatsapp: '0821234567', website: 'https://www.thistlehouse.org.za',
+      verified: true, year_established: 2012, beneficiaries_per_year: 520,
+    },
+    {
+      id: 'c2', name: 'New Beginnings NPO',
+      type: 'gbv_centre', city: 'Johannesburg', province: 'Gauteng', suburb: 'Soweto',
+      description: 'New Beginnings supports survivors of domestic violence and human trafficking across Soweto. We operate a safe house, a dedicated survivor skills programme, and a 24-hour crisis line.',
+      mission: 'Every woman deserves a second chance at a safe, dignified life.',
+      services: ['Safe House', 'Crisis Hotline', 'Trauma Debriefing', 'Job Placement', 'Support Groups'],
+      languages: ['Zulu', 'Sesotho', 'English', 'Xhosa'],
+      is_24_hour: true, has_shelter: true, provides_counselling: true, provides_legal_support: false,
+      capacity: 30, img: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=600&q=80',
+      contact_email: 'help@newbeginnings.org.za', contact_phone: '011 982 0034',
+      whatsapp: '0734567890',
+      verified: true, year_established: 2016, beneficiaries_per_year: 310,
+    },
+    {
+      id: 'c3', name: 'Ubuntu Youth Programme',
+      type: 'orphanage', city: 'Johannesburg', province: 'Gauteng', suburb: 'Alexandra',
+      description: 'Ubuntu Youth Programme provides residential care, education, and vocational training for orphaned and vulnerable youth aged 10–21 in Alexandra township. We operate a craft studio and digital skills lab.',
+      mission: 'Ubuntu — I am because we are. Every child deserves community and opportunity.',
+      services: ['Residential Care', 'Education & Skills Training', 'Child Protection', 'Case Management'],
+      languages: ['Zulu', 'Sepedi', 'English', 'Xhosa'],
+      is_24_hour: false, has_shelter: true, provides_counselling: true, provides_legal_support: false,
+      capacity: 60, img: 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80',
+      contact_email: 'info@ubuntuyouth.org.za', contact_phone: '011 440 2281',
+      verified: true, year_established: 2009, beneficiaries_per_year: 180,
+    },
+    {
+      id: 'c4', name: 'Khanya Elderly Home',
+      type: 'old_age_home', city: 'Pretoria', province: 'Gauteng', suburb: 'Atteridgeville',
+      description: 'Khanya Elderly Home provides compassionate full-time residential care for elderly South Africans who have no family support. We offer assisted living, nursing care, and craft workshops that connect our residents to the Amani marketplace.',
+      mission: 'Ageing with dignity. Living with purpose.',
+      services: ['Residential Care', 'Nursing Care', 'Education & Skills Training', 'Support Groups'],
+      languages: ['Tswana', 'Sepedi', 'English', 'Afrikaans'],
+      is_24_hour: true, has_shelter: false, provides_counselling: true, provides_legal_support: false,
+      capacity: 80, img: 'https://images.unsplash.com/photo-1566127444979-b3d2b654e3d7?w=600&q=80',
+      contact_email: 'admin@khanya.co.za', contact_phone: '012 374 5581',
+      verified: true, year_established: 2003, beneficiaries_per_year: 95,
+    },
+    {
+      id: 'c5', name: 'Khayelitsha Women\'s Hub',
+      type: 'gbv_centre', city: 'Cape Town', province: 'Western Cape', suburb: 'Khayelitsha',
+      description: 'Khayelitsha Women\'s Hub is a grassroots GBV centre run by and for women in Khayelitsha. We focus on community-based trauma support, economic empowerment, and advocacy.',
+      mission: 'Healing together. Building power from within.',
+      services: ['Counselling', 'Support Groups', 'Skills Training', 'Crisis Hotline', 'Relocation Assistance'],
+      languages: ['Xhosa', 'English'],
+      is_24_hour: false, has_shelter: true, provides_counselling: true, provides_legal_support: false,
+      capacity: 25, img: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=600&q=80',
+      contact_email: 'khayelitsha.hub@gmail.com', contact_phone: '021 361 4422',
+      verified: true, year_established: 2018, beneficiaries_per_year: 240,
+    },
+    {
+      id: 'c6', name: 'Empilweni Care Centre',
+      type: 'gbv_centre', city: 'Durban', province: 'KwaZulu-Natal', suburb: 'Umlazi',
+      description: 'Empilweni (meaning "place of health" in Zulu) provides holistic care for survivors of gender-based violence in Umlazi. Our team of social workers and psychologists supports survivors from crisis through to long-term recovery.',
+      mission: 'Empilweni: a place where healing begins.',
+      services: ['Counselling', 'Medical Support', 'Legal Aid', 'Court Support', 'Case Management'],
+      languages: ['Zulu', 'English'],
+      is_24_hour: true, has_shelter: false, provides_counselling: true, provides_legal_support: true,
+      capacity: 35, img: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=600&q=80',
+      contact_email: 'empilweni@care.org.za', contact_phone: '031 906 2241',
+      whatsapp: '0829876543',
+      verified: true, year_established: 2014, beneficiaries_per_year: 380,
+    },
+    {
+      id: 'c7', name: 'Sunshine Children\'s Village',
+      type: 'orphanage', city: 'Bloemfontein', province: 'Free State', suburb: 'Mangaung',
+      description: 'Sunshine Children\'s Village provides a loving home for orphaned and abandoned children from infancy to 18. We have 8 cottage homes, a school, and a vocational training centre on our 4-hectare property.',
+      mission: 'Every child deserves a home, a family, and a future.',
+      services: ['Residential Care', 'Education & Skills Training', 'Medical Support', 'Child Protection'],
+      languages: ['Sesotho', 'Afrikaans', 'English'],
+      is_24_hour: true, has_shelter: true, provides_counselling: true, provides_legal_support: false,
+      capacity: 120, img: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600&q=80',
+      contact_email: 'admin@sunshinevillage.co.za', contact_phone: '051 444 0023',
+      website: 'https://www.sunshinechildrensvillage.co.za',
+      verified: true, year_established: 1996, beneficiaries_per_year: 135,
+    },
+    {
+      id: 'c8', name: 'Ubuntu Women\'s Centre',
+      type: 'gbv_centre', city: 'Port Elizabeth', province: 'Eastern Cape', suburb: 'New Brighton',
+      description: 'Ubuntu Women\'s Centre provides crisis intervention and long-term support to GBV survivors in the Eastern Cape. We have a shelter, a legal clinic, and a partnership with the NMU Law Clinic.',
+      mission: 'No woman should face violence alone.',
+      services: ['Emergency Shelter', 'Legal Aid', 'Counselling', 'Police Support', 'Support Groups'],
+      languages: ['Xhosa', 'English', 'Afrikaans'],
+      is_24_hour: true, has_shelter: true, provides_counselling: true, provides_legal_support: true,
+      capacity: 40, img: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80',
+      contact_email: 'ubuntu@womencentre.co.za', contact_phone: '041 453 9011',
+      verified: true, year_established: 2007, beneficiaries_per_year: 290,
+    },
+  ];
+
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private fb: FormBuilder,
+  ) {}
+
+  ngOnInit(): void {
+    this.authService.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => this.currentUser = u);
+
+    this.startSlideshow();
+
+    this.donateForm = this.fb.group({
+      centre_id:  ['', Validators.required],
+      donor_name: ['', Validators.required],
+      donor_email:['', [Validators.required, Validators.email]],
+      amount:     [''],
+      goods_desc: [''],
+      payment_method: [''],
+      message:    [''],
+    });
+
+    this.volunteerForm = this.fb.group({
+      centre_id:    ['', Validators.required],
+      full_name:    ['', Validators.required],
+      email:        ['', [Validators.required, Validators.email]],
+      phone:        ['', Validators.required],
+      skills:       ['', Validators.required],
+      availability: ['', Validators.required],
+      message:      [''],
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    clearInterval(this.slideInterval);
+  }
+
+  // ── Slideshow ─────────────────────────────────────────────
+  startSlideshow(): void {
+    this.slideInterval = setInterval(() => {
+      this.currentSlide = (this.currentSlide + 1) % this.noticePosts.length;
+    }, 4500);
+  }
+
+  goToSlide(i: number): void {
+    this.currentSlide = i;
+    clearInterval(this.slideInterval);
+    this.startSlideshow();
+  }
+
+  prevSlide(): void { this.goToSlide((this.currentSlide - 1 + this.noticePosts.length) % this.noticePosts.length); }
+  nextSlide(): void { this.goToSlide((this.currentSlide + 1) % this.noticePosts.length); }
+
+  get currentNotice(): NoticePost { return this.noticePosts[this.currentSlide]; }
+  get currentNoticeImg(): string { return this.currentNotice.img || 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=1200&q=80'; }
+
+  // ── Filtering ─────────────────────────────────────────────
+  get filteredCentres(): Centre[] {
+    return this.allCentres.filter(c => {
+      const searchMatch = !this.searchQuery ||
+        c.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        c.city.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        c.suburb.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        c.services.some(s => s.toLowerCase().includes(this.searchQuery.toLowerCase()));
+      const provinceMatch = !this.selectedProvince || c.province === this.selectedProvince;
+      const typeMatch = !this.selectedType || c.type === this.selectedType;
+      return searchMatch && provinceMatch && typeMatch;
+    });
+  }
+
+  getTypeLabel(type: string): string {
+    const map: Record<string, string> = { gbv_centre: 'GBV Centre', orphanage: 'Orphanage', old_age_home: 'Old Age Home' };
+    return map[type] || type;
+  }
+
+  // ── Centre click ──────────────────────────────────────────
+  openCentre(centre: Centre): void {
+    this.selectedCentre = centre;
+    if (this.currentUser) {
+      this.activeModal = 'centre-detail';
+    } else {
+      this.activeModal = 'centre-preview';
+    }
+  }
+
+  // ── Modals ────────────────────────────────────────────────
+  showDonate(centre?: Centre): void {
+    if (!this.currentUser) {
+      if (centre) { this.donateForm.patchValue({ centre_id: centre.id }); this.selectedCentre = centre; }
+      this.pendingModal = 'donate';
+      this.activeModal = 'auth'; this.authTab = 'login'; return;
+    }
+    if (centre) { this.donateForm.patchValue({ centre_id: centre.id }); this.selectedCentre = centre; }
+    this.activeModal = 'donate';
+  }
+
+  showVolunteer(centre?: Centre): void {
+    if (!this.currentUser) { this.activeModal = 'auth'; this.authTab = 'login'; return; }
+    if (centre) { this.volunteerForm.patchValue({ centre_id: centre.id }); this.selectedCentre = centre; }
+    this.activeModal = 'volunteer';
+  }
+
+  closeModal(e: MouseEvent): void { this.activeModal = ''; }
+  closeModalDirect(): void { this.activeModal = ''; }
+
+  // ── Auth ──────────────────────────────────────────────────
+  doLogin(): void {
+    this.authError = '';
+    if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
+    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole);
+    if (!ok) { this.authError = 'Invalid credentials.'; return; }
+    const pending = this.pendingModal;
+    this.pendingModal = '';
+    this.closeModalDirect();
+    this.showToast('Welcome back!');
+    if (pending) setTimeout(() => { this.activeModal = pending; }, 100);
+    else if (this.selectedCentre) setTimeout(() => { this.activeModal = 'centre-detail'; }, 100);
+  }
+
+  doRegister(): void {
+    this.authError = '';
+    if (this.registerRole === 'centre') { this.closeModalDirect(); this.router.navigate(['/register/centre']); return; }
+    if (this.registerRole === 'seller') { this.closeModalDirect(); this.router.navigate(['/register/seller']); return; }
+    if (!this.registerName || !this.registerEmail || !this.registerPassword) { this.authError = 'Please fill in all fields.'; return; }
+    if (this.registerPassword.length < 8) { this.authError = 'Password must be 8+ characters.'; return; }
+    const ok = this.authService.register(this.registerName, this.registerEmail, this.registerPassword, this.registerRole);
+    if (ok) { this.closeModalDirect(); this.showToast(`Welcome, ${this.registerName}!`); }
+    else { this.authError = 'Registration failed.'; }
+  }
+
+  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
+
+  // ── Donate submit ─────────────────────────────────────────
+  submitDonate(): void {
+    if (this.donateForm.invalid) { this.donateForm.markAllAsTouched(); return; }
+    this.closeModalDirect();
+    this.showToast('Thank you! Your contribution has been recorded.');
+  }
+
+  // ── Volunteer submit ──────────────────────────────────────
+  submitVolunteer(): void {
+    if (this.volunteerForm.invalid) { this.volunteerForm.markAllAsTouched(); return; }
+    this.closeModalDirect();
+    this.showToast('Application sent! The centre will review and contact you.');
+  }
+
+  // ── Toast ─────────────────────────────────────────────────
+  showToast(msg: string): void {
+    this.toastMsg = msg;
+    this.toastVisible = true;
+    setTimeout(() => this.toastVisible = false, 3000);
+  }
+}

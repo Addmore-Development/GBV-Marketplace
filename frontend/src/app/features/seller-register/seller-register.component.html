@@ -30,19 +30,39 @@
 <!-- MAIN REGISTRATION FORM -->
 <div class="register-page" *ngIf="!submitSuccess">
 
-  <header class="page-header">
-    <div class="header-inner">
-      <div class="logo" title="Double-tap for quick exit">
-        <span class="logo-icon">🌿</span>
-        <span class="logo-text">Amani</span>
-        <span class="quick-exit-hint">(double‑tap to hide)</span>
+  <!-- ── TOP NAV ── -->
+  <nav class="reg-nav">
+    <div class="reg-nav-inner">
+      <!-- Back + Brand -->
+      <div class="reg-nav-left">
+        <a routerLink="/marketplace" class="back-btn">
+          <span class="back-arrow">←</span> Back to Marketplace
+        </a>
+        <a routerLink="/marketplace" class="reg-brand">
+          <div class="reg-brand-mark">A</div>
+          <div class="reg-brand-text">
+            <span class="reg-brand-name">Amani</span>
+            <span class="reg-brand-sub">Empowerment Market</span>
+          </div>
+        </a>
       </div>
-      <div class="header-copy">
-        <h1>Become a Seller</h1>
-        <p>Turn your craft into income — safely and privately</p>
+
+      <!-- Auth actions (top-right) -->
+      <div class="reg-nav-right">
+        <ng-container *ngIf="!currentUser">
+          <button class="nav-btn-ghost" (click)="showAuthModal('login')">Sign In</button>
+          <button class="nav-btn-solid" (click)="showAuthModal('register')">Register</button>
+        </ng-container>
+        <ng-container *ngIf="currentUser">
+          <div class="user-chip">
+            <div class="user-avatar">{{ currentUser.initials }}</div>
+            <span class="user-name">{{ currentUser.name.split(' ')[0] }}</span>
+          </div>
+          <button class="nav-btn-ghost small" (click)="logout()">Sign out</button>
+        </ng-container>
       </div>
     </div>
-  </header>
+  </nav>
 
   <div class="stepper-wrapper">
     <div class="stepper">
@@ -206,5 +226,62 @@
   <div class="safety-footer">
     <span>🛡️ In danger? Call 10111 first.</span>
     <span>Double‑tap the Amani logo to hide this page.</span>
+  </div>
+</div>
+
+<!-- ── AUTH MODAL ── -->
+<div class="modal-backdrop" [class.open]="authModal" (click)="closeAuthModal($event)">
+  <div class="modal" [class.open]="authModal" (click)="$event.stopPropagation()">
+    <button class="modal-close" (click)="authModal = ''">✕</button>
+
+    <!-- Login -->
+    <div *ngIf="authModal === 'login'">
+      <div class="modal-head">
+        <div class="modal-logo">A</div>
+        <h2 class="modal-title">Welcome back</h2>
+        <p class="modal-sub">Sign in to your Amani account</p>
+      </div>
+      <div class="modal-tabs">
+        <button class="mtab" [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
+        <button class="mtab" [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
+        <button class="mtab" [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
+      </div>
+      <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
+      <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
+      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+      <button class="modal-cta" (click)="doLogin()">Sign In →</button>
+      <div class="modal-switch">No account? <span (click)="authModal = 'register'">Register here</span></div>
+    </div>
+
+    <!-- Register -->
+    <div *ngIf="authModal === 'register'">
+      <div class="modal-head">
+        <div class="modal-logo">A</div>
+        <h2 class="modal-title">Join Amani</h2>
+        <p class="modal-sub">Create your account</p>
+      </div>
+      <div class="role-grid">
+        <div class="role-card" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
+          <div class="rc-icon">🛒</div><div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
+        </div>
+        <div class="role-card" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
+          <div class="rc-icon">🎨</div><div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
+        </div>
+        <div class="role-card" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
+          <div class="rc-icon">🏠</div><div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
+        </div>
+      </div>
+      <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
+      <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
+      <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
+      <div class="mf-note" [class.vetting]="registerRole !== 'buyer'">
+        <span *ngIf="registerRole === 'buyer'">ℹ️ Buyer accounts activate immediately.</span>
+        <span *ngIf="registerRole === 'seller'">⚠️ Seller accounts require NRSO vetting.</span>
+        <span *ngIf="registerRole === 'centre'">⚠️ Centre registration requires NPO docs &amp; site visit.</span>
+      </div>
+      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+      <button class="modal-cta" (click)="doRegisterModal()">Create Account →</button>
+      <div class="modal-switch">Have an account? <span (click)="authModal = 'login'">Sign in</span></div>
+    </div>
   </div>
 </div>

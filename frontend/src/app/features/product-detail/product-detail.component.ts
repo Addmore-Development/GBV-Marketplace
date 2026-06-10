@@ -335,7 +335,7 @@ interface Product {
     </div>
 
     <!-- ── REVIEWS ── -->
-    <div class="reviews-section" *ngIf="product.reviews?.length">
+    <div class="reviews-section" *ngIf="product.reviews.length">
       <div class="reviews-inner">
         <div class="reviews-header">
           <h2 class="reviews-title">Customer Reviews</h2>

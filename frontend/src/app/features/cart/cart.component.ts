@@ -186,78 +186,8 @@ import { AuthService, User } from '../../services/auth.service';
         </div>
       </div>
 
-    </div>
-
-    <!-- RIGHT: Summary + Checkout -->
-    <div class="cart-right">
-
-      <!-- Promo code -->
-      <div class="promo-box">
-        <input class="promo-input" type="text" placeholder="Promo code / voucher" [(ngModel)]="promoCode" />
-        <button class="promo-btn" (click)="applyPromo()">Apply</button>
-      </div>
-      <div class="promo-success" *ngIf="promoApplied">✓ Code applied — R25 discount added!</div>
-
-      <!-- Impact summary -->
-      <div class="impact-summary-box">
-        <div class="isb-header">
-          <span>🧾 Your Impact</span>
-          <span class="isb-sub">Every rand tracked</span>
-        </div>
-        <div class="is-row">
-          <div class="is-label"><span class="is-dot survivor"></span> Survivor Income</div>
-          <strong>{{ formatPrice(totalSurvivor) }}</strong>
-        </div>
-        <div class="is-row">
-          <div class="is-label"><span class="is-dot centre"></span> Centre Counselling</div>
-          <strong>{{ formatPrice(totalCentre) }}</strong>
-        </div>
-        <div class="is-row muted">
-          <div class="is-label"><span class="is-dot platform"></span> Platform Fee</div>
-          <strong>{{ formatPrice(totalPlatform) }}</strong>
-        </div>
-        <div class="is-divider"></div>
-        <div class="impact-bar-full">
-          <div class="ibf-fill survivor" [style.width.%]="cart.subtotal > 0 ? (totalSurvivor / cart.subtotal) * 100 : 0"></div>
-          <div class="ibf-fill centre"   [style.width.%]="cart.subtotal > 0 ? (totalCentre   / cart.subtotal) * 100 : 0"></div>
-          <div class="ibf-fill platform" [style.flex]="1"></div>
-        </div>
-        <div class="impact-legend">
-          <span class="leg survivor">● Maker</span>
-          <span class="leg centre">● Centre</span>
-          <span class="leg platform">● Platform</span>
-        </div>
-      </div>
-
-      <!-- Order summary -->
-      <div class="order-summary-box">
-        <h3 class="osb-title">Order Summary</h3>
-        <div class="os-row">
-          <span>Subtotal ({{ cart.items.length }} items)</span>
-          <span>{{ formatPrice(cart.subtotal) }}</span>
-        </div>
-        <div class="os-row">
-          <span>Delivery</span>
-          <span class="free-delivery" *ngIf="cart.subtotal >= 500">Free</span>
-          <span *ngIf="cart.subtotal < 500">R65.00</span>
-        </div>
-        <div class="os-row discount" *ngIf="promoApplied">
-          <span>Promo Discount</span>
-          <span>− R25.00</span>
-        </div>
-        <div class="os-divider"></div>
-        <div class="os-row total">
-          <span>Total</span>
-          <strong>{{ formatPrice(getTotal()) }}</strong>
-        </div>
-        <div class="free-delivery-hint" *ngIf="cart.subtotal < 500">
-          Add {{ formatPrice(500 - cart.subtotal) }} more for free delivery!
-          <div class="fdh-bar"><div class="fdh-fill" [style.width.%]="(cart.subtotal / 500) * 100"></div></div>
-        </div>
-      </div>
-
-      <!-- Checkout form -->
-      <div class="checkout-form-box">
+      <!-- Delivery Details (below You Might Also Like) -->
+      <div class="checkout-form-box" style="margin-top:24px;">
         <h3 class="cfb-title">📍 Delivery Details</h3>
         <form [formGroup]="checkoutForm" (ngSubmit)="placeOrder()">
 
@@ -350,6 +280,87 @@ import { AuthService, User } from '../../services/auth.service';
       </div>
 
     </div>
+
+    <!-- RIGHT: Summary + Checkout -->
+    <div class="cart-right">
+
+      <!-- Sign-in prompt if not logged in -->
+      <div class="signin-prompt" *ngIf="!currentUser">
+        <div class="sip-icon">🔒</div>
+        <p>Sign in or register to complete your purchase</p>
+        <div class="sip-btns">
+          <button class="sip-btn-primary" (click)="showAuthModal('login')">Sign In</button>
+          <button class="sip-btn-outline" (click)="showAuthModal('register')">Register</button>
+        </div>
+      </div>
+
+      <!-- Promo code -->
+      <div class="promo-box">
+        <input class="promo-input" type="text" placeholder="Promo code / voucher" [(ngModel)]="promoCode" />
+        <button class="promo-btn" (click)="applyPromo()">Apply</button>
+      </div>
+      <div class="promo-success" *ngIf="promoApplied">✓ Code applied — R25 discount added!</div>
+
+      <!-- Impact summary -->
+      <div class="impact-summary-box">
+        <div class="isb-header">
+          <span>🧾 Your Impact</span>
+          <span class="isb-sub">Every rand tracked</span>
+        </div>
+        <div class="is-row">
+          <div class="is-label"><span class="is-dot survivor"></span> Survivor Income</div>
+          <strong>{{ formatPrice(totalSurvivor) }}</strong>
+        </div>
+        <div class="is-row">
+          <div class="is-label"><span class="is-dot centre"></span> Centre Counselling</div>
+          <strong>{{ formatPrice(totalCentre) }}</strong>
+        </div>
+        <div class="is-row muted">
+          <div class="is-label"><span class="is-dot platform"></span> Platform Fee</div>
+          <strong>{{ formatPrice(totalPlatform) }}</strong>
+        </div>
+        <div class="is-divider"></div>
+        <div class="impact-bar-full">
+          <div class="ibf-fill survivor" [style.width.%]="cart.subtotal > 0 ? (totalSurvivor / cart.subtotal) * 100 : 0"></div>
+          <div class="ibf-fill centre"   [style.width.%]="cart.subtotal > 0 ? (totalCentre   / cart.subtotal) * 100 : 0"></div>
+          <div class="ibf-fill platform" [style.flex]="1"></div>
+        </div>
+        <div class="impact-legend">
+          <span class="leg survivor">● Maker</span>
+          <span class="leg centre">● Centre</span>
+          <span class="leg platform">● Platform</span>
+        </div>
+      </div>
+
+      <!-- Order summary -->
+      <div class="order-summary-box">
+        <h3 class="osb-title">Order Summary</h3>
+        <div class="os-row">
+          <span>Subtotal ({{ cart.items.length }} items)</span>
+          <span>{{ formatPrice(cart.subtotal) }}</span>
+        </div>
+        <div class="os-row">
+          <span>Delivery</span>
+          <span class="free-delivery" *ngIf="cart.subtotal >= 500">Free</span>
+          <span *ngIf="cart.subtotal < 500">R65.00</span>
+        </div>
+        <div class="os-row discount" *ngIf="promoApplied">
+          <span>Promo Discount</span>
+          <span>− R25.00</span>
+        </div>
+        <div class="os-divider"></div>
+        <div class="os-row total">
+          <span>Total</span>
+          <strong>{{ formatPrice(getTotal()) }}</strong>
+        </div>
+        <div class="free-delivery-hint" *ngIf="cart.subtotal < 500">
+          Add {{ formatPrice(500 - cart.subtotal) }} more for free delivery!
+          <div class="fdh-bar"><div class="fdh-fill" [style.width.%]="(cart.subtotal / 500) * 100"></div></div>
+        </div>
+      </div>
+
+
+    </div>
   </div>
 
 </div>
@@ -416,12 +427,32 @@ import { AuthService, User } from '../../services/auth.service';
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
     :host {
-      --gold: #C49A3C; --gold-light: #F5E9C8; --gold-dark: #B8860B;
-      --forest: #2D5016; --forest-deep: #1A3009; --forest-mid: #3D6B20;
-      --sage: #5A7A3A; --sage-light: #EFF4E8; --sage-mid: #D1DEC4;
-      --teal: #1A6B5A; --red: #EF4444; --amber: #D97706; --green: #16A34A;
-      --text-dark: #1C2B1A; --text-mid: #4A5C47; --text-light: #7A8C77; --text-muted: #9CA3AF;
-      --border: #E5E7EB; --bg: #F3F4F6; --white: #FFFFFF;
+      --cream:       #FAF7F2;
+      --beige:       #F0EAE0;
+      --beige-dark:  #DDD3C4;
+      --brown:       #3D2B1F;
+      --brown-mid:   #6B4C3B;
+      --brown-light: #A07858;
+      --black:       #1A1210;
+      --white:       #FFFFFF;
+      --border:      #E0D8CE;
+      --text-dark:   #1A1210;
+      --text-mid:    #4A3830;
+      --text-light:  #7A6A62;
+      --text-muted:  #9C8C84;
+      --green:       #2D6A4F;
+      --red:         #8B2635;
+      --gold:        #B8860B;
+      --gold-light:  #F5E9C8;
+      --forest:      #3D2B1F;
+      --forest-deep: #1A1210;
+      --forest-mid:  #6B4C3B;
+      --sage:        #5A7A3A;
+      --sage-light:  #F0EAE0;
+      --sage-mid:    #DDD3C4;
+      --teal:        #2D6A4F;
+      --amber:       #B8860B;
+      --bg:          #FAF7F2;
       font-family: 'DM Sans', sans-serif;
       background: var(--bg);
       display: block;
@@ -430,7 +461,7 @@ import { AuthService, User } from '../../services/auth.service';
 
     /* NAV */
     .cart-nav {
-      background: var(--forest-deep);
+      background: var(--brown);
       padding: 0 28px;
       height: 64px;
       display: flex;
@@ -821,6 +852,25 @@ import { AuthService, User } from '../../services/auth.service';
     }
     @keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
 
+    /* SIGN-IN PROMPT */
+    .signin-prompt {
+      background: #FAF7F2; border: 2px dashed #DDD3C4; border-radius: 12px;
+      padding: 22px; text-align: center; margin-bottom: 14px;
+      .sip-icon { font-size: 1.8rem; margin-bottom: 8px; }
+      p { color: #4A3830; font-size: .88rem; margin: 0 0 14px; }
+    }
+    .sip-btns { display: flex; gap: 8px; justify-content: center; }
+    .sip-btn-primary {
+      background: #3D2B1F; color: white; border: none; padding: 9px 22px;
+      border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: .84rem;
+      font-weight: 700; cursor: pointer;
+    }
+    .sip-btn-outline {
+      background: transparent; color: #3D2B1F; border: 1.5px solid #3D2B1F;
+      padding: 9px 22px; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+      font-size: .84rem; font-weight: 700; cursor: pointer;
+    }
+
     .trust-badges {
       display: flex; justify-content: center; gap: 16px;
       font-size: .72rem; color: var(--text-muted);
@@ -1006,6 +1056,7 @@ export class CartComponent implements OnInit, OnDestroy {
 
   // ── Place order ───────────────────────────────────────
   placeOrder(): void {
+    if (!this.currentUser) { this.showAuthModal('login'); return; }
     if (this.checkoutForm.invalid || this.isPlacingOrder) {
       this.checkoutForm.markAllAsTouched();
       return;

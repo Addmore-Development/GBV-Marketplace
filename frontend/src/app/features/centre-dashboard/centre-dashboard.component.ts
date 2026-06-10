@@ -80,8 +80,8 @@ interface Need {
     </div>
 
     <div class="sb-status" *ngIf="!sidebarCollapsed">
-      <span class="status-dot verified"></span>
-      <span class="status-label">Verified & Live</span>
+      <span class="status-dot" [class.verified]="verificationStatus === 'verified'" [class.pending]="verificationStatus === 'pending'"></span>
+      <span class="status-label" [class.pending-label]="verificationStatus === 'pending'">{{ verificationStatus === 'verified' ? 'Verified & Live' : 'Pending Verification' }}</span>
     </div>
 
     <nav class="sb-nav">
@@ -127,8 +127,13 @@ interface Need {
     ════════════════════════════════════ -->
     <div class="tab-content" *ngIf="activeTab === 'overview'">
 
+      <!-- Pending verification banner -->
+      <div class="alert-banner info" *ngIf="verificationStatus === 'pending'">
+        🌿 <strong>Welcome, {{ (centreManagerName || '').split(' ')[0] }}!</strong> Your application for <strong>{{ centreName }}</strong> has been received and is under review (1–14 days). We'll email you at the address you registered with once approved.
+      </div>
+
       <!-- Alert banner -->
-      <div class="alert-banner warning" *ngIf="hasAlert">
+      <div class="alert-banner warning" *ngIf="hasAlert && verificationStatus === 'verified'">
         ⚠️ 3 new orders require packing confirmation.
         <button class="alert-action" (click)="activeTab = 'orders'">View orders →</button>
       </div>
@@ -560,12 +565,34 @@ interface Need {
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
     :host {
-      --gold: #C49A3C; --gold-light: #F5E9C8; --gold-dark: #B8860B;
-      --forest: #2D5016; --forest-deep: #1A3009; --forest-mid: #3D6B20;
-      --sage: #5A7A3A; --sage-light: #EFF4E8; --sage-mid: #D1DEC4;
-      --teal: #1A6B5A; --red: #EF4444; --amber: #D97706; --green: #16A34A;
-      --text-dark: #1C2B1A; --text-mid: #4A5C47; --text-light: #7A8C77; --text-muted: #9CA3AF;
-      --border: #E5E7EB; --bg: #F3F4F6; --white: #FFFFFF; --sidebar-w: 240px;
+      --cream:       #FAF7F2;
+      --beige:       #F0EAE0;
+      --beige-dark:  #DDD3C4;
+      --brown:       #3D2B1F;
+      --brown-mid:   #6B4C3B;
+      --brown-light: #A07858;
+      --black:       #1A1210;
+      --white:       #FFFFFF;
+      --border:      #E0D8CE;
+      --text-dark:   #1A1210;
+      --text-mid:    #4A3830;
+      --text-light:  #7A6A62;
+      --text-muted:  #9C8C84;
+      --green:       #2D6A4F;
+      --red:         #8B2635;
+      --gold:        #B8860B;
+      --gold-light:  #F5E9C8;
+      --gold-dark:   #B8860B;
+      --forest:      #3D2B1F;
+      --forest-deep: #1A1210;
+      --forest-mid:  #6B4C3B;
+      --sage:        #5A7A3A;
+      --sage-light:  #F0EAE0;
+      --sage-mid:    #DDD3C4;
+      --teal:        #2D6A4F;
+      --amber:       #B8860B;
+      --bg:          #FAF7F2;
+      --sidebar-w: 240px;
       font-family: 'DM Sans', sans-serif; display: block; min-height: 100vh;
     }
 
@@ -594,8 +621,8 @@ interface Need {
     .sb-centre-type { font-size: .66rem; color: rgba(255,255,255,.38); text-transform: uppercase; letter-spacing: .8px; }
     .sb-toggle { background: none; border: none; color: rgba(255,255,255,.4); cursor: pointer; font-size: .8rem; flex-shrink: 0; padding: 0; transition: color .2s; &:hover { color: white; } }
     .sb-status { display: flex; align-items: center; gap: 8px; padding: 10px 16px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; &.verified { background: var(--green); box-shadow: 0 0 6px rgba(22,163,74,.5); } }
-    .status-label { font-size: .74rem; color: var(--green); font-weight: 600; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; &.verified { background: var(--green); box-shadow: 0 0 6px rgba(22,163,74,.5); } &.pending { background: var(--amber); box-shadow: 0 0 6px rgba(184,134,11,.5); } }
+    .status-label { font-size: .74rem; color: var(--green); font-weight: 600; &.pending-label { color: var(--amber); } }
 
     .sb-nav { display: flex; flex-direction: column; gap: 2px; padding: 8px 8px; flex: 1; }
     .sb-link {
@@ -637,8 +664,9 @@ interface Need {
     /* Alert banner */
     .alert-banner {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; font-size: .86rem; font-weight: 600;
+      padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; font-size: .86rem; font-weight: 500;
       &.warning { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+      &.info    { background: #F0FDF4; color: #14532D; border: 1px solid #BBF7D0; }
     }
     .alert-action { background: #92400E; color: white; border: none; padding: 6px 14px; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: .78rem; font-weight: 700; cursor: pointer; }
 
@@ -857,6 +885,7 @@ export class CentreDashboardComponent implements OnInit {
   impactStory = '';
   storyQuarter = 'Q2 2026 (Apr–Jun)';
   Math = Math;
+  verificationStatus: 'verified' | 'pending' = 'verified';
 
   centreName = 'Thistle House';
   centreType = 'GBV Centre · Cape Town';
@@ -959,7 +988,57 @@ export class CentreDashboardComponent implements OnInit {
     { icon: '📦', value: '61', label: 'Products sold' },
   ];
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    // ── Pull data saved by the registration form ─────────────
+    const stored = {
+      name:        localStorage.getItem('centreName'),
+      type:        localStorage.getItem('centreType'),
+      city:        localStorage.getItem('centreCity'),
+      province:    localStorage.getItem('centreProvince'),
+      email:       localStorage.getItem('centreEmail'),
+      manager:     localStorage.getItem('centreManagerName'),
+      phone:       localStorage.getItem('centrePhone'),
+      npo:         localStorage.getItem('centreNpoNumber'),
+    };
+
+    if (stored.name) {
+      this.centreName = stored.name;
+
+      // Pretty-print centre type
+      const typeMap: Record<string, string> = {
+        gbv_centre:   'GBV Centre',
+        orphanage:    'Orphanage / Child Care',
+        old_age_home: 'Old Age Home',
+      };
+      const typeLabel = stored.type ? (typeMap[stored.type] || stored.type) : 'Care Centre';
+      this.centreType = typeLabel + (stored.city ? ` · ${stored.city}` : '');
+
+      if (stored.manager) {
+        this.centreManagerName = stored.manager;
+        this.centreInitials    = stored.manager.split(' ')
+          .map((w: string) => w[0])
+          .slice(0, 2)
+          .join('')
+          .toUpperCase();
+      }
+
+      // Pre-fill the editable profile form
+      if (stored.name)     this.profileForm.name      = stored.name;
+      if (stored.city)     this.profileForm.city      = stored.city;
+      if (stored.province) this.profileForm.province  = stored.province;
+      if (stored.phone)    this.profileForm.phone     = stored.phone;
+      if (stored.npo)      this.profileForm.npo_number = stored.npo;
+      const desc    = localStorage.getItem('centreDescription');
+      const mission = localStorage.getItem('centreMission');
+      const website = localStorage.getItem('centreWebsite');
+      if (desc)    this.profileForm.description = desc;
+      if (mission) this.profileForm.tagline     = mission.slice(0, 100);
+      if (website) this.profileForm.website     = website;
+
+      // Newly registered centres are pending verification
+      this.verificationStatus = 'pending';
+    }
+  }
 
   formatK(n: number): string {
     if (n >= 1000) return (n / 1000).toFixed(0) + 'K';

@@ -225,3 +225,35 @@ export const adminReviewCentre = async (req: Request, res: Response) => {
     client.release();
   }
 };
+// ─── LOGIN ────────────────────────────────────────────────────
+export const loginCentre = async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  try {
+    const result = await pool.query(
+      `SELECT id, centre_name, centre_type, contact_email, contact_person_name,
+              city, province, contact_phone, npo_number, password_hash, status
+       FROM centres WHERE contact_email = $1`,
+      [email]
+    );
+    if (!result.rows.length) return res.status(401).json({ error: 'Invalid email or password' });
+    const centre = result.rows[0];
+    const isValid = await bcrypt.compare(password, centre.password_hash);
+    if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
+    return res.json({
+      centre_id: centre.id,
+      centre_name: centre.centre_name,
+      centre_type: centre.centre_type,
+      contact_email: centre.contact_email,
+      contact_person_name: centre.contact_person_name,
+      city: centre.city,
+      province: centre.province,
+      contact_phone: centre.contact_phone,
+      npo_number: centre.npo_number,
+      status: centre.status,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};

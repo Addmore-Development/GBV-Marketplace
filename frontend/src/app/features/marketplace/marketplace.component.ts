@@ -53,26 +53,34 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
   authError = '';
   loginEmail = '';
   loginPassword = '';
-  loginRole: 'buyer'|'seller'|'centre' = 'buyer';
+  loginRole: 'buyer' | 'seller' | 'centre' = 'buyer';
   registerName = '';
   registerEmail = '';
   registerPassword = '';
-  registerRole: 'buyer'|'seller'|'centre' = 'buyer';
+  registerRole: 'buyer' | 'seller' | 'centre' = 'buyer';
   selectedProduct: Product | null = null;
   selectedQty = 1;
+  impactInfoOpen = false;
 
   private destroy$ = new Subject<void>();
 
   readonly categories = [
-    { key: 'all',        label: 'All Products', icon: '✦', count: 24 },
-    { key: 'jewellery',  label: 'Jewellery',    icon: '💛', count: 8  },
-    { key: 'textiles',   label: 'Clothing',     icon: '👗', count: 5  },
-    { key: 'food',       label: 'Food & Jams',  icon: '🍯', count: 4  },
-    { key: 'crafts',     label: 'Art & Crafts', icon: '🎨', count: 7  },
+    { key: 'all',       label: 'All Products' },
+    { key: 'jewellery', label: 'Jewellery & Accessories' },
+    { key: 'textiles',  label: 'Clothing & Textiles' },
+    { key: 'food',      label: 'Food & Jams' },
+    { key: 'crafts',    label: 'Art & Crafts' },
+  ];
+
+  readonly featuredCats = [
+    { key: 'jewellery', label: 'Jewellery & Accessories', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80' },
+    { key: 'textiles',  label: 'Clothing & Textiles',     img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80' },
+    { key: 'food',      label: 'Food & Jams',             img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&q=80' },
+    { key: 'crafts',    label: 'Art & Crafts',            img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
+    { key: 'all',       label: 'Shop All',                img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=400&q=80' },
   ];
 
   readonly allProducts: Product[] = [
-    // Jewellery
     {
       id: 'p001', title: 'Beaded Sunrise Necklace', seller_alias: 'Nomsa B.',
       centre_name: 'Thistle House', category: 'jewellery', price: 180,
@@ -110,10 +118,9 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       stock: 15, rating: 4.6, reviews: 11, sold: 29,
       img: 'https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?w=600&q=80',
       description: 'Made from recycled glass beads sourced locally. Adjustable fit.',
-      story: '"Recycling glass into jewellery — turning broken things into beautiful ones. That is our story too." — Palesa',
+      story: '"Recycling glass into jewellery — turning broken things into beautiful ones." — Palesa',
       seller_type: 'survivor'
     },
-    // Textiles
     {
       id: 'p005', title: 'Shweshwe Print Tote Bag', seller_alias: 'Zanele P.',
       centre_name: 'Thistle House', category: 'textiles', price: 220,
@@ -134,15 +141,14 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       story: '"I brought these dyeing techniques from Nigeria. Now I share them here." — Fatima',
       seller_type: 'survivor'
     },
-    // Food
     {
       id: 'p007', title: 'Fig & Ginger Preserve (3-pack)', seller_alias: 'Gogo Dlamini',
       centre_name: 'Khanya Elderly Home', category: 'food', price: 120,
       survivor_income: 84, centre_funding: 36, platform_fee: 6,
       stock: 18, rating: 5.0, reviews: 41, sold: 112,
       img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=600&q=80',
-      description: 'Three jars of homemade fig and ginger preserve. No artificial preservatives. Made in small batches.',
-      story: '"I have been making jam since 1975. At 74, I am still the best cook in this place." — Gogo Dlamini',
+      description: 'Three jars of homemade fig and ginger preserve. No artificial preservatives.',
+      story: '"I have been making jam since 1975. At 74, I am still the best cook here." — Gogo Dlamini',
       badge: 'bestseller', seller_type: 'elderly'
     },
     {
@@ -155,7 +161,6 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       story: '"I started mixing scrubs during lockdown. Now it pays school fees." — Amahle',
       seller_type: 'survivor'
     },
-    // Crafts
     {
       id: 'p009', title: 'Hand-Thrown Earth Bowl', seller_alias: 'Sipho K.',
       centre_name: 'Ubuntu Youth Programme', category: 'crafts', price: 340,
@@ -172,7 +177,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       survivor_income: 196, centre_funding: 84, platform_fee: 14,
       stock: 6, rating: 4.8, reviews: 12, sold: 29,
       img: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=600&q=80',
-      description: 'Intricate wire bicycle sculpture, approx. 25cm. A staple of South African township craft tradition.',
+      description: 'Intricate wire bicycle sculpture, approx. 25cm.',
       story: '"I started making wire toys at 8 to sell at robots. Now I sell internationally." — Lebo, 22',
       seller_type: 'youth'
     },
@@ -192,7 +197,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       survivor_income: 206.5, centre_funding: 88.5, platform_fee: 14.75,
       stock: 9, rating: 4.9, reviews: 24, sold: 58,
       img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=600&q=80',
-      description: 'Large hand-woven sisal basket with leather handles. Strong enough for a full grocery shop.',
+      description: 'Large hand-woven sisal basket with leather handles.',
       story: '"My mother taught me this weave. I am teaching my daughter. Three generations." — Nomvula',
       badge: 'bestseller', seller_type: 'survivor'
     },
@@ -208,10 +213,10 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
         p.seller_alias.toLowerCase().includes(this.searchQuery.toLowerCase());
       return catMatch && priceMatch && searchMatch;
     }).sort((a, b) => {
-      if (this.sortBy === 'popular')   return b.sold - a.sold;
-      if (this.sortBy === 'price-asc') return a.price - b.price;
+      if (this.sortBy === 'popular')    return b.sold - a.sold;
+      if (this.sortBy === 'price-asc')  return a.price - b.price;
       if (this.sortBy === 'price-desc') return b.price - a.price;
-      if (this.sortBy === 'rating')    return b.rating - a.rating;
+      if (this.sortBy === 'rating')     return b.rating - a.rating;
       return 0;
     });
   }
@@ -234,16 +239,33 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
   @HostListener('window:scroll')
   onScroll(): void { this.scrolled = window.scrollY > 40; }
 
+  getCategoryLabel(): string {
+    return this.categories.find(c => c.key === this.activeCategory)?.label || '';
+  }
+
   formatPrice(p: number): string { return `R${(p || 0).toFixed(2)}`; }
-  formatSurvivorPct(p: Product): string { return `${Math.round((p.survivor_income / p.price) * 100)}%`; }
 
   openProduct(p: Product): void { this.selectedProduct = p; this.selectedQty = 1; }
   closeProduct(): void { this.selectedProduct = null; }
 
+  scrollToProducts(): void {
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+  }
+
   addToCart(p: Product, qty = 1): void {
+    if (!this.currentUser) { this.showAuthModal('login'); return; }
     if (this.addingIds.has(p.id)) return;
     this.addingIds.add(p.id);
-    this.cartService.addToCart(p.id, qty).subscribe({
+    this.cartService.addToCart(p.id, qty, {
+      title: p.title,
+      price: p.price,
+      thumbnail: p.img,
+      seller_alias: p.seller_alias,
+      centre_name: p.centre_name,
+      survivor_income: p.survivor_income,
+      centre_funding: p.centre_funding,
+      platform_fee: p.platform_fee,
+    }).subscribe({
       next: () => {
         this.addingIds.delete(p.id);
         this.addedIds.add(p.id);
@@ -280,12 +302,16 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
 
   doRegister(): void {
     this.authError = '';
+    if (this.registerRole === 'centre') { this.authModal = ''; this.router.navigate(['/register/centre']); return; }
+    if (this.registerRole === 'seller') { this.authModal = ''; this.router.navigate(['/register/seller']); return; }
     if (!this.registerName || !this.registerEmail || !this.registerPassword) { this.authError = 'Please fill in all fields.'; return; }
     if (this.registerPassword.length < 8) { this.authError = 'Password must be at least 8 characters.'; return; }
     const ok = this.authService.register(this.registerName, this.registerEmail, this.registerPassword, this.registerRole);
-    if (ok && this.registerRole === 'buyer') this.authModal = '';
-    else if (!ok) this.authError = 'Registration failed. Please try again.';
+    if (ok) this.authModal = '';
+    else this.authError = 'Registration failed. Please try again.';
   }
+
+  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
 
   stars(rating: number): boolean[] {
     return Array.from({ length: 5 }, (_, i) => i < Math.round(rating));
@@ -294,7 +320,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
   getButtonLabel(p: Product): string {
     if (p.stock === 0) return 'Out of stock';
     if (this.addingIds.has(p.id)) return 'Adding…';
-    if (this.addedIds.has(p.id)) return '✓ Added';
+    if (this.addedIds.has(p.id)) return 'Added';
     return '+ Add to cart';
   }
 
@@ -304,6 +330,5 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     return 'card-add-btn';
   }
 
-  goToDonate(): void { this.router.navigate(['/donate']); }
-  goToCentres(): void { this.router.navigate(['/for-centres']); }
+  goToContribute(): void { this.router.navigate(['/centres']); }
 }

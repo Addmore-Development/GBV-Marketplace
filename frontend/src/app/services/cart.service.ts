@@ -2,8 +2,7 @@
 // frontend/src/app/services/cart.service.ts
 // ============================================================
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, of } from 'rxjs';
 
 export interface CartItem {
   product_id: string;
@@ -27,54 +26,67 @@ export interface Cart {
 
 @Injectable({ providedIn: 'root' })
 export class CartService {
-  private readonly API = 'http://localhost:3000/api/marketplace';
-  private sessionId: string;
-
-  private cartSubject = new BehaviorSubject<Cart>({ items: [], subtotal: 0 });
+  private cartSubject = new BehaviorSubject<Cart>(this.loadFromStorage());
   cart$ = this.cartSubject.asObservable();
-  cartCount$ = new BehaviorSubject<number>(0);
+  cartCount$ = new BehaviorSubject<number>(this.cartSubject.value.items.reduce((s, i) => s + i.quantity, 0));
 
-  constructor(private http: HttpClient) {
-    this.sessionId = localStorage.getItem('amani_session') || this.generateSession();
-    this.loadCart();
+  private loadFromStorage(): Cart {
+    try {
+      const stored = localStorage.getItem('amani_cart');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return { items: [], subtotal: 0 };
   }
 
-  private generateSession(): string {
-    const id = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('amani_session', id);
-    return id;
+  private persist(cart: Cart): void {
+    localStorage.setItem('amani_cart', JSON.stringify(cart));
   }
 
-  private get headers(): HttpHeaders {
-    return new HttpHeaders({ 'x-session-id': this.sessionId });
+  private recalc(items: CartItem[]): Cart {
+    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    return { items, subtotal };
   }
 
-  loadCart(): void {
-    this.http.get<Cart>(`${this.API}/cart`, { headers: this.headers })
-      .subscribe({
-        next: cart => {
-          this.cartSubject.next(cart);
-          this.cartCount$.next(cart.items.reduce((s, i) => s + i.quantity, 0));
-        },
-        error: () => {}
+  private emit(cart: Cart): void {
+    this.cartSubject.next(cart);
+    this.cartCount$.next(cart.items.reduce((s, i) => s + i.quantity, 0));
+    this.persist(cart);
+  }
+
+  addToCart(
+    productId: string,
+    quantity: number,
+    meta?: Partial<CartItem>
+  ): Observable<Cart> {
+    const items = [...this.cartSubject.value.items];
+    const idx = items.findIndex(i => i.product_id === productId);
+
+    if (quantity === 0) {
+      // Remove
+      if (idx >= 0) items.splice(idx, 1);
+    } else if (idx >= 0) {
+      // Update quantity
+      items[idx] = { ...items[idx], quantity };
+    } else if (meta) {
+      // Add new item
+      items.push({
+        product_id: productId,
+        title: meta.title || '',
+        price: meta.price || 0,
+        quantity,
+        thumbnail: meta.thumbnail || '',
+        seller_alias: meta.seller_alias || '',
+        centre_name: meta.centre_name || '',
+        currency: 'ZAR',
+        survivor_income: meta.survivor_income || 0,
+        centre_funding: meta.centre_funding || 0,
+        platform_fee: meta.platform_fee || 0,
       });
-  }
+    }
 
-  addToCart(productId: string, quantity: number): Observable<Cart> {
-    return this.http.post<Cart>(
-      `${this.API}/cart`,
-      { product_id: productId, quantity },
-      { headers: this.headers }
-    ).pipe(
-      tap(cart => {
-        if (cart.session_id) {
-          this.sessionId = cart.session_id;
-          localStorage.setItem('amani_session', cart.session_id);
-        }
-        this.cartSubject.next(cart);
-        this.cartCount$.next(cart.items.reduce((s, i) => s + i.quantity, 0));
-      })
-    );
+    const cart = this.recalc(items);
+    this.emit(cart);
+    return of(cart);
   }
 
   removeFromCart(productId: string): Observable<Cart> {
@@ -86,16 +98,17 @@ export class CartService {
   }
 
   placeOrder(orderData: any): Observable<any> {
-    return this.http.post(
-      `${this.API}/orders`, orderData, { headers: this.headers }
-    ).pipe(tap(() => {
-      this.cartSubject.next({ items: [], subtotal: 0 });
-      this.cartCount$.next(0);
-    }));
+    const orderId = 'ORD-' + Date.now().toString(36).toUpperCase();
+    const receipt = { orderId, ...orderData };
+    localStorage.setItem('amani_last_order', JSON.stringify(receipt));
+    const empty: Cart = { items: [], subtotal: 0 };
+    this.emit(empty);
+    return of({ success: true, orderId, receipt });
   }
 
   getImpactReceipt(orderId: string): Observable<any> {
-    return this.http.get(`${this.API}/orders/${orderId}/receipt`);
+    const stored = localStorage.getItem('amani_last_order');
+    return of(stored ? JSON.parse(stored) : null);
   }
 
   get currentCart(): Cart { return this.cartSubject.value; }

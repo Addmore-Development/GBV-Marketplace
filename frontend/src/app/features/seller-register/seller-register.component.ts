@@ -6,7 +6,9 @@ import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
+import { AuthService, User } from '../../services/auth.service';
+import { FormsModule } from '@angular/forms';
 
 interface Step {
   label: string;
@@ -23,7 +25,7 @@ interface Centre {
 @Component({
   selector: 'app-seller-register',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, HttpClientModule],
+  imports: [CommonModule, ReactiveFormsModule, HttpClientModule, FormsModule, RouterModule],
   templateUrl: './seller-register.component.html',
   styleUrls: ['./seller-register.component.scss'],
 })
@@ -32,6 +34,17 @@ export class SellerRegisterComponent implements OnInit {
   isSubmitting = false;
   submitError = '';
   submitSuccess = false;
+  // ── Nav auth state ────────────────────────────────────
+  currentUser: User | null = null;
+  authModal = '';
+  loginRole: 'buyer' | 'seller' | 'centre' = 'buyer';
+  loginEmail = '';
+  loginPassword = '';
+  authError = '';
+  registerRole: 'buyer' | 'seller' | 'centre' = 'buyer';
+  registerName = '';
+  registerEmail = '';
+  registerPassword = '';
 
   centres: Centre[] = [];
   isLoadingCentres = true;
@@ -54,12 +67,14 @@ export class SellerRegisterComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private http: HttpClient,
-    public router: Router
+    public router: Router,
+    private authService: AuthService,
   ) {}
 
   ngOnInit(): void {
     this.buildForm();
     this.loadCentres();
+    this.authService.user$.subscribe(u => this.currentUser = u);
   }
 
   buildForm(): void {
@@ -323,4 +338,28 @@ export class SellerRegisterComponent implements OnInit {
   quickExit(): void {
     window.location.href = '/news';
   }
+  // ── Nav auth methods ──────────────────────────────────
+  showAuthModal(modal: string): void { this.authModal = modal; this.authError = ''; }
+  closeAuthModal(e: MouseEvent): void { this.authModal = ''; }
+
+  doLogin(): void {
+    this.authError = '';
+    if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
+    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole);
+    if (ok) { this.authModal = ''; }
+    else { this.authError = 'Login failed. Please try again.'; }
+  }
+
+  doRegisterModal(): void {
+    this.authError = '';
+    if (this.registerRole === 'centre') { this.authModal = ''; this.router.navigate(['/register/centre']); return; }
+    if (this.registerRole === 'seller') { this.authModal = ''; this.router.navigate(['/register/seller']); return; }
+    if (!this.registerName || !this.registerEmail || !this.registerPassword) { this.authError = 'Please fill in all fields.'; return; }
+    if (this.registerPassword.length < 8) { this.authError = 'Password must be 8+ characters.'; return; }
+    const ok = this.authService.register(this.registerName, this.registerEmail, this.registerPassword, this.registerRole);
+    if (ok) { this.authModal = ''; }
+    else { this.authError = 'Registration failed. Please try again.'; }
+  }
+
+  logout(): void { this.authService.logout(); }
 }

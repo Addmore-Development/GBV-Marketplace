@@ -1,0 +1,489 @@
+<!-- frontend/src/app/features/centres/centres.component.html -->
+
+<!-- ── NAV ── -->
+<nav class="page-nav">
+  <div class="page-nav-inner">
+    <div class="nav-left">
+      <a routerLink="/marketplace" class="back-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Marketplace
+      </a>
+      <a routerLink="/marketplace" class="nav-brand">
+        <div class="brand-mark">A</div>
+        <div class="brand-text">
+          <span class="brand-name">Amani</span>
+          <span class="brand-sub">Centres</span>
+        </div>
+      </a>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-donate-nav" (click)="showDonate()">Donate</button>
+      <button class="btn-volunteer-nav" (click)="showVolunteer()">Volunteer</button>
+      <ng-container *ngIf="!currentUser">
+        <button class="btn-ghost" (click)="activeModal = 'auth'; authTab = 'login'">Sign In</button>
+        <button class="btn-solid" (click)="activeModal = 'auth'; authTab = 'register'">Register</button>
+      </ng-container>
+      <ng-container *ngIf="currentUser">
+        <div class="user-chip">
+          <div class="user-avatar">{{ currentUser.initials }}</div>
+          <span class="user-name">{{ currentUser.name.split(' ')[0] }}</span>
+        </div>
+        <button class="btn-ghost small" (click)="logout()">Sign out</button>
+      </ng-container>
+    </div>
+  </div>
+</nav>
+
+<!-- ── PAGE HEADER ── -->
+<div class="page-header">
+  <div class="ph-inner">
+    <h1 class="ph-title">Support a Centre</h1>
+    <p class="ph-sub">Browse verified care centres across South Africa. Donate, volunteer, or find help near you.</p>
+    <div class="ph-actions">
+      <button class="btn-primary" (click)="showDonate()">Donate to a Centre</button>
+      <button class="btn-outline" (click)="showVolunteer()">Volunteer Your Skills</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── NOTICE BOARD SLIDESHOW ── -->
+<section class="noticeboard" [style.background-image]="'url(' + (noticePosts[currentSlide].img || currentNoticeImg) + ')'" style="background-size:cover;background-position:center;">
+  <div class="nb-overlay">
+  <div class="nb-inner">
+    <div class="nb-header">
+      <h2 class="nb-title">Notice Board</h2>
+      <p class="nb-sub">Updates, achievements, and opportunities from our network of verified centres</p>
+    </div>
+
+    <div class="nb-slideshow">
+      <div class="nb-slide" *ngFor="let post of noticePosts; let i = index"
+        [class.active]="i === currentSlide">
+        <div class="nb-slide-inner">
+          <div class="nb-slide-content">
+            <div class="nb-badge" [style.background]="post.badge_color">
+              {{ post.type === 'achievement' ? 'Achievement' :
+                 post.type === 'job'         ? 'Opportunity' :
+                 post.type === 'appeal'      ? 'Appeal'      :
+                 post.type === 'update'      ? 'Update'      : 'Notice' }}
+            </div>
+            <div class="nb-centre-name">{{ post.centre_name }}</div>
+            <h3 class="nb-post-title">{{ post.title }}</h3>
+            <p class="nb-post-body">{{ post.body }}</p>
+            <div class="nb-post-date">{{ post.date | date:'d MMMM yyyy' }}</div>
+          </div>
+          <div class="nb-slide-img" *ngIf="post.img">
+            <img [src]="post.img" [alt]="post.title" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <button class="nb-arrow nb-prev" (click)="prevSlide()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="nb-arrow nb-next" (click)="nextSlide()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
+      <!-- Dots -->
+      <div class="nb-dots">
+        <button class="nb-dot" *ngFor="let p of noticePosts; let i = index"
+          [class.active]="i === currentSlide" (click)="goToSlide(i)">
+        </button>
+      </div>
+    </div>
+  </div>
+  </div>
+</section>
+
+<!-- ── SEARCH + FILTERS ── -->
+<section class="search-section">
+  <div class="search-inner">
+    <div class="search-bar-wrap">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input class="search-input" type="text" placeholder="Search by centre name, city, suburb, or service…"
+        [(ngModel)]="searchQuery" />
+      <button class="search-clear" *ngIf="searchQuery" (click)="searchQuery = ''">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="filter-row">
+      <select class="filter-select" [(ngModel)]="selectedProvince">
+        <option value="">All Provinces</option>
+        <option *ngFor="let p of provinces" [value]="p">{{ p }}</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="selectedType">
+        <option value="">All Centre Types</option>
+        <option *ngFor="let t of centreTypes" [value]="t.value">{{ t.label }}</option>
+      </select>
+      <span class="results-label">{{ filteredCentres.length }} centre{{ filteredCentres.length !== 1 ? 's' : '' }} found</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── CENTRE GRID ── -->
+<section class="centres-section">
+  <div class="centres-inner">
+
+    <div class="centre-grid" *ngIf="filteredCentres.length > 0">
+      <div class="centre-card" *ngFor="let c of filteredCentres">
+        <!-- Image -->
+        <div class="cc-visual">
+          <img [src]="c.img" [alt]="c.name" />
+          <div class="cc-type-badge">{{ getTypeLabel(c.type) }}</div>
+          <div class="cc-verified" *ngIf="c.verified">Verified</div>
+        </div>
+
+        <!-- Body -->
+        <div class="cc-body">
+          <h3 class="cc-name">{{ c.name }}</h3>
+          <div class="cc-location">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {{ c.suburb }}, {{ c.city }}, {{ c.province }}
+          </div>
+
+          <!-- Public info (visible to all) -->
+          <p class="cc-desc">{{ c.description | slice:0:140 }}…</p>
+
+          <div class="cc-services-preview">
+            <span class="cc-svc" *ngFor="let s of c.services.slice(0,3)">{{ s }}</span>
+            <span class="cc-svc more" *ngIf="c.services.length > 3">+{{ c.services.length - 3 }} more</span>
+          </div>
+
+          <div class="cc-flags">
+            <span class="cc-flag" *ngIf="c.is_24_hour">24/7 Service</span>
+            <span class="cc-flag shelter" *ngIf="c.has_shelter">Shelter</span>
+            <span class="cc-flag counsel" *ngIf="c.provides_counselling">Counselling</span>
+            <span class="cc-flag legal" *ngIf="c.provides_legal_support">Legal Aid</span>
+          </div>
+
+          <!-- Contact info: login required -->
+          <div class="cc-contact-locked" *ngIf="!currentUser">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Sign in to view contact details</span>
+          </div>
+
+          <div class="cc-contact-info" *ngIf="currentUser">
+            <a *ngIf="c.contact_phone" [href]="'tel:' + c.contact_phone" class="cc-contact-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.92 6.92l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+              {{ c.contact_phone }}
+            </a>
+            <a *ngIf="c.contact_email" [href]="'mailto:' + c.contact_email" class="cc-contact-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              {{ c.contact_email }}
+            </a>
+          </div>
+
+          <!-- Actions -->
+          <div class="cc-actions">
+            <button class="cc-btn-donate"    (click)="$event.stopPropagation(); showDonate(c)">Donate</button>
+            <button class="cc-btn-volunteer" (click)="$event.stopPropagation(); showVolunteer(c)">Volunteer</button>
+            <button class="cc-btn-view"      (click)="$event.stopPropagation(); openCentre(c)">
+              {{ currentUser ? 'View Profile' : 'Preview' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-state" *ngIf="filteredCentres.length === 0">
+      <h3>No centres found</h3>
+      <p>Try adjusting your search or removing a filter.</p>
+      <button class="btn-outline" (click)="searchQuery=''; selectedProvince=''; selectedType=''">Clear filters</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── MODAL BACKDROP ── -->
+<div class="modal-backdrop" [class.open]="activeModal" (click)="closeModal($event)">
+
+  <!-- ── AUTH MODAL ── -->
+  <div class="modal auth-modal open" (click)="$event.stopPropagation()" *ngIf="activeModal === 'auth'">
+    <button class="modal-close" (click)="closeModalDirect()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-logo-mark">A</div>
+
+    <div class="modal-tabs-bar">
+      <button class="modal-tab" [class.active]="authTab === 'login'"    (click)="authTab = 'login'">Sign In</button>
+      <button class="modal-tab" [class.active]="authTab === 'register'" (click)="authTab = 'register'">Register</button>
+    </div>
+
+    <!-- Login -->
+    <div *ngIf="authTab === 'login'">
+      <h2 class="modal-title">Welcome back</h2>
+      <p class="modal-sub">Sign in to access contact details, donate, and volunteer</p>
+      <div class="role-tabs">
+        <button [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
+        <button [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
+        <button [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
+      </div>
+      <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
+      <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
+      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+      <button class="modal-cta" (click)="doLogin()">Sign In</button>
+    </div>
+
+    <!-- Register -->
+    <div *ngIf="authTab === 'register'">
+      <h2 class="modal-title">Create an account</h2>
+      <p class="modal-sub">Register to contribute, volunteer, and connect with centres</p>
+      <div class="role-select-grid">
+        <div class="role-opt" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
+          <div class="ro-label">Buyer</div><div class="ro-desc">Shop &amp; donate</div>
+        </div>
+        <div class="role-opt" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
+          <div class="ro-label">Seller</div><div class="ro-desc">Sell creations</div>
+        </div>
+        <div class="role-opt" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
+          <div class="ro-label">Centre</div><div class="ro-desc">Register centre</div>
+        </div>
+      </div>
+      <ng-container *ngIf="registerRole !== 'centre' && registerRole !== 'seller'">
+        <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
+        <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
+        <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
+      </ng-container>
+      <ng-container *ngIf="registerRole === 'centre' || registerRole === 'seller'">
+        <div class="centre-cta-preview">
+          <p *ngIf="registerRole === 'centre'">Centre registration requires a full 9-step application. Click below to begin.</p>
+          <p *ngIf="registerRole === 'seller'">Seller registration requires NRSO vetting. Click below to begin your application.</p>
+        </div>
+      </ng-container>
+      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+      <button class="modal-cta" (click)="doRegister()">
+        {{ registerRole === 'centre' ? 'Start Centre Registration' : registerRole === 'seller' ? 'Start Seller Application' : 'Create Account' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ── CENTRE DETAIL MODAL (logged in) ── -->
+  <div class="modal modal-xl open" (click)="$event.stopPropagation()" *ngIf="activeModal === 'centre-detail' && selectedCentre">
+    <button class="modal-close" (click)="closeModalDirect()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="centre-detail-grid">
+      <div class="cd-image">
+        <img [src]="selectedCentre.img" [alt]="selectedCentre.name" />
+        <div class="cd-type">{{ getTypeLabel(selectedCentre.type) }}</div>
+      </div>
+      <div class="cd-info">
+        <div class="cd-verified" *ngIf="selectedCentre.verified">Verified Centre</div>
+        <h2 class="cd-name">{{ selectedCentre.name }}</h2>
+        <div class="cd-location">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          {{ selectedCentre.suburb }}, {{ selectedCentre.city }}, {{ selectedCentre.province }}
+        </div>
+
+        <p class="cd-desc">{{ selectedCentre.description }}</p>
+
+        <div class="cd-mission">
+          <div class="cd-section-label">Mission</div>
+          <p>{{ selectedCentre.mission }}</p>
+        </div>
+
+        <div class="cd-row-stats">
+          <div class="cd-stat"><span class="cd-stat-val">{{ selectedCentre.year_established }}</span><span class="cd-stat-label">Est.</span></div>
+          <div class="cd-stat"><span class="cd-stat-val">{{ selectedCentre.capacity }}</span><span class="cd-stat-label">Capacity</span></div>
+          <div class="cd-stat"><span class="cd-stat-val">{{ selectedCentre.beneficiaries_per_year }}</span><span class="cd-stat-label">Served / year</span></div>
+        </div>
+
+        <div class="cd-section-label">Services Offered</div>
+        <div class="cd-services">
+          <span class="cd-svc" *ngFor="let s of selectedCentre.services">{{ s }}</span>
+        </div>
+
+        <div class="cd-section-label">Languages Spoken</div>
+        <div class="cd-langs">
+          <span *ngFor="let l of selectedCentre.languages" class="cd-lang">{{ l }}</span>
+        </div>
+
+        <div class="cd-section-label">Contact Details</div>
+        <div class="cd-contacts">
+          <a *ngIf="selectedCentre.contact_phone" [href]="'tel:' + selectedCentre.contact_phone" class="cd-contact">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.92 6.92l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            {{ selectedCentre.contact_phone }}
+          </a>
+          <a *ngIf="selectedCentre.contact_email" [href]="'mailto:' + selectedCentre.contact_email" class="cd-contact">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            {{ selectedCentre.contact_email }}
+          </a>
+          <a *ngIf="selectedCentre.whatsapp" [href]="'https://wa.me/27' + selectedCentre.whatsapp.slice(1)" target="_blank" class="cd-contact whatsapp">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            WhatsApp
+          </a>
+          <a *ngIf="selectedCentre.website" [href]="selectedCentre.website" target="_blank" class="cd-contact">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+            Website
+          </a>
+        </div>
+
+        <div class="cd-footer-actions">
+          <button class="btn-primary cd-action-btn" (click)="showDonate(selectedCentre)">💛 Donate to this Centre</button>
+          <button class="btn-outline cd-action-btn" (click)="showVolunteer(selectedCentre)">🤝 Volunteer Here</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CENTRE PREVIEW MODAL (not logged in) ── -->
+  <div class="modal open" (click)="$event.stopPropagation()" *ngIf="activeModal === 'centre-preview' && selectedCentre">
+    <button class="modal-close" (click)="closeModalDirect()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-logo-mark">A</div>
+    <h2 class="modal-title">{{ selectedCentre.name }}</h2>
+    <div class="preview-location">{{ selectedCentre.city }}, {{ selectedCentre.province }}</div>
+    <p class="modal-sub" style="margin-bottom:16px">{{ selectedCentre.description | slice:0:180 }}…</p>
+    <div class="preview-services">
+      <span class="cd-svc" *ngFor="let s of selectedCentre.services.slice(0,4)">{{ s }}</span>
+    </div>
+    <div class="locked-notice">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Sign in or register to view full details, contact information, and to donate or volunteer.
+    </div>
+    <div class="preview-auth-btns">
+      <button class="modal-cta" (click)="authTab = 'login'; activeModal = 'auth'">Sign In</button>
+      <button class="modal-cta outline" (click)="authTab = 'register'; activeModal = 'auth'">Register</button>
+    </div>
+  </div>
+
+  <!-- ── DONATE MODAL ── -->
+  <div class="modal modal-lg open" (click)="$event.stopPropagation()" *ngIf="activeModal === 'donate'">
+    <button class="modal-close" (click)="closeModalDirect()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal-title">Donate to a Centre</h2>
+    <p class="modal-sub">Support verified centres with money, goods, or essential necessities</p>
+
+    <!-- Donate type tabs -->
+    <div class="donate-type-tabs">
+      <button [class.active]="donateType === 'money'" (click)="donateType = 'money'">Money</button>
+      <button [class.active]="donateType === 'goods'" (click)="donateType = 'goods'">Goods</button>
+      <button [class.active]="donateType === 'time'"  (click)="donateType = 'time'">Time</button>
+    </div>
+
+    <form [formGroup]="donateForm" (ngSubmit)="submitDonate()">
+      <div class="mf-group">
+        <label>Select Centre</label>
+        <select formControlName="centre_id">
+          <option value="">Choose a centre…</option>
+          <option *ngFor="let c of allCentres" [value]="c.id">{{ c.name }} — {{ c.city }}</option>
+        </select>
+      </div>
+      <div class="mf-group">
+        <label>Your Full Name</label>
+        <input type="text" formControlName="donor_name" placeholder="e.g. Nomsa Dlamini" />
+      </div>
+      <div class="mf-group">
+        <label>Your Email</label>
+        <input type="email" formControlName="donor_email" placeholder="you@example.com" />
+      </div>
+
+      <!-- Money -->
+      <ng-container *ngIf="donateType === 'money'">
+        <div class="amount-grid">
+          <button type="button" class="amount-btn" *ngFor="let a of [50, 100, 250, 500]"
+            [class.selected]="donateForm.get('amount')?.value === a"
+            (click)="donateForm.patchValue({amount: a})">R{{ a }}</button>
+        </div>
+        <div class="mf-group">
+          <label>Or enter amount (R)</label>
+          <input type="number" formControlName="amount" placeholder="e.g. 150" min="10" />
+        </div>
+        <div class="mf-group">
+          <label>Payment Method</label>
+          <select formControlName="payment_method">
+            <option value="">Select…</option>
+            <option value="eft">EFT / Bank Transfer</option>
+            <option value="card">Credit / Debit Card</option>
+            <option value="snapscan">SnapScan</option>
+          </select>
+        </div>
+      </ng-container>
+
+      <!-- Goods -->
+      <ng-container *ngIf="donateType === 'goods'">
+        <div class="goods-categories">
+          <div class="goods-cat" *ngFor="let g of ['Clothing', 'Blankets & Linen', 'Toys', 'Baby Items', 'Toiletries', 'Food & Groceries', 'School Supplies', 'Medical Supplies', 'Furniture']">{{ g }}</div>
+        </div>
+        <div class="mf-group">
+          <label>Describe what you're donating</label>
+          <textarea formControlName="goods_desc" rows="3" placeholder="e.g. 10 winter blankets, size 8 school shoes, 2 boxes of toiletries"></textarea>
+        </div>
+      </ng-container>
+
+      <!-- Time -->
+      <ng-container *ngIf="donateType === 'time'">
+        <div class="mf-note info">Donating your time? Use the Volunteer form for a proper match and approval process.</div>
+        <button type="button" class="modal-cta outline" (click)="closeModalDirect(); showVolunteer()">Switch to Volunteer Form</button>
+      </ng-container>
+
+      <div class="mf-group" *ngIf="donateType !== 'time'">
+        <label>Message (optional)</label>
+        <textarea formControlName="message" rows="2" placeholder="A message to the centre or its residents…"></textarea>
+      </div>
+
+      <button type="submit" class="modal-cta" *ngIf="donateType !== 'time'">Submit Donation</button>
+    </form>
+  </div>
+
+  <!-- ── VOLUNTEER MODAL ── -->
+  <div class="modal modal-lg open" (click)="$event.stopPropagation()" *ngIf="activeModal === 'volunteer'">
+    <button class="modal-close" (click)="closeModalDirect()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal-title">Volunteer Your Skills</h2>
+    <p class="modal-sub">Submit your application and wait for the centre to approve your placement. All volunteers working with vulnerable people require NRSO clearance (arranged through Amani — free of charge).</p>
+
+    <form [formGroup]="volunteerForm" (ngSubmit)="submitVolunteer()">
+      <div class="mf-group">
+        <label>Select Centre</label>
+        <select formControlName="centre_id">
+          <option value="">Choose a centre…</option>
+          <option *ngFor="let c of allCentres" [value]="c.id">{{ c.name }} — {{ c.city }}</option>
+        </select>
+      </div>
+      <div class="cf-row">
+        <div class="mf-group">
+          <label>Full Name</label>
+          <input type="text" formControlName="full_name" placeholder="Your full name" />
+        </div>
+        <div class="mf-group">
+          <label>Phone Number</label>
+          <input type="tel" formControlName="phone" placeholder="e.g. 0821234567" />
+        </div>
+      </div>
+      <div class="mf-group">
+        <label>Email</label>
+        <input type="email" formControlName="email" placeholder="you@example.com" />
+      </div>
+      <div class="mf-group">
+        <label>Your Skills</label>
+        <input type="text" formControlName="skills" placeholder="e.g. Counselling, Legal Aid, Cooking, Teaching, Driving, IT" />
+      </div>
+      <div class="mf-group">
+        <label>Availability</label>
+        <select formControlName="availability">
+          <option value="">Select…</option>
+          <option value="weekends">Weekends only</option>
+          <option value="weekdays">Weekdays</option>
+          <option value="flexible">Flexible</option>
+          <option value="once-off">Once-off</option>
+          <option value="remote">Remote / Online only</option>
+        </select>
+      </div>
+      <div class="mf-group">
+        <label>Additional Information (optional)</label>
+        <textarea formControlName="message" rows="3" placeholder="Tell the centre about yourself and what you'd like to contribute…"></textarea>
+      </div>
+      <div class="mf-note vetting">All volunteers working with vulnerable populations require NRSO clearance and SAPS background check. Amani facilitates this free of charge after your application is approved by the centre.</div>
+      <button type="submit" class="modal-cta">Submit Volunteer Application</button>
+    </form>
+  </div>
+
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" [class.show]="toastVisible">{{ toastMsg }}</div>

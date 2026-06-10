@@ -52,6 +52,9 @@
       <button class="sb-link" [class.active]="activeTab === 'centre'" (click)="activeTab = 'centre'">
         <span class="sb-icon">🏢</span><span class="sb-label">My Centre</span>
       </button>
+      <button class="sb-link" [class.active]="activeTab === 'volunteer'" (click)="activeTab = 'volunteer'">
+        <span class="sb-icon">🤝</span><span class="sb-label">Volunteer</span>
+      </button>
       <button class="sb-link" [class.active]="activeTab === 'learn'" (click)="activeTab = 'learn'">
         <span class="sb-icon">🌱</span><span class="sb-label">Grow & Learn</span>
       </button>
@@ -64,7 +67,7 @@
       </button>
       <div class="sb-divider"></div>
       <button class="sb-link sanctuary-link" (click)="requestSanctuary()">
-        <span class="sb-icon">🔐</span><span class="sb-label">My Sanctuary</span>
+        <span class="sb-icon">🔐</span><span class="sb-label">My Stats</span>
       </button>
     </nav>
 
@@ -87,6 +90,7 @@
                activeTab === 'listings' ? 'My Listings' :
                activeTab === 'earnings' ? 'My Earnings' :
                activeTab === 'centre' ? 'My Centre' :
+               activeTab === 'volunteer' ? 'Volunteer' :
                activeTab === 'learn' ? 'Grow & Learn' :
                activeTab === 'contacts' ? 'My Circle' :
                activeTab === 'profile' ? 'My Story' : 'Dashboard' }}</h1>
@@ -103,7 +107,6 @@
       <span>Your story isn't complete yet — <strong>complete your profile</strong> to start listing your work.</span>
       <button (click)="activeTab = 'profile'">Complete now →</button>
     </div>
-
     <!-- ════════════════════════════════════
          TAB: HOME / MY STUDIO
     ════════════════════════════════════ -->
@@ -314,47 +317,90 @@
     </div>
 
     <!-- ════════════════════════════════════
-         TAB: MY CENTRE
+     TAB: MY CENTRE
+════════════════════════════════════ -->
+<div class="tab-content" *ngIf="activeTab === 'centre'">
+  <div class="profile-intro">
+    <h2>My Centre</h2>
+    <p>Information about the Amani workshop you are connected to.</p>
+  </div>
+
+  <div class="pf-section" *ngIf="seller.centre_name; else noCentre">
+    <h3>Centre Details</h3>
+    <div class="centre-info-card">
+      <div class="ci-row">
+        <strong>Name:</strong> {{ seller.centre_name }}
+      </div>
+      <div class="ci-row">
+        <strong>Location:</strong> {{ seller.centre_city || 'Unknown' }}
+      </div>
+      <div class="ci-row">
+        <strong>Your verification status:</strong>
+        <span class="centre-status" [class.approved]="seller.verification_status === 'approved'">
+          {{ seller.verification_status === 'approved' ? '✓ Verified' : '⏳ Pending review' }}
+        </span>
+      </div>
+    </div>
+    <div class="pf-group" style="margin-top: 20px;">
+      <label>Need help?</label>
+      <p>If you have questions about your centre, please speak to the centre manager or contact Amani support.</p>
+      <button class="btn-primary" (click)="requestSupport('centre')">Contact Support</button>
+    </div>
+  </div>
+
+  <ng-template #noCentre>
+    <div class="empty-state">
+      <div class="es-icon">🏢</div>
+      <h3>No centre assigned yet</h3>
+      <p>You haven't been assigned to a centre. Please complete your registration or contact Amani support.</p>
+    </div>
+  </ng-template>
+</div>
+        <!-- ════════════════════════════════════
+         TAB: VOLUNTEER (NEW)
     ════════════════════════════════════ -->
-    <div class="tab-content" *ngIf="activeTab === 'centre'">
+    <div class="tab-content" *ngIf="activeTab === 'volunteer'">
       <div class="profile-intro">
-        <h2>My Centre</h2>
-        <p>Information about the Amani workshop you are connected to.</p>
+        <h2>Volunteer Opportunities</h2>
+        <p>Unpaid roles where you can give back to your community. Applications are reviewed by the centre.</p>
       </div>
 
-      <div class="pf-section" *ngIf="seller.centre_id; else noCentre">
-        <h3>Centre Details</h3>
-        <div class="centre-info-card">
-          <div class="ci-row">
-            <strong>Name:</strong> {{ centreInfo?.centre_name || seller.centre_name || 'Loading...' }}
+      <!-- List of opportunities -->
+      <div class="volunteer-grid" *ngIf="volunteerOpportunities.length > 0">
+        <div class="volunteer-card" *ngFor="let opp of volunteerOpportunities">
+          <div class="vc-header">
+            <h3>{{ opp.title }}</h3>
+            <span class="vc-centre">{{ opp.centre_name }} ({{ opp.city }})</span>
           </div>
-          <div class="ci-row">
-            <strong>Location:</strong> {{ centreInfo?.city || seller.centre_city || 'Unknown' }}, {{ centreInfo?.province || '' }}
+          <p class="vc-desc">{{ opp.description }}</p>
+          <div class="vc-skills" *ngIf="opp.skills_required?.length">
+            <strong>Skills needed:</strong> {{ opp.skills_required.join(', ') }}
           </div>
-          <div class="ci-row">
-            <strong>Status:</strong>
-            <span class="centre-status" [class.approved]="centreInfo?.status === 'approved'" [class.pending]="centreInfo?.status !== 'approved'">
-              {{ centreStatusText }}
-            </span>
+          <div class="vc-location" *ngIf="opp.location">
+            📍 {{ opp.location }}
           </div>
-          <div class="ci-row" *ngIf="centreInfo?.status !== 'approved'">
-            <small>Your centre must be verified before you can fully participate. Please contact the centre manager for updates.</small>
-          </div>
-        </div>
-        <div class="pf-group" style="margin-top: 20px;">
-          <label>Need help?</label>
-          <p>If you have questions about your centre, please speak to the centre manager or contact Amani support.</p>
-          <button class="btn-primary" (click)="requestSupport('centre')">Contact Support</button>
+          <button class="btn-primary" (click)="openApplyModal(opp)">Apply →</button>
         </div>
       </div>
+      <div class="empty-state" *ngIf="volunteerOpportunities.length === 0">
+        <div class="es-icon">🤝</div>
+        <h3>No opportunities right now</h3>
+        <p>Check back later or contact your centre directly.</p>
+      </div>
 
-      <ng-template #noCentre>
-        <div class="empty-state">
-          <div class="es-icon">🏢</div>
-          <h3>No centre assigned yet</h3>
-          <p>You haven't been assigned to a centre. Please complete your registration or contact Amani support.</p>
+      <!-- My applications -->
+      <div class="my-applications" *ngIf="myApplications.length > 0">
+        <h3>My Applications</h3>
+        <div class="app-card" *ngFor="let app of myApplications">
+          <div class="app-title">{{ app.title }}</div>
+          <div class="app-centre">{{ app.centre_name }}</div>
+          <div class="app-status" [class.approved]="app.status === 'approved'" [class.rejected]="app.status === 'rejected'">
+            Status: {{ app.status }}
+          </div>
+          <div class="app-notes" *ngIf="app.notes">Notes: {{ app.notes }}</div>
+          <div class="app-date">Applied: {{ app.applied_at | date:'d MMM y' }}</div>
         </div>
-      </ng-template>
+      </div>
     </div>
 
     <!-- ════════════════════════════════════
@@ -632,7 +678,7 @@
           <div class="ev-desc" *ngIf="e.description">{{ e.description }}</div>
           <div class="ev-date">Added {{ e.created_at | date:'d MMM y' }}</div>
           <div class="ev-file" *ngIf="e.file_url">
-            <a [href]="e.file_url" target="_blank">View file ↗</a>
+            <a [href]="getFileUrl(e.file_url)" target="_blank">View file ↗</a>
           </div>
         </div>
         <span class="ev-court" *ngIf="e.is_court_ready">✓ Court ready</span>
@@ -697,7 +743,7 @@
     <input type="password" [(ngModel)]="hiddenPin" placeholder="4–6 digits" autocomplete="off" (keyup.enter)="verifyPin()">
     <div class="error" *ngIf="pinError">{{ pinError }}</div>
     <div class="mc-btns">
-      <button class="btn-primary" (click)="verifyPin()">Open sanctuary</button>
+      <button class="btn-primary" (click)="verifyPin()">Open Stats</button>
       <button class="btn-cancel" (click)="closePinModal()">Not now</button>
     </div>
     <p class="mc-note">Double-tap the Amani logo at any time to leave immediately.</p>
@@ -790,6 +836,22 @@
       <p>Everyone in your circle has been notified.</p>
       <!-- <p class="as-emergency">🛡️ If you are in immediate danger — <strong>call 10111 now</strong>.</p> -->
       <button class="btn-primary" (click)="showSuppliersPanel = false; alertSent = false">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Volunteer Application Modal (NEW) -->
+<div class="modal-overlay" *ngIf="showApplyModal">
+  <div class="modal-card">
+    <div class="mc-icon">🤝</div>
+    <h3>Apply for {{ selectedOpportunity?.title }}</h3>
+    <p>{{ selectedOpportunity?.centre_name }} – {{ selectedOpportunity?.city }}</p>
+    <label>Why are you interested? (optional)</label>
+    <textarea rows="3" [(ngModel)]="applyNotes" placeholder="Tell the centre why you'd like to volunteer..."></textarea>
+    <div class="error" *ngIf="applyError">{{ applyError }}</div>
+    <div class="mc-btns">
+      <button class="btn-primary" (click)="submitApplication()">Submit application</button>
+      <button class="btn-cancel" (click)="showApplyModal = false">Cancel</button>
     </div>
   </div>
 </div>

@@ -30,6 +30,9 @@ import {
     addEvidence,
     createSupportRequest,
     grantHiddenLayer,
+    getVolunteerOpportunities,
+    applyForVolunteer,
+    getMyVolunteerApplications,
 } from '../controllers/seller.controller';
 
 const router = Router();
@@ -76,6 +79,11 @@ router.post('/generate-court-pack/:sellerId', generateCourtPack);
 router.post('/evidence', addEvidence);
 router.post('/support', createSupportRequest);
 router.post('/volunteer', grantHiddenLayer);
+
+// ── Volunteer opportunities ─────────────────────────────────
+router.get('/volunteer-opportunities', getVolunteerOpportunities);
+router.post('/volunteer-applications', applyForVolunteer);
+router.get('/volunteer-applications/:sellerId', getMyVolunteerApplications);
 
 
 export default router;

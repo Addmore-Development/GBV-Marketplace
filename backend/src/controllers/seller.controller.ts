@@ -783,3 +783,84 @@ export const getSellerPublicProfile = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Server error' });
     }
 };
+
+// ==================== VOLUNTEER ====================
+
+// GET all active volunteer opportunities (optionally filtered by seller's centre)
+export const getVolunteerOpportunities = async (req: Request, res: Response) => {
+    const centreId = req.query.centreId as string;
+    if (!centreId) {
+        return res.status(400).json({ error: 'centreId is required' });
+    }
+    try {
+        const result = await pool.query(
+            `SELECT vo.*, c.centre_name, c.city
+             FROM volunteer_opportunities vo
+             JOIN centres c ON c.id = vo.centre_id
+             WHERE vo.centre_id = $1 AND vo.status = 'active'
+             ORDER BY vo.created_at DESC`,
+            [centreId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch volunteer opportunities' });
+    }
+};
+
+
+// Apply for a volunteer opportunity
+export const applyForVolunteer = async (req: Request, res: Response) => {
+    const { seller_id, opportunity_id, notes } = req.body;
+    if (!seller_id || !opportunity_id) {
+        return res.status(400).json({ error: 'Seller ID and opportunity ID are required' });
+    }
+    try {
+        // Check if already applied
+        const existing = await pool.query(
+            `SELECT id FROM volunteer_applications WHERE seller_id = $1 AND opportunity_id = $2`,
+            [seller_id, opportunity_id]
+        );
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: 'You have already applied for this opportunity' });
+        }
+        // Check if opportunity exists and is active
+        const opp = await pool.query(
+            `SELECT id FROM volunteer_opportunities WHERE id = $1 AND status = 'active'`,
+            [opportunity_id]
+        );
+        if (opp.rows.length === 0) {
+            return res.status(404).json({ error: 'Opportunity not found or no longer active' });
+        }
+        const result = await pool.query(
+            `INSERT INTO volunteer_applications (seller_id, opportunity_id, notes)
+             VALUES ($1, $2, $3)
+             RETURNING id, seller_id, opportunity_id, status, applied_at`,
+            [seller_id, opportunity_id, notes || null]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to submit application' });
+    }
+};
+
+// Get seller's volunteer applications (with opportunity details)
+export const getMyVolunteerApplications = async (req: Request, res: Response) => {
+    const { sellerId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT va.*, vo.title, vo.description, vo.location, c.centre_name, c.city
+             FROM volunteer_applications va
+             JOIN volunteer_opportunities vo ON vo.id = va.opportunity_id
+             JOIN centres c ON c.id = vo.centre_id
+             WHERE va.seller_id = $1
+             ORDER BY va.applied_at DESC`,
+            [sellerId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch your applications' });
+    }
+};

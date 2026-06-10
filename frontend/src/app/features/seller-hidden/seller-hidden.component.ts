@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +9,7 @@ import { FormsModule } from '@angular/forms';
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './seller-hidden.component.html',
   styleUrls: ['./seller-hidden.component.scss'],
+  encapsulation: ViewEncapsulation.None,  // Ensures styles are applied globally
 })
 export class SellerHiddenComponent implements OnInit {
   activeSection: 'case' | 'evidence' | 'support' = 'case';
@@ -26,10 +27,8 @@ export class SellerHiddenComponent implements OnInit {
   constructor(private router: Router) {}
 
   ngOnInit(): void {
-    // Verify PIN again on component load (optional)
     const pinValid = localStorage.getItem('hiddenLayerAccess') === 'true';
     if (!pinValid) {
-      // Redirect back to dashboard if PIN not verified
       this.router.navigate(['/seller/dashboard'], { queryParams: { error: 'unauthorized' } });
     }
   }
@@ -40,7 +39,6 @@ export class SellerHiddenComponent implements OnInit {
 
   uploadEvidence(): void {
     alert('Upload evidence (photos, voice notes, WhatsApp messages). File will be encrypted.');
-    // Implement actual upload logic
   }
 
   generateCourtPack(): void {

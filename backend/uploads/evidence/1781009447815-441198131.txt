@@ -1,0 +1,3 @@
+Id number: 9001014800086
+
+backend command: npx ts-node src/index.ts

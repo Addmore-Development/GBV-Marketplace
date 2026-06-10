@@ -21,6 +21,7 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/uploads', express.static('uploads'));
 
+
 // PostgreSQL connection
 export const pool = new Pool({
   host: process.env.DB_HOST,

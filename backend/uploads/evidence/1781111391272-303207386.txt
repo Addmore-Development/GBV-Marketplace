@@ -1,3 +1,202 @@
+backend\src\index.ts
+
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import { Pool } from 'pg';
+import centreRoutes from './routes/centre.routes';
+import marketplaceRoutes from './routes/marketplace.routes';
+import sellerRoutes from './routes/seller.routes';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(helmet());
+app.use(express.json());
+app.use('/api/centres', centreRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/sellers', sellerRoutes);
+app.use('/uploads', express.static('uploads'));
+
+// PostgreSQL connection
+export const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+// Test DB connection
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('❌ Database connection failed:', err.message);
+  } else {
+    console.log('✅ Connected to PostgreSQL');
+    release();
+  }
+});
+
+// Health check route
+app.get('/', (req, res) => {
+  res.json({ message: '🛒 GBV Marketplace API is running' });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+backend\src\routes\seller.routes.ts
+
+
+// ============================================================
+// backend/src/routes/seller.routes.ts
+// ============================================================
+import { Router } from 'express';
+import {
+    getVerifiedCentres,
+    getCentreById,
+    uploadEvidence, 
+    generateCourtPack,
+    verifyID,
+    registerSeller,
+    loginSeller,
+    getSellerPublicProfile,
+    getSellerProfile,
+    updateSellerProfile,
+    getSellerProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    getSellerEarnings,
+    getTrainingModules,
+    updateTrainingProgress,
+    getTrustedContacts,
+    addTrustedContact,
+    deleteTrustedContact,
+    triggerEmergencyAlert,
+    getCaseJourney,
+    updateCaseJourney,
+    getEvidence,
+    addEvidence,
+    createSupportRequest,
+    grantHiddenLayer,
+    getVolunteerOpportunities,
+    applyForVolunteer,
+    getMyVolunteerApplications,
+} from '../controllers/seller.controller';
+
+const router = Router();
+
+// ── Public ──────────────────────────────────────────────────
+router.get('/centres/verified', getVerifiedCentres);
+router.get('/centres/:id', getCentreById);
+router.post('/verify-id', verifyID);
+router.post('/register', registerSeller);
+router.post('/login', loginSeller);
+router.get('/public/:alias', getSellerPublicProfile);
+
+// ── Profile ─────────────────────────────────────────────────
+router.get('/profile/:id', getSellerProfile);
+router.put('/profile/:id', updateSellerProfile);
+
+// ── Products / Listings ──────────────────────────────────────
+router.get('/products/:sellerId', getSellerProducts);
+router.post('/products', createProduct);
+router.put('/products/:id', updateProduct);
+router.delete('/products/:productId', deleteProduct);
+
+// ── Earnings ────────────────────────────────────────────────
+router.get('/earnings/:sellerId', getSellerEarnings);
+
+// ── Training ────────────────────────────────────────────────
+router.get('/training/:sellerId', getTrainingModules);
+router.put('/training/:sellerId/:moduleId', updateTrainingProgress);
+
+// ── Trusted contacts & Emergency ─────────────────────────────
+router.get('/contacts/:sellerId', getTrustedContacts);
+router.post('/contacts', addTrustedContact);
+router.delete('/contacts/:id', deleteTrustedContact);
+router.post('/emergency', triggerEmergencyAlert);
+
+// ── Hidden layer (case journey, evidence, support) ───────────
+router.get('/journey/:sellerId', getCaseJourney);
+router.put('/journey/:sellerId', updateCaseJourney);
+router.get('/evidence/:sellerId', getEvidence);
+// Evidence upload with file
+router.post('/evidence', uploadEvidence.single('file'), addEvidence);
+// Court pack generation
+router.post('/generate-court-pack/:sellerId', generateCourtPack);
+router.post('/evidence', addEvidence);
+router.post('/support', createSupportRequest);
+router.post('/volunteer', grantHiddenLayer);
+
+// ── Volunteer opportunities ─────────────────────────────────
+router.get('/volunteer-opportunities', getVolunteerOpportunities);
+router.post('/volunteer-applications', applyForVolunteer);
+router.get('/volunteer-applications/:sellerId', getMyVolunteerApplications);
+
+
+export default router;
+
+
+
+
+backend\src\routes\marketplace.routes.ts
+
+// ============================================================
+// backend/src/routes/marketplace.routes.ts
+// ============================================================
+import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
+import {
+  getProducts, getProduct, getCategories,
+  getCart, updateCart, placeOrder, getImpactReceipt,
+  addProduct, approveProduct,
+} from '../controllers/marketplace.controller';
+import { verifyAdminToken } from '../middleware/auth.middleware';
+
+const router = Router();
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/products/'),
+  filename:    (req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${path.extname(file.originalname)}`);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 8 * 1024 * 1024 } });
+
+// ── Public ──────────────────────────────────────────────────
+router.get('/products',           getProducts);
+router.get('/products/:id',       getProduct);
+router.get('/categories',         getCategories);
+
+// ── Cart ────────────────────────────────────────────────────
+router.get('/cart',               getCart);
+router.post('/cart',              updateCart);
+
+// ── Checkout ────────────────────────────────────────────────
+router.post('/orders',            placeOrder);
+router.get('/orders/:orderId/receipt', getImpactReceipt);
+
+// ── Centre: add product ─────────────────────────────────────
+router.post('/products', upload.fields([{ name: 'images', maxCount: 5 }]), addProduct);
+
+// ── Admin ───────────────────────────────────────────────────
+router.patch('/admin/products/:id', verifyAdminToken, approveProduct);
+
+export default router;
+
+
+backend\create-db.js
+
 require('dotenv').config();
 const { Client } = require('pg');
 
@@ -582,8 +781,6 @@ async function initDatabase() {
     // Remove obsolete columns that cause conflicts
     await dbClient.query(`ALTER TABLE evidence_items DROP COLUMN IF EXISTS case_id;`).catch(e => console.log(e.message));
     await dbClient.query(`ALTER TABLE evidence_items DROP COLUMN IF EXISTS evidence_type;`).catch(e => console.log(e.message));
-    await dbClient.query(`ALTER TABLE evidence_items DROP COLUMN IF EXISTS file_name;`).catch(e => console.log(e.message));
-    await dbClient.query(`ALTER TABLE evidence_items DROP COLUMN IF EXISTS file_path;`).catch(e => console.log(e.message));
     // Add foreign key constraint if missing
     await dbClient.query(`
       DO $$ 
@@ -951,35 +1148,25 @@ async function initDatabase() {
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // SEED VOLUNTEER OPPORTUNITIES (fixed – separate inserts)
+    // OPTIONAL SEED: Volunteer opportunities (commented out by default)
+    // Uncomment if you want test opportunities after the tables are created.
     // ──────────────────────────────────────────────────────────────────────
+    /*
     const oppCount = await dbClient.query(`SELECT COUNT(*) FROM volunteer_opportunities`);
     if (parseInt(oppCount.rows[0].count) === 0) {
-      // Insert for Thistle House
       await dbClient.query(`
         INSERT INTO volunteer_opportunities (centre_id, title, description, skills_required, location)
-        SELECT id, 'Event Support Volunteer', 'Help organise community craft fairs and fundraising events.', ARRAY['Organisation','Communication'], city
-        FROM centres WHERE centre_name = 'Thistle House'
-        ON CONFLICT (id) DO NOTHING;
-      `);
-      // Insert for Women of Worth
-      await dbClient.query(`
-        INSERT INTO volunteer_opportunities (centre_id, title, description, skills_required, location)
-        SELECT id, 'Administrative Assistant', 'Assist with data entry, donor comms, and social media updates.', ARRAY['Computer skills','Writing'], city
-        FROM centres WHERE centre_name = 'Women of Worth'
-        ON CONFLICT (id) DO NOTHING;
-      `);
-      // Insert for Ikhaya Labantu
-      await dbClient.query(`
-        INSERT INTO volunteer_opportunities (centre_id, title, description, skills_required, location)
-        SELECT id, 'Craft Workshop Facilitator', 'Help teach beadwork and sewing skills to other survivors.', ARRAY['Beading','Teaching'], city
-        FROM centres WHERE centre_name = 'Ikhaya Labantu'
-        ON CONFLICT (id) DO NOTHING;
+        SELECT id, 'Event Support Volunteer', 'Help organise community craft fairs and fundraising events.', ARRAY['Organisation','Communication'], city FROM centres WHERE centre_name = 'Thistle House'
+        UNION ALL
+        SELECT id, 'Administrative Assistant', 'Assist with data entry, donor comms, and social media updates.', ARRAY['Computer skills','Writing'], city FROM centres WHERE centre_name = 'Women of Worth'
+        UNION ALL
+        SELECT id, 'Craft Workshop Facilitator', 'Help teach beadwork and sewing skills to other survivors.', ARRAY['Beading','Teaching'], city FROM centres WHERE centre_name = 'Ikhaya Labantu';
       `);
       console.log('✅ Volunteer opportunities seeded');
     } else {
       console.log('✅ Volunteer opportunities already exist — skipping seed');
     }
+    */
 
     await dbClient.end();
     console.log('');
@@ -994,3 +1181,51 @@ async function initDatabase() {
 }
 
 initDatabase();
+
+backend\package.json
+
+
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "pdfkit": "^0.18.0",
+    "pg": "^8.20.0",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^25.8.0",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pg": "^8.20.0",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
+
+
+

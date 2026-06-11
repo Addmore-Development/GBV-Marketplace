@@ -25,6 +25,7 @@ app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/uploads', express.static('uploads'));
 
+
 // PostgreSQL connection
 export const pool = new Pool({
   host: process.env.DB_HOST,

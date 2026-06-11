@@ -1,13 +1,13 @@
 // ============================================================
 // frontend/src/app/features/seller-dashboard/seller-dashboard.component.ts
 // ============================================================
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary' | 'centre';
+type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary' | 'centre' | 'volunteer';
 
 interface SellerProfile {
     id: string;
@@ -93,7 +93,7 @@ interface EvidenceItem {
     id: string;
     item_type: string;
     filename?: string;
-    file_url?: string;      // ADDED
+    file_url?: string;
     description?: string;
     date_of_incident?: string;
     is_court_ready: boolean;
@@ -114,6 +114,7 @@ interface CentreInfo {
     imports: [CommonModule, HttpClientModule, RouterModule, FormsModule],
     templateUrl: './seller-dashboard.component.html',
     styleUrls: ['./seller-dashboard.component.scss'],
+    encapsulation: ViewEncapsulation.None,
 })
 export class SellerDashboardComponent implements OnInit {
     private readonly API = 'http://localhost:3000/api/sellers';
@@ -180,6 +181,15 @@ export class SellerDashboardComponent implements OnInit {
     // File upload property
     selectedEvidenceFile: File | null = null;
 
+    // Volunteer properties
+    volunteerOpportunities: any[] = [];
+    myApplications: any[] = [];
+    showApplyModal = false;
+    selectedOpportunity: any = null;
+    applyNotes = '';
+    applyError = '';
+    applySuccess = false;
+
     constructor(
         private http: HttpClient,
         private router: Router,
@@ -238,6 +248,8 @@ export class SellerDashboardComponent implements OnInit {
                 this.loadTraining();
                 this.loadContacts();
                 this.loadCentreInfo();
+                this.loadVolunteerOpportunities();
+                this.loadMyApplications();
             },
             error: (err) => {
                 console.error('[Dashboard] Error loading profile:', err);
@@ -341,6 +353,55 @@ export class SellerDashboardComponent implements OnInit {
                 this.cdr.detectChanges();
             },
             error: (err) => console.error('[Dashboard] Error loading evidence:', err)
+        });
+    }
+
+    // Volunteer methods
+    loadVolunteerOpportunities(): void {
+    if (!this.seller?.centre_id) return;
+    this.http.get<any[]>(`${this.API}/volunteer-opportunities?centreId=${this.seller.centre_id}`).subscribe({
+        next: (data) => {
+            this.volunteerOpportunities = data;
+            this.cdr.detectChanges();
+        },
+        error: (err) => console.error('Error loading opportunities:', err)
+    });
+}
+
+    loadMyApplications(): void {
+        if (!this.seller) return;
+        this.http.get<any[]>(`${this.API}/volunteer-applications/${this.seller.id}`).subscribe({
+            next: (data) => {
+                this.myApplications = data;
+                this.cdr.detectChanges();
+            },
+            error: (err) => console.error('Error loading applications:', err)
+        });
+    }
+
+    openApplyModal(opp: any): void {
+        this.selectedOpportunity = opp;
+        this.applyNotes = '';
+        this.applyError = '';
+        this.applySuccess = false;
+        this.showApplyModal = true;
+    }
+
+    submitApplication(): void {
+        if (!this.seller) return;
+        this.http.post<any>(`${this.API}/volunteer-applications`, {
+            seller_id: this.seller.id,
+            opportunity_id: this.selectedOpportunity.id,
+            notes: this.applyNotes
+        }).subscribe({
+            next: () => {
+                this.applySuccess = true;
+                this.showApplyModal = false;
+                this.loadMyApplications();
+            },
+            error: (err) => {
+                this.applyError = err.error?.error || 'Application failed';
+            }
         });
     }
 
@@ -636,8 +697,19 @@ export class SellerDashboardComponent implements OnInit {
     }
 
     generateCourtPack(): void {
-        alert('Preparing your documents. Your court pack will be ready to download in a moment.');
-    }
+    this.http.post(`${this.API}/generate-court-pack/${this.seller?.id}`, {}, { responseType: 'blob' })
+        .subscribe({
+            next: (blob) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `court-pack-${this.seller?.id}.pdf`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            },
+            error: () => alert('Could not generate court pack')
+        });
+}
 
     logout(): void {
         localStorage.clear();

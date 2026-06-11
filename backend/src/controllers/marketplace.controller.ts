@@ -33,12 +33,12 @@ export const getProducts = async (req: Request, res: Response) => {
       params.push(category);
     }
     if (search) {
-      where += ` AND (p.title ILIKE $${idx} OR p.description ILIKE $${idx} OR p.tags::text ILIKE $${idx})`;
+      where += ` AND (p.name ILIKE $${idx} OR p.description ILIKE $${idx})`;
       params.push(`%${search}%`);
       idx++;
     }
     if (centre_id) {
-      where += ` AND p.centre_id = $${idx++}`;
+      where += ` AND s.centre_id = $${idx++}`;
       params.push(centre_id);
     }
     if (min_price) {
@@ -50,31 +50,44 @@ export const getProducts = async (req: Request, res: Response) => {
       params.push(parseFloat(max_price as string));
     }
 
-    const allowedSort  = ['created_at', 'price', 'total_sold', 'rating_avg'];
+    const allowedSort  = ['created_at', 'price', 'total_sold'];
     const allowedOrder = ['ASC', 'DESC'];
     const safeSort  = allowedSort.includes(sort as string)  ? sort  : 'created_at';
     const safeOrder = allowedOrder.includes((order as string).toUpperCase()) ? order : 'DESC';
 
+    // Count query
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM products p ${where}`, params
+      `SELECT COUNT(*) FROM products p ${where}`,
+      params
     );
 
+    // Main query – removed rating_avg and rating_count, using static defaults
     const result = await pool.query(
       `SELECT
-        p.id, p.title, p.description, p.category, p.tags, p.story,
-        p.price, p.currency, p.survivor_pct, p.centre_pct, p.platform_pct,
-        p.stock_quantity, p.thumbnail, p.images,
-        p.seller_alias, p.seller_type,
-        p.total_sold, p.rating_avg, p.rating_count,
-        p.processing_days, p.ships_from_hub,
-        c.centre_name, c.city, c.province,
-        c.provides_counselling, c.has_shelter,
-        -- Pre-calculated impact for display
-        ROUND(p.price * p.survivor_pct / 100, 2) as survivor_income,
-        ROUND(p.price * p.centre_pct   / 100, 2) as centre_funding,
-        ROUND(p.price * p.platform_pct / 100, 2) as platform_fee
+        p.id,
+        p.name AS title,
+        p.description,
+        p.category,
+        COALESCE(p.story, p.description) AS story,
+        p.price,
+        COALESCE(p.stock, 0) AS stock,
+        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS img,
+        p.seller_alias,
+        COALESCE(p.seller_type, 'survivor') AS seller_type,
+        5.0 AS rating,
+        0 AS reviews,
+        COALESCE(p.total_sold, 0) AS sold,
+        c.centre_name,
+        c.city,
+        ROUND(p.price * COALESCE(p.survivor_pct, 70) / 100, 2) AS survivor_income,
+        ROUND(p.price * COALESCE(p.centre_pct, 28) / 100, 2) AS centre_funding,
+        ROUND(p.price * COALESCE(p.platform_pct, 2) / 100, 2) AS platform_fee,
+        CASE WHEN COALESCE(p.stock, 0) = 0 THEN 'out-of-stock'
+             WHEN COALESCE(p.stock, 0) <= 5 THEN 'low-stock'
+             ELSE NULL END AS badge
        FROM products p
-       JOIN centres c ON c.id = p.centre_id
+       JOIN sellers s ON s.id = p.seller_id
+       JOIN centres c ON c.id = s.centre_id
        ${where}
        ORDER BY p.${safeSort} ${safeOrder}
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -108,22 +121,31 @@ export const getProduct = async (req: Request, res: Response) => {
         ROUND(p.price * p.centre_pct   / 100, 2) as centre_funding,
         ROUND(p.price * p.platform_pct / 100, 2) as platform_fee
        FROM products p
-       JOIN centres c ON c.id = p.centre_id
+       JOIN sellers s ON s.id = p.seller_id
+       JOIN centres c ON c.id = s.centre_id
        WHERE p.id = $1 AND p.status = 'active'`,
       [id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Product not found' });
 
-    // Get reviews
-    const reviews = await pool.query(
-      `SELECT buyer_name, rating, comment, created_at
-       FROM product_reviews WHERE product_id = $1
-       ORDER BY created_at DESC LIMIT 10`,
-      [id]
-    );
+    // Get reviews – if table exists, otherwise return empty array
+    let reviews = [];
+    try {
+      const reviewsResult = await pool.query(
+        `SELECT buyer_name, rating, comment, created_at
+         FROM product_reviews WHERE product_id = $1
+         ORDER BY created_at DESC LIMIT 10`,
+        [id]
+      );
+      reviews = reviewsResult.rows;
+    } catch (err) {
+      // Ignore – table may not exist yet
+      console.warn('product_reviews table not found, returning empty reviews');
+    }
 
-    return res.json({ ...result.rows[0], reviews: reviews.rows });
+    return res.json({ ...result.rows[0], reviews });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -138,6 +160,7 @@ export const getCategories = async (req: Request, res: Response) => {
     );
     return res.json(result.rows);
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -160,6 +183,7 @@ export const getCart = async (req: Request, res: Response) => {
 
     return res.json({ items, subtotal: parseFloat(subtotal.toFixed(2)) });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -176,10 +200,13 @@ export const updateCart = async (req: Request, res: Response) => {
 
     // Fetch product
     const prod = await pool.query(
-      `SELECT id, title, price, thumbnail, seller_alias, currency,
-              survivor_pct, centre_pct, platform_pct, stock_quantity,
+      `SELECT p.id, p.name AS title, p.price, COALESCE(p.image_url, '') AS thumbnail,
+              p.seller_alias, p.currency, p.survivor_pct, p.centre_pct, p.platform_pct,
+              COALESCE(p.stock, 0) AS stock_quantity,
               c.centre_name
-       FROM products p JOIN centres c ON c.id = p.centre_id
+       FROM products p
+       JOIN sellers s ON s.id = p.seller_id
+       JOIN centres c ON c.id = s.centre_id
        WHERE p.id = $1 AND p.status = 'active'`,
       [product_id]
     );
@@ -227,6 +254,7 @@ export const updateCart = async (req: Request, res: Response) => {
     const subtotal = items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
     return res.json({ session_id: sessionId, items, subtotal: parseFloat(subtotal.toFixed(2)) });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -253,9 +281,13 @@ export const placeOrder = async (req: Request, res: Response) => {
 
     const items = cartResult.rows[0].items;
 
-    // Find nearest hub centre (simplified: first centre in items)
+    // Find nearest hub centre (simplified: use seller's centre of first item)
     const hubCentreId = items[0] ? await client.query(
-      `SELECT centre_id FROM products WHERE id = $1`, [items[0].product_id]
+      `SELECT s.centre_id
+       FROM products p
+       JOIN sellers s ON s.id = p.seller_id
+       WHERE p.id = $1`,
+      [items[0].product_id]
     ).then(r => r.rows[0]?.centre_id) : null;
 
     await client.query('BEGIN');
@@ -267,10 +299,12 @@ export const placeOrder = async (req: Request, res: Response) => {
 
     for (const item of items) {
       const prod = await client.query(
-        `SELECT id, price, survivor_pct, centre_pct, platform_pct,
-                stock_quantity, title, thumbnail, seller_alias,
-                c.centre_name, p.centre_id
-         FROM products p JOIN centres c ON c.id = p.centre_id
+        `SELECT p.id, p.name AS title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
+                COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias,
+                c.centre_name, s.centre_id
+         FROM products p
+         JOIN sellers s ON s.id = p.seller_id
+         JOIN centres c ON c.id = s.centre_id
          WHERE p.id = $1 AND p.status = 'active' FOR UPDATE`,
         [item.product_id]
       );
@@ -305,8 +339,7 @@ export const placeOrder = async (req: Request, res: Response) => {
 
       // Decrement stock
       await client.query(
-        `UPDATE products SET stock_quantity = stock_quantity - $1,
-         total_sold = total_sold + $1 WHERE id = $2`,
+        `UPDATE products SET stock = stock - $1, total_sold = total_sold + $1 WHERE id = $2`,
         [item.quantity, p.id]
       );
     }
@@ -415,6 +448,7 @@ export const getImpactReceipt = async (req: Request, res: Response) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Receipt not found' });
     return res.json(result.rows[0]);
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -429,13 +463,18 @@ export const addProduct = async (req: Request, res: Response) => {
     const images = files?.images?.map(f => f.path) || [];
     const thumbnail = images[0] || null;
 
+    // Ensure required fields exist
+    if (!body.title || !body.price || !body.stock_quantity) {
+      return res.status(400).json({ error: 'Missing required fields: title, price, stock_quantity' });
+    }
+
     const result = await pool.query(
       `INSERT INTO products (
-        centre_id, seller_alias, seller_type, title, description,
+        centre_id, seller_alias, seller_type, name, description,
         category, tags, story, price, survivor_pct, centre_pct, platform_pct,
-        stock_quantity, images, thumbnail, weight_grams, processing_days
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-       RETURNING id, title, status`,
+        stock, images, image_url, weight_grams, processing_days, status
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       RETURNING id, name, status`,
       [
         centreId, body.seller_alias, body.seller_type,
         body.title, body.description, body.category,
@@ -445,9 +484,10 @@ export const addProduct = async (req: Request, res: Response) => {
         parseFloat(body.centre_pct  || '28'),
         parseFloat(body.platform_pct || '2'),
         parseInt(body.stock_quantity),
-        images, thumbnail,
+        images, thumbnail || null,
         body.weight_grams ? parseInt(body.weight_grams) : null,
         parseInt(body.processing_days || '3'),
+        'pending' // needs admin approval
       ]
     );
 
@@ -473,6 +513,7 @@ export const approveProduct = async (req: Request, res: Response) => {
     );
     return res.json({ message: `Product ${action}` });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };

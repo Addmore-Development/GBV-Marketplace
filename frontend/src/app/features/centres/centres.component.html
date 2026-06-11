@@ -128,7 +128,7 @@
     <div class="centre-grid" *ngIf="filteredCentres.length > 0">
       <div class="centre-card" *ngFor="let c of filteredCentres">
         <!-- Image -->
-        <div class="cc-visual">
+        <div class="cc-visual" (click)="openCentre(c)" style="cursor:pointer">
           <img [src]="c.img" [alt]="c.name" />
           <div class="cc-type-badge">{{ getTypeLabel(c.type) }}</div>
           <div class="cc-verified" *ngIf="c.verified">Verified</div>
@@ -176,11 +176,9 @@
 
           <!-- Actions -->
           <div class="cc-actions">
-            <button class="cc-btn-donate"    (click)="$event.stopPropagation(); showDonate(c)">Donate</button>
-            <button class="cc-btn-volunteer" (click)="$event.stopPropagation(); showVolunteer(c)">Volunteer</button>
-            <button class="cc-btn-view"      (click)="$event.stopPropagation(); openCentre(c)">
-              {{ currentUser ? 'View Profile' : 'Preview' }}
-            </button>
+            <button class="cc-btn-action cc-btn-donate"    (click)="$event.stopPropagation(); showDonate(c)">Donate</button>
+            <button class="cc-btn-action cc-btn-volunteer" (click)="$event.stopPropagation(); showVolunteer(c)">Volunteer</button>
+            <button class="cc-btn-action cc-btn-view"      (click)="$event.stopPropagation(); openCentre(c)">View Profile</button>
           </div>
         </div>
       </div>

@@ -1,365 +1,131 @@
-// ============================================================
-// seller-register.component.ts
-// Amani – Victim/Survivor (Seller) Registration – VALIDATION ON CLICK + 409 HANDLING
-// ============================================================
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
-import { AuthService, User } from '../../services/auth.service';
-import { FormsModule } from '@angular/forms';
-
-interface Step {
-  label: string;
-  icon: string;
-  description: string;
-}
 
 interface Centre {
   id: string;
   name: string;
   city: string;
+  province: string;
 }
+
+const STATIC_CENTRES: Centre[] = [
+  { id: 'c1', name: 'Thistle House GBV Centre',   city: 'Cape Town',      province: 'Western Cape' },
+  { id: 'c2', name: 'New Beginnings NPO',          city: 'Johannesburg',   province: 'Gauteng' },
+  { id: 'c3', name: 'Ubuntu Youth Programme',      city: 'Johannesburg',   province: 'Gauteng' },
+  { id: 'c4', name: 'Khanya Elderly Home',         city: 'Pretoria',       province: 'Gauteng' },
+  { id: 'c5', name: "Khayelitsha Women's Hub",     city: 'Cape Town',      province: 'Western Cape' },
+  { id: 'c6', name: 'Empilweni Care Centre',       city: 'Durban',         province: 'KwaZulu-Natal' },
+  { id: 'c7', name: "Sunshine Children's Village", city: 'Bloemfontein',   province: 'Free State' },
+  { id: 'c8', name: "Ubuntu Women's Centre",       city: 'Port Elizabeth', province: 'Eastern Cape' },
+];
 
 @Component({
   selector: 'app-seller-register',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, HttpClientModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, HttpClientModule, RouterModule],
   templateUrl: './seller-register.component.html',
   styleUrls: ['./seller-register.component.scss'],
 })
 export class SellerRegisterComponent implements OnInit {
-  currentStep = 0;
-  isSubmitting = false;
-  submitError = '';
-  submitSuccess = false;
-  // ── Nav auth state ────────────────────────────────────
-  currentUser: User | null = null;
-  authModal = '';
-  loginRole: 'buyer' | 'seller' | 'centre' = 'buyer';
-  loginEmail = '';
-  loginPassword = '';
-  authError = '';
-  registerRole: 'buyer' | 'seller' | 'centre' = 'buyer';
-  registerName = '';
-  registerEmail = '';
-  registerPassword = '';
+  private readonly API = 'http://localhost:3000/api/sellers';
 
-  centres: Centre[] = [];
-  isLoadingCentres = true;
+  idNumber = '';
+  fullName = '';
+  email = '';
+  pin = '';
+  selectedCentreId = '';
 
-  steps: Step[] = [
-    { label: 'Your Identity', icon: '🌿', description: 'Public seller profile & private details' },
-    { label: 'Centre & Products', icon: '🏠', description: 'Link to your care centre and what you make' },
-    { label: 'Payout & Security', icon: '💰', description: 'How you get paid + hidden layer PIN' },
-    { label: 'Review & Consent', icon: '✅', description: 'Finalise your seller account' },
-  ];
+  readonly centres: Centre[] = STATIC_CENTRES;
 
-  productCategories = [
-    'Beaded jewellery', 'Clothing & textiles', 'Food preserves',
-    'Candles & soaps', 'Pottery & ceramics', 'Wire art',
-    'Baked goods', 'Hand-dyed scarves', 'Other crafts'
-  ];
+  isLoading = false;
+  error = '';
+  idVerified = false;
+  idError = '';
 
-  form!: FormGroup;
-
-  constructor(
-    private fb: FormBuilder,
-    private http: HttpClient,
-    public router: Router,
-    private authService: AuthService,
-  ) {}
-
-  ngOnInit(): void {
-    this.buildForm();
-    this.loadCentres();
-    this.authService.user$.subscribe(u => this.currentUser = u);
+  // ── Computed: all fields valid ──────────────────────────────
+  get canSubmit(): boolean {
+    return (
+      this.idVerified &&
+      this.fullName.trim().length > 0 &&
+      this.email.trim().length > 0 &&
+      /^\d{4,6}$/.test(this.pin) &&
+      this.selectedCentreId.length > 0 &&
+      !this.isLoading
+    );
   }
 
-  buildForm(): void {
-    this.form = this.fb.group({
-      // Step 0
-      alias: ['', [Validators.required, Validators.minLength(3)]],
-      public_bio: ['', [Validators.required, Validators.minLength(30)]],
-      real_name: ['', Validators.required],
-      real_surname: ['', Validators.required],
-      id_number: ['', [Validators.required, Validators.pattern(/^\d{13}$/)]],
-      email: ['', [Validators.required, Validators.email]],
-      phone: ['', [Validators.required, Validators.pattern(/^(\+27|0)[6-8][0-9]{8}$/)]],
+  constructor(private http: HttpClient, private router: Router) {}
+  ngOnInit(): void {}
 
-      // Step 1
-      centre_id: [{ value: '', disabled: true }, Validators.required],
-      product_categories: [[], Validators.required],
-      skills_experience: ['', Validators.required],
-
-      // Step 2
-      payout_method: ['eft', Validators.required],
-      bank_name: [''],
-      account_holder: [''],
-      account_number: [''],
-      branch_code: [''],
-      cash_centre_note: [''],
-      hidden_pin: ['', [Validators.required, Validators.pattern(/^\d{4,6}$/)]],
-      confirm_pin: ['', Validators.required],
-
-      // Step 3
-      agree_terms: [false, Validators.requiredTrue],
-      agree_popia: [false, Validators.requiredTrue],
-      understand_safety: [false, Validators.requiredTrue],
-    }, { validators: this.pinMatchValidator });
-  }
-
-  pinMatchValidator(group: AbstractControl): { [key: string]: boolean } | null {
-    const pin = group.get('hidden_pin')?.value;
-    const confirm = group.get('confirm_pin')?.value;
-    return pin === confirm ? null : { pinMismatch: true };
-  }
-
-  get payoutMethod(): string {
-    return this.form.get('payout_method')?.value || 'eft';
-  }
-
-  isBankFieldInvalid(field: string): boolean {
-    const control = this.form.get(field);
-    return this.payoutMethod === 'eft' && !!control && control.invalid && control.touched;
-  }
-
-  getCentreName(): string {
-    const centreId = this.form.get('centre_id')?.value;
-    if (!centreId) return 'your centre';
-    const centre = this.centres.find(c => c.id === centreId);
-    return centre ? centre.name : 'your centre';
-  }
-
-  loadCentres(): void {
-  this.http.get<Centre[]>('http://localhost:3000/api/sellers/centres/verified')
-    .subscribe({
-      next: (data) => {
-        this.centres = data;
-        this.isLoadingCentres = false;
-        this.form.get('centre_id')?.enable();
-      },
-      error: (err) => {
-        console.error('Failed to load centres', err);
-        this.isLoadingCentres = false;
-        this.submitError = 'Could not load care centres. Please refresh the page.';
-        // Still enable the field so user can manually select? But no data. Better keep disabled.
-        this.form.get('centre_id')?.disable();
-      }
-    });
-
-  // Timeout fallback: after 5 seconds, enable centre_id if still disabled
-  setTimeout(() => {
-    if (this.form.get('centre_id')?.disabled) {
-      console.warn('Forcing centre_id enable after timeout');
-      this.form.get('centre_id')?.enable();
+  // ── BUG FIX: write cleaned digits BACK to the bound field ──
+  onIdInput(): void {
+    const cleaned = this.idNumber.replace(/\D/g, '');
+    this.idNumber = cleaned;          // ← this line was missing, causing the button to stay disabled
+    this.idVerified = false;
+    this.idError = '';
+    if (cleaned.length === 13) {
+      this.verifyIdLocally(cleaned);
     }
-  }, 5000);
-}
+  }
 
-  toggleArrayValue(controlName: string, value: string): void {
-    const control = this.form.get(controlName);
-    const current: string[] = control?.value || [];
-    const idx = current.indexOf(value);
-    if (idx > -1) {
-      control?.setValue(current.filter((v) => v !== value));
-    } else {
-      control?.setValue([...current, value]);
+  private verifyIdLocally(id: string): void {
+    let sum = 0;
+    for (let i = 0; i < 13; i++) {
+      let digit = parseInt(id[i], 10);
+      if (i % 2 === 1) { digit *= 2; if (digit > 9) digit -= 9; }
+      sum += digit;
     }
-    control?.markAsTouched();
+    if (sum % 10 !== 0) {
+      this.idError = 'ID number appears invalid — check the digits.';
+      return;
+    }
+    this.idVerified = true;
   }
 
-  isSelected(controlName: string, value: string): boolean {
-    return (this.form.get(controlName)?.value || []).includes(value);
-  }
+  register(): void {
+    this.error = '';
+    if (!this.canSubmit) { this.error = 'Please complete all fields.'; return; }
 
-  // ===================== VALIDATION ON CLICK =====================
-  getStepFields(step: number): string[] {
-    const stepMap: { [key: number]: string[] } = {
-      0: ['alias', 'public_bio', 'real_name', 'real_surname', 'id_number', 'email', 'phone'],
-      1: ['centre_id', 'product_categories', 'skills_experience'],
-      2: ['hidden_pin', 'confirm_pin'],
-      3: ['agree_terms', 'agree_popia', 'understand_safety'],
+    const nameParts = this.fullName.trim().split(/\s+/);
+    const real_name = nameParts[0];
+    const real_surname = nameParts.slice(1).join(' ') || '';
+    let alias = this.email.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    if (!alias) alias = `maker_${Date.now()}`;
+
+    this.isLoading = true;
+
+    const payload = {
+      id_number: this.idNumber,
+      real_name, real_surname,
+      email: this.email, pin: this.pin, alias,
+      phone: '0000000000',
+      centre_id: this.selectedCentreId,
+      accepted_terms: true, accepted_popia: true, safety_acknowledged: true,
     };
-    return stepMap[step] || [];
-  }
 
-  validateCurrentStep(): boolean {
-    let isValid = true;
-    const stepFields = this.getStepFields(this.currentStep);
-
-    for (const field of stepFields) {
-      const control = this.form.get(field);
-      if (control && control.invalid) {
-        control.markAsTouched();
-        isValid = false;
-      }
-    }
-
-    // Special validation for step 2 (PIN + bank fields if EFT)
-    if (this.currentStep === 2) {
-      if (this.form.errors?.['pinMismatch']) {
-        this.form.get('confirm_pin')?.markAsTouched();
-        isValid = false;
-      }
-      if (this.payoutMethod === 'eft') {
-        const bankFields = ['bank_name', 'account_holder', 'account_number', 'branch_code'];
-        for (const field of bankFields) {
-          const control = this.form.get(field);
-          if (control && control.invalid) {
-            control.markAsTouched();
-            isValid = false;
-          }
-        }
-      }
-    }
-
-    if (!isValid) {
-      this.scrollToFirstError();
-    }
-    return isValid;
-  }
-
-  scrollToFirstError(): void {
-    const firstError = document.querySelector('.error, .ng-invalid');
-    if (firstError) {
-      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
-
-  // ===================== NAVIGATION =====================
-  nextStep(): void {
-    if (this.validateCurrentStep()) {
-      this.currentStep++;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      alert('Please fix the errors in the form before continuing.');
-    }
-  }
-
-  prevStep(): void {
-    if (this.currentStep > 0) {
-      this.currentStep--;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }
-
-  // ===================== SUBMIT =====================
-  onSubmit(): void {
-  if (!this.validateCurrentStep()) {
-    alert('Please fix the errors in the form before submitting.');
-    return;
-  }
-  if (this.isSubmitting) return;
-
-  // Ensure centre_id is enabled (in case it was disabled)
-  this.form.get('centre_id')?.enable();
-
-  this.isSubmitting = true;
-  this.submitError = '';
-
-  const payload = this.buildPayload();
-
-  // Log the payload to the console for debugging
-  console.log('📦 Submitting payload:', JSON.stringify(payload, null, 2));
-
-  this.http.post('http://localhost:3000/api/sellers/register', payload)
-    .subscribe({
-      next: (res: any) => {
+    this.http.post<any>(`${this.API}/register`, payload).subscribe({
+      next: (res) => {
         localStorage.setItem('sellerId', res.seller_id);
         localStorage.setItem('sellerAlias', res.alias);
         localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.form.get('hidden_pin')?.value);
-        this.submitSuccess = true;
-        this.isSubmitting = false;
-        setTimeout(() => {
-          this.router.navigate(['/seller/dashboard'], { queryParams: { new: true } });
-        }, 2000);
+        localStorage.setItem('hiddenPin', this.pin);
+        localStorage.setItem('hiddenLayerAccess', 'false');
+        this.isLoading = false;
+        this.router.navigate(['/seller/dashboard']);
       },
       error: (err) => {
-        this.isSubmitting = false;
-        // Show detailed error from backend
-        if (err.error && err.error.error) {
-          this.submitError = err.error.error;
-        } else if (err.status === 400) {
-          this.submitError = 'Bad request. Please check all fields are filled correctly.';
-        } else if (err.status === 409) {
-          this.submitError = 'An account with this email or alias already exists.';
+        this.isLoading = false;
+        if (err.error?.code === 'ALREADY_EXISTS' || err.status === 409) {
+          this.error = 'This email is already registered. Please sign in instead.';
         } else {
-          this.submitError = err.error?.message || 'Registration failed. Please try again.';
+          this.error = err.error?.error || 'Something went wrong. Please try again.';
         }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     });
-}
-  private buildPayload(): any {
-    const val = this.form.value;
-    const payload: any = {
-      alias: val.alias,
-      public_bio: val.public_bio,
-      real_name: val.real_name,
-      real_surname: val.real_surname,
-      id_number: val.id_number,
-      email: val.email,
-      phone: val.phone,
-      centre_id: val.centre_id,
-      product_categories: val.product_categories,
-      skills_experience: val.skills_experience,
-      payout_method: val.payout_method,
-      hidden_pin: val.hidden_pin,
-      accepted_terms: true,
-      accepted_popia: true,
-      safety_acknowledged: true,
-    };
-
-    if (val.payout_method === 'eft') {
-      payload.bank_details = {
-        bank_name: val.bank_name,
-        account_holder: val.account_holder,
-        account_number: val.account_number,
-        branch_code: val.branch_code,
-      };
-    } else {
-      payload.cash_pickup_note = val.cash_centre_note || 'Will collect at centre';
-    }
-    return payload;
   }
 
-  // Quick exit
-  @HostListener('dblclick', ['$event'])
-  onDoubleClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    if (target && target.closest('.logo')) {
-      this.quickExit();
-    }
-  }
-
-  quickExit(): void {
-    window.location.href = '/news';
-  }
-  // ── Nav auth methods ──────────────────────────────────
-  showAuthModal(modal: string): void { this.authModal = modal; this.authError = ''; }
-  closeAuthModal(e: MouseEvent): void { this.authModal = ''; }
-
-  doLogin(): void {
-    this.authError = '';
-    if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
-    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole);
-    if (ok) { this.authModal = ''; }
-    else { this.authError = 'Login failed. Please try again.'; }
-  }
-
-  doRegisterModal(): void {
-    this.authError = '';
-    if (this.registerRole === 'centre') { this.authModal = ''; this.router.navigate(['/register/centre']); return; }
-    if (this.registerRole === 'seller') { this.authModal = ''; this.router.navigate(['/register/seller']); return; }
-    if (!this.registerName || !this.registerEmail || !this.registerPassword) { this.authError = 'Please fill in all fields.'; return; }
-    if (this.registerPassword.length < 8) { this.authError = 'Password must be 8+ characters.'; return; }
-    const ok = this.authService.register(this.registerName, this.registerEmail, this.registerPassword, this.registerRole);
-    if (ok) { this.authModal = ''; }
-    else { this.authError = 'Registration failed. Please try again.'; }
-  }
-
-  logout(): void { this.authService.logout(); }
+  quickExit(): void { window.location.href = '/news'; }
 }

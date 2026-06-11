@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import centreRoutes from './routes/centre.routes';
 import marketplaceRoutes from './routes/marketplace.routes';
 import sellerRoutes from './routes/seller.routes';
+import adminRoutes from './routes/admin.routes';
 
 dotenv.config();
 
@@ -16,9 +17,13 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
+
+// Routes
 app.use('/api/centres', centreRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/sellers', sellerRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/uploads', express.static('uploads'));
 
 // PostgreSQL connection
 export const pool = new Pool({

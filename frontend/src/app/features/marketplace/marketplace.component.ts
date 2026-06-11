@@ -1,13 +1,12 @@
-// ============================================================
-// frontend/src/app/features/marketplace/marketplace.component.ts
-// ============================================================
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CartService } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
+import { SellerAuthService, SellerUser } from '../../services/seller-auth.service';
 
 interface Product {
   id: string;
@@ -33,7 +32,7 @@ interface Product {
 @Component({
   selector: 'app-marketplace',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, HttpClientModule],
   templateUrl: './marketplace.component.html',
   styleUrls: ['./marketplace.component.scss']
 })
@@ -58,8 +57,25 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
   registerEmail = '';
   registerPassword = '';
   registerRole: 'buyer' | 'seller' | 'centre' = 'buyer';
+
+  // ── Inline seller registration ────────────────────────────
+  sellerIdNumber = '';
+  sellerFullName = '';
+  sellerEmail = '';
+  sellerPin = '';
+  sellerCentreId = '';
+  sellerIdVerified = false;
+  sellerIdError = '';
+  sellerIsLoading = false;
+  sellerError = '';
+  sellerCentres: { id: string; name: string; city: string; province: string }[] = [];
+  sellerCentresLoading = false;
   selectedProduct: Product | null = null;
   selectedQty = 1;
+
+  // Real products from backend (falls back to static list on error)
+  products: Product[] = [];
+  isLoadingProducts = true;
   impactInfoOpen = false;
 
   private destroy$ = new Subject<void>();
@@ -80,7 +96,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     { key: 'all',       label: 'Shop All',                img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=400&q=80' },
   ];
 
-  readonly allProducts: Product[] = [
+  readonly staticProducts: Product[] = [
     {
       id: 'p001', title: 'Beaded Sunrise Necklace', seller_alias: 'Nomsa B.',
       centre_name: 'Thistle House', category: 'jewellery', price: 180,
@@ -203,6 +219,10 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     },
   ];
 
+  get allProducts(): Product[] {
+    return this.products.length ? this.products : this.staticProducts;
+  }
+
   get filteredProducts(): Product[] {
     return this.allProducts.filter(p => {
       const catMatch = this.activeCategory === 'all' || p.category === this.activeCategory;
@@ -224,29 +244,75 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
   constructor(
     private cartService: CartService,
     private authService: AuthService,
+    private sellerAuth: SellerAuthService,
     private router: Router,
+    private http: HttpClient,
   ) {}
 
   ngOnInit(): void {
+    this.loadRealProducts();
     this.cartService.cart$.pipe(takeUntil(this.destroy$))
       .subscribe(c => this.cartCount = c.items.reduce((s, i) => s + i.quantity, 0));
     this.authService.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => this.currentUser = u);
+    this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) {
+          this.currentUser = {
+            name: u.alias,
+            email: u.email,
+            role: 'seller',
+            initials: u.alias.slice(0,2).toUpperCase()
+          };
+        }
+      });
   }
 
-  ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  loadRealProducts(): void {
+    this.isLoadingProducts = true;
+    this.http.get<any>('http://localhost:3000/api/marketplace/products')
+      .subscribe({
+        next: (res) => {
+          this.products = res.products ?? [];
+          this.isLoadingProducts = false;
+        },
+        error: () => {
+          this.isLoadingProducts = false;
+          this.products = [];
+        }
+      });
+  }
 
   @HostListener('window:scroll')
-  onScroll(): void { this.scrolled = window.scrollY > 40; }
+  onScroll(): void {
+    this.scrolled = window.scrollY > 40;
+  }
 
   getCategoryLabel(): string {
     return this.categories.find(c => c.key === this.activeCategory)?.label || '';
   }
 
-  formatPrice(p: number): string { return `R${(p || 0).toFixed(2)}`; }
+  formatPrice(p: number): string {
+    return `R${(p || 0).toFixed(2)}`;
+  }
 
-  openProduct(p: Product): void { this.selectedProduct = p; this.selectedQty = 1; }
-  closeProduct(): void { this.selectedProduct = null; }
+  formatSurvivorPct(p: Product): string {
+    return `${Math.round((p.survivor_income / p.price) * 100)}%`;
+  }
+
+  openProduct(p: Product): void {
+    this.selectedProduct = p;
+    this.selectedQty = 1;
+  }
+
+  closeProduct(): void {
+    this.selectedProduct = null;
+  }
 
   scrollToProducts(): void {
     document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
@@ -272,7 +338,9 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
         this.showToast(`${p.title} added to cart`);
         setTimeout(() => this.addedIds.delete(p.id), 2000);
       },
-      error: () => { this.addingIds.delete(p.id); }
+      error: () => {
+        this.addingIds.delete(p.id);
+      }
     });
   }
 
@@ -289,8 +357,139 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     setTimeout(() => this.toastVisible = false, 2800);
   }
 
-  showAuthModal(m: string): void { this.authModal = m; this.authError = ''; }
-  closeAuthModal(e: MouseEvent): void { this.authModal = ''; }
+  showAuthModal(m: string): void {
+    this.authModal = m;
+    if (m === 'register' && this.sellerCentres.length === 0) {
+      this.loadSellerCentres();
+    }
+  }
+
+  loadSellerCentres(): void {
+    this.sellerCentresLoading = true;
+    this.http.get<any[]>('http://localhost:3000/api/sellers/centres/verified').subscribe({
+      next: (data) => {
+        this.sellerCentres = (data || []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          city: c.city,
+          province: c.province,
+        }));
+        this.sellerCentresLoading = false;
+      },
+      error: () => { this.sellerCentresLoading = false; }
+    });
+  }
+
+  closeAuthModal(e: MouseEvent): void {
+    this.authModal = '';
+  }
+
+  redirectTo(role: string, action: string): void {
+    this.authModal = '';
+    if (role === 'seller') {
+      if (action === 'login') {
+        this.router.navigate(['/login']);
+      } else {
+        this.router.navigate(['/register/seller']);
+      }
+    } else if (role === 'centre') {
+      if (action === 'login') {
+        this.router.navigate(['/centre-dashboard']);
+      } else {
+        this.router.navigate(['/register/centre']);
+      }
+    } else if (role === 'buyer') {
+      if (action === 'login') {
+        this.showToast('Shop as guest – no account needed');
+      } else {
+        this.showToast('Buyers can shop without registration');
+      }
+    }
+  }
+
+  // ── Inline seller registration ────────────────────────────
+  onSellerIdInput(): void {
+    const cleaned = this.sellerIdNumber.replace(/\D/g, '');
+    this.sellerIdNumber = cleaned;
+    this.sellerIdVerified = false;
+    this.sellerIdError = '';
+    if (cleaned.length === 13) {
+      this.sellerIdVerified = true;
+    } else if (cleaned.length > 0) {
+      this.sellerIdError = `${cleaned.length}/13 digits entered.`;
+    }
+  }
+
+  get sellerCanSubmit(): boolean {
+    return this.sellerIdVerified &&
+      this.sellerFullName.trim().length > 0 &&
+      this.sellerEmail.trim().length > 0 &&
+      /^\d{4,6}$/.test(this.sellerPin) &&
+      this.sellerCentreId.length > 0 &&
+      !this.sellerIsLoading;
+  }
+
+  doSellerRegister(): void {
+    this.sellerError = '';
+    if (!this.sellerCanSubmit) { this.sellerError = 'Please complete all fields.'; return; }
+
+    const nameParts = this.sellerFullName.trim().split(/\s+/);
+    const real_name = nameParts[0];
+    const real_surname = nameParts.slice(1).join(' ') || '';
+    let alias = this.sellerEmail.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    if (!alias) alias = `maker_${Date.now()}`;
+
+    this.sellerIsLoading = true;
+
+    const payload = {
+      id_number: this.sellerIdNumber,
+      real_name, real_surname,
+      email: this.sellerEmail,
+      pin: this.sellerPin,
+      alias,
+      phone: '0000000000',
+      centre_id: this.sellerCentreId,
+      accepted_terms: true, accepted_popia: true, safety_acknowledged: true,
+    };
+
+    this.http.post<any>('http://localhost:3000/api/sellers/register', payload).subscribe({
+      next: (res) => {
+        localStorage.setItem('sellerId', res.seller_id);
+        localStorage.setItem('sellerAlias', res.alias);
+        localStorage.setItem('sellerEmail', res.email);
+        localStorage.setItem('hiddenPin', this.sellerPin);
+        localStorage.setItem('hiddenLayerAccess', 'false');
+        // Update auth state so nav reflects logged-in seller
+        const sellerUser = {
+          id: res.seller_id,
+          alias: res.alias,
+          email: res.email,
+          verification_status: res.verification_status || 'pending',
+          hidden_layer_granted: false,
+        };
+        localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
+        this.sellerAuth['userSubject'].next(sellerUser);
+        this.sellerIsLoading = false;
+        this.authModal = '';
+        this.router.navigate(['/seller/dashboard']);
+      },
+      error: (err) => {
+        this.sellerIsLoading = false;
+        if (err.error?.code === 'ALREADY_EXISTS' || err.status === 409) {
+          this.sellerError = 'This email is already registered. Please sign in instead.';
+        } else {
+          this.sellerError = err.error?.error || err.message || 'Something went wrong. Please try again.';
+        }
+      }
+    });
+  }
+
+  sellerQuickExit(): void { window.location.href = 'https://www.news24.com'; }
+
+  goToSellerLogin(): void {
+    this.authModal = '';
+    this.router.navigate(['/login']);
+  }
 
   doLogin(): void {
     this.authError = '';
@@ -330,5 +529,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     return 'card-add-btn';
   }
 
+  goToDonate(): void { this.router.navigate(['/donate']); }
+  goToCentres(): void { this.router.navigate(['/for-centres']); }
   goToContribute(): void { this.router.navigate(['/centres']); }
 }

@@ -579,3 +579,45 @@
   gap: 7px;
   flex-wrap: wrap;
 }
+
+/* ── Equal-width action buttons ───────────────────────────── */
+.cc-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cc-btn-action {
+  width: 100%;
+  padding: 9px 4px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .79rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  text-align: center;
+  white-space: nowrap;
+
+  &.cc-btn-donate {
+    background: #8B2635;
+    color: white;
+    border: none;
+    &:hover { background: #6D1D29; }
+  }
+
+  &.cc-btn-volunteer {
+    background: transparent;
+    color: #5A7A3A;
+    border: 1.5px solid #5A7A3A;
+    &:hover { background: #5A7A3A; color: white; }
+  }
+
+  &.cc-btn-view {
+    background: transparent;
+    color: var(--brown);
+    border: 1.5px solid var(--border);
+    &:hover { border-color: var(--brown); background: var(--beige); }
+  }
+}

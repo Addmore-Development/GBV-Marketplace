@@ -380,14 +380,58 @@
         <div class="mf-note vetting">Centre registrations require NPO documentation and a site visit before approval.</div>
       </ng-container>
 
-      <!-- Seller: route to seller form -->
+      <!-- Seller: full inline form -->
       <ng-container *ngIf="registerRole === 'seller'">
-        <div class="centre-register-preview">
-          <h3>Seller Registration</h3>
-          <p>Selling on Amani requires NRSO background vetting and a referral from a verified care centre.</p>
+        <div class="seller-form-header">
+          <h3>Join as a maker</h3>
+          <p>Your information is kept private and secure.</p>
         </div>
-        <button class="modal-cta" (click)="doRegister()">Start Seller Application</button>
-        <div class="mf-note vetting">Seller accounts require NRSO vetting (7–14 days).</div>
+
+        <div class="mf-group">
+          <label>South African ID number</label>
+          <input [(ngModel)]="sellerIdNumber" (input)="onSellerIdInput()"
+            placeholder="13-digit SA ID number"
+            maxlength="13" inputmode="numeric" />
+          <div class="id-status verified" *ngIf="sellerIdVerified">✓ 13 digits entered</div>
+          <div class="id-status error"    *ngIf="sellerIdError">{{ sellerIdError }}</div>
+          <div class="mf-hint">Use a valid female South African ID number. The backend validates format and gender digit.</div>
+        </div>
+
+        <div class="mf-group">
+          <label>Full name</label>
+          <input [(ngModel)]="sellerFullName" placeholder="Your full name" />
+        </div>
+
+        <div class="mf-group">
+          <label>Email address</label>
+          <input [(ngModel)]="sellerEmail" type="email" placeholder="you@example.com" />
+        </div>
+
+        <div class="mf-group">
+          <label>Create a private PIN (4–6 digits)</label>
+          <input [(ngModel)]="sellerPin" type="password" inputmode="numeric"
+            placeholder="4–6 digits" maxlength="6" />
+          <div class="mf-hint">You'll use this PIN to log in. Write it down somewhere safe.</div>
+        </div>
+
+        <div class="mf-group">
+          <label>Nearest Amani workshop *</label>
+          <select [(ngModel)]="sellerCentreId" [disabled]="sellerCentresLoading">
+            <option value="" disabled selected>{{ sellerCentresLoading ? 'Loading centres…' : 'Select a centre…' }}</option>
+            <option *ngFor="let c of sellerCentres" [value]="c.id">
+              {{ c.name }} — {{ c.city }}, {{ c.province }}
+            </option>
+          </select>
+          <div class="mf-hint">Choose the centre closest to you. Your products will be shipped from here.</div>
+        </div>
+
+        <div class="modal-error" *ngIf="sellerError">{{ sellerError }}</div>
+
+        <button class="modal-cta" [disabled]="!sellerCanSubmit || sellerIsLoading" (click)="doSellerRegister()">
+          {{ sellerIsLoading ? 'Submitting…' : 'Join Amani →' }}
+        </button>
+
+
       </ng-container>
 
       <!-- Buyer: quick inline form -->

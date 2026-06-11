@@ -1,287 +1,101 @@
-<!-- ============================================================
-  seller-register.component.html
-  Amani – Seller (Survivor) Registration – ALWAYS ENABLED BUTTONS
-  ============================================================ -->
+<div class="register-page">
+  <div class="register-card">
 
-<!-- SUCCESS STATE (unchanged) -->
-<div class="success-screen" *ngIf="submitSuccess">
-  <div class="success-card">
-    <div class="success-icon">🌿✨</div>
-    <h1>Welcome, {{ form.get('alias')?.value }}</h1>
-    <p class="success-subtitle">Your seller account is being created</p>
-    <div class="success-body">
-      <p>You are now part of the Amani marketplace — where your craft creates independence.</p>
-      <div class="ref-box">
-        <span class="ref-label">What happens next?</span>
-        <ul>
-          <li>We’ll verify your association with <strong>{{ getCentreName() }}</strong></li>
-          <li>You’ll receive a welcome email with your hidden‑layer PIN reminder</li>
-          <li>Start listing products immediately from your dashboard</li>
-        </ul>
-      </div>
-      <div class="next-step">
-        <p>🔐 <strong>Your hidden layer PIN is active.</strong> Double‑tap any Amani logo to exit safely.</p>
-      </div>
-    </div>
-    <button class="btn-dashboard" (click)="router.navigate(['/seller/dashboard'])">Go to Dashboard →</button>
-  </div>
-</div>
-
-<!-- MAIN REGISTRATION FORM -->
-<div class="register-page" *ngIf="!submitSuccess">
-
-  <!-- ── TOP NAV ── -->
-  <nav class="reg-nav">
-    <div class="reg-nav-inner">
-      <!-- Back + Brand -->
-      <div class="reg-nav-left">
-        <a routerLink="/marketplace" class="back-btn">
-          <span class="back-arrow">←</span> Back to Marketplace
-        </a>
-        <a routerLink="/marketplace" class="reg-brand">
-          <div class="reg-brand-mark">A</div>
-          <div class="reg-brand-text">
-            <span class="reg-brand-name">Amani</span>
-            <span class="reg-brand-sub">Empowerment Market</span>
-          </div>
-        </a>
-      </div>
-
-      <!-- Auth actions (top-right) -->
-      <div class="reg-nav-right">
-        <ng-container *ngIf="!currentUser">
-          <button class="nav-btn-ghost" (click)="showAuthModal('login')">Sign In</button>
-          <button class="nav-btn-solid" (click)="showAuthModal('register')">Register</button>
-        </ng-container>
-        <ng-container *ngIf="currentUser">
-          <div class="user-chip">
-            <div class="user-avatar">{{ currentUser.initials }}</div>
-            <span class="user-name">{{ currentUser.name.split(' ')[0] }}</span>
-          </div>
-          <button class="nav-btn-ghost small" (click)="logout()">Sign out</button>
-        </ng-container>
-      </div>
-    </div>
-  </nav>
-
-  <div class="stepper-wrapper">
-    <div class="stepper">
-      <div *ngFor="let step of steps; let i = index"
-           class="step-item"
-           [class.active]="i === currentStep"
-           [class.completed]="i < currentStep">
-        <div class="step-circle">
-          <span *ngIf="i < currentStep">✓</span>
-          <span *ngIf="i >= currentStep">{{ step.icon }}</span>
-        </div>
-        <div class="step-label">{{ step.label }}</div>
-      </div>
-    </div>
-    <div class="progress-bar">
-      <div class="progress-fill" [style.width.%]="(currentStep / (steps.length - 1)) * 100"></div>
-    </div>
-  </div>
-
-  <div class="form-container">
-    <div class="step-header">
-      <div class="step-icon-large">{{ steps[currentStep].icon }}</div>
-      <div>
-        <h2>{{ steps[currentStep].label }}</h2>
-        <p>{{ steps[currentStep].description }}</p>
-      </div>
+    <div class="logo" (dblclick)="quickExit()" title="Double-tap to leave">
+      <span class="logo-leaf">🌿</span>
+      <span class="logo-name">Amani</span>
     </div>
 
-    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <h2>Join as a maker</h2>
+    <p class="step-sub">Your information is kept private and secure.</p>
 
-      <!-- STEP 0 – IDENTITY (unchanged) -->
-      <div class="step-panel" *ngIf="currentStep === 0">
-        <div class="info-banner">
-          <span>🛡️</span>
-          <p><strong>Your safety is our priority.</strong> Your real name and ID are only used for payments and legal compliance — they will never appear on your public seller profile.</p>
+    <div class="form-body">
+
+      <!-- ID Number -->
+      <div class="form-group">
+        <label>South African ID number</label>
+        <input
+          type="text"
+          [(ngModel)]="idNumber"
+          maxlength="13"
+          placeholder="13-digit ID number"
+          autocomplete="off"
+          (input)="onIdInput()"
+          [class.verified]="idVerified"
+          [class.error-border]="idError"
+        >
+        <div class="id-feedback" *ngIf="idVerified">
+          <span class="id-ok">✓ Identity confirmed</span>
         </div>
-        <div class="form-group required">
-          <label>Public alias (shop name)</label>
-          <input type="text" formControlName="alias" placeholder="e.g. HopeCrafts, BeadsByZanele">
-          <small>This is what buyers see. Choose something empowering.</small>
-          <div class="error" *ngIf="form.get('alias')?.touched && form.get('alias')?.invalid">Alias required (min 3 characters)</div>
+        <div class="id-feedback error" *ngIf="idError && !idVerified">
+          <span>{{ idError }}</span>
         </div>
-        <div class="form-group required">
-          <label>Public bio (why you create)</label>
-          <textarea formControlName="public_bio" rows="3" placeholder="Share your craft story..."></textarea>
-          <div class="error" *ngIf="form.get('public_bio')?.touched && form.get('public_bio')?.invalid">Bio required (min 30 characters)</div>
-        </div>
-        <div class="form-row">
-          <div class="form-group required"><label>Real first name (private)</label><input type="text" formControlName="real_name"><div class="error" *ngIf="form.get('real_name')?.touched && form.get('real_name')?.invalid">Required</div></div>
-          <div class="form-group required"><label>Real surname (private)</label><input type="text" formControlName="real_surname"><div class="error" *ngIf="form.get('real_surname')?.touched && form.get('real_surname')?.invalid">Required</div></div>
-        </div>
-        <div class="form-group required"><label>South African ID number (private)</label><input type="text" formControlName="id_number" placeholder="13 digits"><div class="error" *ngIf="form.get('id_number')?.touched && form.get('id_number')?.invalid">Valid 13-digit ID required</div></div>
-        <div class="form-row">
-          <div class="form-group required"><label>Email address</label><input type="email" formControlName="email"><div class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">Valid email required</div></div>
-          <div class="form-group required"><label>Phone number</label><input type="tel" formControlName="phone"><div class="error" *ngIf="form.get('phone')?.touched && form.get('phone')?.invalid">Valid SA number required (e.g. 0712345678)</div></div>
-        </div>
+        <small>Enter any valid 13-digit number for testing.</small>
       </div>
 
-      <!-- STEP 1 – CENTRE & PRODUCTS (unchanged) -->
-      <div class="step-panel" *ngIf="currentStep === 1">
-        <div class="info-banner amber">
-          <span>🏠</span>
-          <p>Amani works through verified care centres. Your centre will ship products for you — your home address is never shared with buyers.</p>
-        </div>
-        <div class="form-group required">
-          <label>Your care centre</label>
-          <select formControlName="centre_id">
-            <option value="" disabled>Select your centre...</option>
-            <option *ngFor="let c of centres" [value]="c.id">{{ c.name }} – {{ c.city }}</option>
-          </select>
-          <div class="error" *ngIf="form.get('centre_id')?.touched && form.get('centre_id')?.invalid">Please select a centre</div>
-        </div>
-        <div class="form-group required">
-          <label>What do you make? (select all that apply)</label>
-          <div class="chip-grid">
-            <button type="button" *ngFor="let cat of productCategories" class="chip" [class.selected]="isSelected('product_categories', cat)" (click)="toggleArrayValue('product_categories', cat)">{{ cat }}</button>
-          </div>
-          <div class="error" *ngIf="form.get('product_categories')?.touched && form.get('product_categories')?.value?.length === 0">Select at least one category</div>
-        </div>
-        <div class="form-group required">
-          <label>Your craft skills / experience</label>
-          <textarea formControlName="skills_experience" rows="3"></textarea>
-          <div class="error" *ngIf="form.get('skills_experience')?.touched && form.get('skills_experience')?.invalid">Required</div>
-        </div>
+      <!-- Full Name -->
+      <div class="form-group">
+        <label>Full name</label>
+        <input
+          type="text"
+          [(ngModel)]="fullName"
+          placeholder="e.g. Nomsa Dlamini"
+          autocomplete="name"
+        >
       </div>
 
-      <!-- STEP 2 – PAYOUT & SECURITY (unchanged except bank fields show errors) -->
-      <div class="step-panel" *ngIf="currentStep === 2">
-        <div class="info-banner">
-          <span>💰</span>
-          <p>You keep <strong>70–80% of every sale</strong>. Amani takes only 2%.</p>
-        </div>
-        <div class="form-group required">
-          <label>How do you want to be paid?</label>
-          <div class="radio-group">
-            <label class="radio-item"><input type="radio" formControlName="payout_method" value="eft"> EFT to my bank account</label>
-            <label class="radio-item"><input type="radio" formControlName="payout_method" value="cash"> Cash pickup at my centre</label>
-          </div>
-        </div>
-        <div class="bank-fields" *ngIf="payoutMethod === 'eft'">
-          <div class="form-row">
-            <div class="form-group"><label>Bank name</label><input type="text" formControlName="bank_name"><div class="error" *ngIf="form.get('bank_name')?.touched && form.get('bank_name')?.invalid">Required</div></div>
-            <div class="form-group"><label>Account holder name</label><input type="text" formControlName="account_holder"><div class="error" *ngIf="form.get('account_holder')?.touched && form.get('account_holder')?.invalid">Required</div></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label>Account number</label><input type="text" formControlName="account_number"><div class="error" *ngIf="form.get('account_number')?.touched && form.get('account_number')?.invalid">Required</div></div>
-            <div class="form-group"><label>Branch code</label><input type="text" formControlName="branch_code"><div class="error" *ngIf="form.get('branch_code')?.touched && form.get('branch_code')?.invalid">Required</div></div>
-          </div>
-        </div>
-        <div class="form-group" *ngIf="payoutMethod === 'cash'">
-          <label>Cash pickup note (optional)</label>
-          <textarea formControlName="cash_centre_note" rows="2"></textarea>
-        </div>
-        <hr class="divider">
-        <div class="form-group required">
-          <label>Hidden layer PIN (4–6 digits)</label>
-          <input type="password" formControlName="hidden_pin" autocomplete="off">
-          <div class="error" *ngIf="form.get('hidden_pin')?.touched && form.get('hidden_pin')?.invalid">4-6 digit PIN required</div>
-        </div>
-        <div class="form-group required">
-          <label>Confirm PIN</label>
-          <input type="password" formControlName="confirm_pin">
-          <div class="error" *ngIf="form.errors?.['pinMismatch'] && form.get('confirm_pin')?.touched">PINs do not match</div>
-        </div>
+      <!-- Email -->
+      <div class="form-group">
+        <label>Email address</label>
+        <input
+          type="email"
+          [(ngModel)]="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+        >
       </div>
 
-      <!-- STEP 3 – REVIEW & CONSENT (unchanged) -->
-      <div class="step-panel" *ngIf="currentStep === 3">
-        <div class="review-summary">
-          <h3>📋 Review your information</h3>
-          <div class="summary-grid">
-            <div class="summary-item"><span class="s-label">Public alias</span><span class="s-val">{{ form.get('alias')?.value }}</span></div>
-            <div class="summary-item"><span class="s-label">Centre</span><span class="s-val">{{ getCentreName() }}</span></div>
-            <div class="summary-item"><span class="s-label">Categories</span><span class="s-val">{{ form.get('product_categories')?.value?.join(', ') }}</span></div>
-            <div class="summary-item"><span class="s-label">Payout</span><span class="s-val">{{ payoutMethod === 'eft' ? 'EFT' : 'Cash at centre' }}</span></div>
-            <div class="summary-item"><span class="s-label">Hidden PIN set</span><span class="s-val">✓ ({{ form.get('hidden_pin')?.value?.length }} digits)</span></div>
-          </div>
-        </div>
-        <div class="consent-section">
-          <label class="consent-item"><input type="checkbox" formControlName="agree_terms"><span>I confirm that all information is accurate...</span></label>
-          <label class="consent-item"><input type="checkbox" formControlName="agree_popia"><span>I consent to Amani processing my personal data under POPIA...</span></label>
-          <label class="consent-item"><input type="checkbox" formControlName="understand_safety"><span>I understand that my real address will never be shared...</span></label>
-          <div class="error" *ngIf="form.get('agree_terms')?.touched && form.get('agree_terms')?.invalid">You must agree to the terms</div>
-          <div class="error" *ngIf="form.get('agree_popia')?.touched && form.get('agree_popia')?.invalid">You must consent to POPIA</div>
-          <div class="error" *ngIf="form.get('understand_safety')?.touched && form.get('understand_safety')?.invalid">You must acknowledge the safety measures</div>
-        </div>
-        <div class="error-banner" *ngIf="submitError"><span>⚠️</span> {{ submitError }}</div>
+      <!-- PIN -->
+      <div class="form-group">
+        <label>Create a private PIN (4–6 digits)</label>
+        <input
+          type="password"
+          [(ngModel)]="pin"
+          placeholder="e.g. 4892"
+          maxlength="6"
+          autocomplete="off"
+        >
+        <small>You'll use this PIN to log in. Write it down somewhere safe.</small>
       </div>
 
-      <!-- Navigation Buttons – ALWAYS ENABLED (no disabled attribute on continue) -->
-      <div class="form-nav">
-        <button type="button" class="btn-back" *ngIf="currentStep > 0" (click)="prevStep()">← Back</button>
-        <button type="button" class="btn-next" *ngIf="currentStep < steps.length - 1" (click)="nextStep()">Continue →</button>
-        <button type="submit" class="btn-submit" *ngIf="currentStep === steps.length - 1" [disabled]="isSubmitting">
-          {{ isSubmitting ? 'Registering...' : 'Start Selling 🌿' }}
-        </button>
+      <!-- Centre Selection — proper dropdown -->
+      <div class="form-group">
+        <label>Nearest Amani workshop *</label>
+        <select [(ngModel)]="selectedCentreId">
+          <option value="">Select a centre…</option>
+          <option *ngFor="let c of centres" [value]="c.id">
+            {{ c.name }} — {{ c.city }}, {{ c.province }}
+          </option>
+        </select>
+        <small>Choose the centre closest to you. Your products will be shipped from here.</small>
       </div>
-    </form>
-  </div>
 
-  <div class="safety-footer">
-    <span>🛡️ In danger? Call 10111 first.</span>
-    <span>Double‑tap the Amani logo to hide this page.</span>
-  </div>
-</div>
-
-<!-- ── AUTH MODAL ── -->
-<div class="modal-backdrop" [class.open]="authModal" (click)="closeAuthModal($event)">
-  <div class="modal" [class.open]="authModal" (click)="$event.stopPropagation()">
-    <button class="modal-close" (click)="authModal = ''">✕</button>
-
-    <!-- Login -->
-    <div *ngIf="authModal === 'login'">
-      <div class="modal-head">
-        <div class="modal-logo">A</div>
-        <h2 class="modal-title">Welcome back</h2>
-        <p class="modal-sub">Sign in to your Amani account</p>
+      <div class="error-msg" *ngIf="error">
+        <span>⚠️</span> {{ error }}
       </div>
-      <div class="modal-tabs">
-        <button class="mtab" [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
-        <button class="mtab" [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
-        <button class="mtab" [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
-      </div>
-      <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
-      <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
-      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
-      <button class="modal-cta" (click)="doLogin()">Sign In →</button>
-      <div class="modal-switch">No account? <span (click)="authModal = 'register'">Register here</span></div>
+
+      <button class="btn-primary" (click)="register()" [disabled]="isLoading || !idVerified || !selectedCentreId">
+        <span *ngIf="!isLoading">Join Amani →</span>
+        <span *ngIf="isLoading" class="loading-dots"><span></span><span></span><span></span></span>
+      </button>
+
+      <p class="login-link">Already joined? <a routerLink="/login">Sign in here</a></p>
+
     </div>
 
-    <!-- Register -->
-    <div *ngIf="authModal === 'register'">
-      <div class="modal-head">
-        <div class="modal-logo">A</div>
-        <h2 class="modal-title">Join Amani</h2>
-        <p class="modal-sub">Create your account</p>
-      </div>
-      <div class="role-grid">
-        <div class="role-card" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
-          <div class="rc-icon">🛒</div><div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
-        </div>
-        <div class="role-card" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
-          <div class="rc-icon">🎨</div><div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
-        </div>
-        <div class="role-card" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
-          <div class="rc-icon">🏠</div><div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
-        </div>
-      </div>
-      <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
-      <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
-      <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
-      <div class="mf-note" [class.vetting]="registerRole !== 'buyer'">
-        <span *ngIf="registerRole === 'buyer'">ℹ️ Buyer accounts activate immediately.</span>
-        <span *ngIf="registerRole === 'seller'">⚠️ Seller accounts require NRSO vetting.</span>
-        <span *ngIf="registerRole === 'centre'">⚠️ Centre registration requires NPO docs &amp; site visit.</span>
-      </div>
-      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
-      <button class="modal-cta" (click)="doRegisterModal()">Create Account →</button>
-      <div class="modal-switch">Have an account? <span (click)="authModal = 'login'">Sign in</span></div>
+    <div class="exit-footer">
+      <button (click)="quickExit()">🚪 Leave this page safely</button>
     </div>
+
   </div>
 </div>

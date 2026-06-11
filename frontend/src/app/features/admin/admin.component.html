@@ -1,0 +1,384 @@
+<!-- admin.component.html -->
+
+<!-- ── PIN LOGIN ─────────────────────────────────────────── -->
+<div class="admin-login" *ngIf="!isAuthenticated">
+  <div class="login-card">
+    <div class="login-logo">🌿 Amani</div>
+    <h2>Admin Access</h2>
+    <p>Enter your admin PIN to continue.</p>
+    <input
+      type="password"
+      [(ngModel)]="adminPin"
+      placeholder="Admin PIN"
+      (keyup.enter)="login()"
+      autocomplete="off"
+    >
+    <div class="login-error" *ngIf="authError">{{ authError }}</div>
+    <button (click)="login()">Enter</button>
+    <a routerLink="/marketplace" class="back-link">← Back to marketplace</a>
+  </div>
+</div>
+
+<!-- ── ADMIN DASHBOARD ────────────────────────────────────── -->
+<div class="admin-wrap" *ngIf="isAuthenticated">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <span class="sb-leaf">🌿</span>
+      <span>Amani Admin</span>
+    </div>
+
+    <nav class="sb-nav">
+      <button [class.active]="activeTab === 'overview'"  (click)="activeTab = 'overview'">
+        <span class="nav-icon">📊</span> Overview
+      </button>
+      <button [class.active]="activeTab === 'sellers'"   (click)="activeTab = 'sellers'; searchQuery = ''">
+        <span class="nav-icon">🧵</span> Sellers
+        <span class="badge-count" *ngIf="stats.pendingSellers > 0">{{ stats.pendingSellers }}</span>
+      </button>
+      <button [class.active]="activeTab === 'centres'"   (click)="activeTab = 'centres'; searchQuery = ''">
+        <span class="nav-icon">🏠</span> Centres
+        <span class="badge-count" *ngIf="stats.pendingCentres > 0">{{ stats.pendingCentres }}</span>
+      </button>
+      <button [class.active]="activeTab === 'buyers'"    (click)="activeTab = 'buyers'; searchQuery = ''">
+        <span class="nav-icon">🛒</span> Buyers
+      </button>
+      <button [class.active]="activeTab === 'messages'"  (click)="activeTab = 'messages'">
+        <span class="nav-icon">💬</span> Messages
+        <span class="badge-count" *ngIf="unreadCount > 0">{{ unreadCount }}</span>
+      </button>
+      <button [class.active]="activeTab === 'donations'" (click)="activeTab = 'donations'">
+        <span class="nav-icon">💛</span> Donations
+      </button>
+    </nav>
+
+    <div class="sb-footer">
+      <button class="sb-logout" (click)="logout()">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="admin-main">
+
+    <!-- ── OVERVIEW ────────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'overview'" class="tab-content">
+      <div class="tab-header">
+        <h1>Platform overview</h1>
+        <p class="tab-sub">Live snapshot of Amani's impact across all users and centres.</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🧵</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ stats.totalSellers }}</div>
+            <div class="stat-label">Total Sellers</div>
+            <div class="stat-sub">{{ stats.pendingSellers }} pending approval</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏠</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ stats.totalCentres }}</div>
+            <div class="stat-label">Registered Centres</div>
+            <div class="stat-sub">{{ stats.approvedCentres }} approved</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🛒</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ stats.totalBuyers }}</div>
+            <div class="stat-label">Buyers</div>
+            <div class="stat-sub">{{ stats.totalOrders }} total orders</div>
+          </div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-icon">💰</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ formatCurrency(stats.totalSalesAmount) }}</div>
+            <div class="stat-label">Seller Earnings</div>
+            <div class="stat-sub">Paid directly to makers</div>
+          </div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-icon">💛</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ formatCurrency(stats.totalDonationAmount) }}</div>
+            <div class="stat-label">Total Donations</div>
+            <div class="stat-sub">{{ stats.totalDonations }} donation(s)</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💬</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ unreadCount }}</div>
+            <div class="stat-label">Unread Messages</div>
+            <div class="stat-sub">From sellers &amp; centres</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-strip">
+        <div class="impact-item">
+          <strong>{{ stats.approvedSellers }}</strong> active makers earning income
+        </div>
+        <div class="impact-sep">·</div>
+        <div class="impact-item">
+          <strong>{{ stats.approvedCentres }}</strong> verified care centres
+        </div>
+        <div class="impact-sep">·</div>
+        <div class="impact-item">
+          <strong>{{ formatCurrency(stats.totalDonationAmount) }}</strong> raised for communities
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SELLERS ─────────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'sellers'" class="tab-content">
+      <div class="tab-header">
+        <h1>Sellers</h1>
+        <p class="tab-sub">Approve, reject, or remove seller accounts.</p>
+      </div>
+
+      <div class="table-controls">
+        <input class="search-input" [(ngModel)]="searchQuery" placeholder="Search by alias or email…">
+        <div class="filter-tabs">
+          <button [class.active]="sellerFilter === 'all'"      (click)="sellerFilter = 'all'">All</button>
+          <button [class.active]="sellerFilter === 'pending'"  (click)="sellerFilter = 'pending'">Pending</button>
+          <button [class.active]="sellerFilter === 'approved'" (click)="sellerFilter = 'approved'">Approved</button>
+          <button [class.active]="sellerFilter === 'rejected'" (click)="sellerFilter = 'rejected'">Rejected</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Alias</th><th>Name</th><th>Email</th><th>Centre</th>
+              <th>Status</th><th>Earned</th><th>Joined</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of filteredSellers">
+              <td><strong>{{ s.alias }}</strong></td>
+              <td>{{ s.real_name }} {{ s.real_surname }}</td>
+              <td class="td-email">{{ s.email }}</td>
+              <td>{{ s.centre_name || '—' }}</td>
+              <td><span class="badge" [ngClass]="statusClass(s.verification_status)">{{ s.verification_status }}</span></td>
+              <td>{{ formatCurrency(s.total_earned) }}</td>
+              <td>{{ formatDate(s.created_at) }}</td>
+              <td class="td-actions">
+                <button class="btn-approve" *ngIf="s.verification_status !== 'approved'" (click)="approveSeller(s.id)">✓ Approve</button>
+                <button class="btn-reject"  *ngIf="s.verification_status === 'pending'"  (click)="rejectSeller(s.id)">✕ Reject</button>
+                <button class="btn-delete"  (click)="deleteSeller(s.id)">🗑</button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredSellers.length === 0">
+              <td colspan="8" class="td-empty">No sellers found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── CENTRES ─────────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'centres'" class="tab-content">
+      <div class="tab-header">
+        <h1>Centres</h1>
+        <p class="tab-sub">Approve or remove care centre registrations.</p>
+      </div>
+
+      <div class="table-controls">
+        <input class="search-input" [(ngModel)]="searchQuery" placeholder="Search by name or city…">
+        <div class="filter-tabs">
+          <button [class.active]="centreFilter === 'all'"      (click)="centreFilter = 'all'">All</button>
+          <button [class.active]="centreFilter === 'pending'"  (click)="centreFilter = 'pending'">Pending</button>
+          <button [class.active]="centreFilter === 'approved'" (click)="centreFilter = 'approved'">Approved</button>
+          <button [class.active]="centreFilter === 'rejected'" (click)="centreFilter = 'rejected'">Rejected</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Centre Name</th><th>Location</th><th>Contact</th>
+              <th>NPO #</th><th>Sellers</th><th>Status</th><th>Joined</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let c of filteredCentres">
+              <td><strong>{{ c.centre_name }}</strong></td>
+              <td>{{ c.city }}, {{ c.province }}</td>
+              <td>
+                <div>{{ c.contact_name }}</div>
+                <div class="td-email">{{ c.contact_email }}</div>
+              </td>
+              <td>{{ c.npo_number || '—' }}</td>
+              <td>{{ c.seller_count || 0 }}</td>
+              <td><span class="badge" [ngClass]="statusClass(c.status)">{{ c.status }}</span></td>
+              <td>{{ formatDate(c.created_at) }}</td>
+              <td class="td-actions">
+                <button class="btn-approve" *ngIf="c.status !== 'approved'" (click)="approveCentre(c.id)">✓ Approve</button>
+                <button class="btn-reject"  *ngIf="c.status === 'pending'"  (click)="rejectCentre(c.id)">✕ Reject</button>
+                <button class="btn-delete"  (click)="deleteCentre(c.id)">🗑</button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredCentres.length === 0">
+              <td colspan="8" class="td-empty">No centres found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── BUYERS ──────────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'buyers'" class="tab-content">
+      <div class="tab-header row">
+        <div>
+          <h1>Buyers</h1>
+          <p class="tab-sub">View and manage buyer accounts.</p>
+        </div>
+        <button class="btn-add" (click)="showAddBuyer = true">+ Add buyer</button>
+      </div>
+
+      <!-- Add buyer form -->
+      <div class="inline-form" *ngIf="showAddBuyer">
+        <h3>Add new buyer</h3>
+        <div class="form-row">
+          <div class="fg"><label>Full name</label><input [(ngModel)]="newBuyer.name" placeholder="Buyer name"></div>
+          <div class="fg"><label>Email</label><input type="email" [(ngModel)]="newBuyer.email" placeholder="email@example.com"></div>
+          <div class="fg"><label>Password</label><input type="password" [(ngModel)]="newBuyer.password" placeholder="Temp password"></div>
+        </div>
+        <div class="form-error" *ngIf="buyerSaveError">{{ buyerSaveError }}</div>
+        <div class="form-actions">
+          <button class="btn-primary" (click)="addBuyer()">Add buyer</button>
+          <button class="btn-ghost" (click)="showAddBuyer = false">Cancel</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Spent</th><th>Orders</th><th>Joined</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let b of buyers">
+              <td><strong>{{ b.name }}</strong></td>
+              <td class="td-email">{{ b.email }}</td>
+              <td>{{ formatCurrency(b.total_spent) }}</td>
+              <td>{{ b.order_count }}</td>
+              <td>{{ formatDate(b.created_at) }}</td>
+              <td class="td-actions">
+                <button class="btn-delete" (click)="deleteBuyer(b.id)">🗑 Delete</button>
+              </td>
+            </tr>
+            <tr *ngIf="buyers.length === 0">
+              <td colspan="6" class="td-empty">No buyers yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── MESSAGES ────────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'messages'" class="tab-content">
+      <div class="tab-header">
+        <h1>Messages</h1>
+        <p class="tab-sub">Communications from sellers and centres.</p>
+      </div>
+
+      <div class="messages-layout">
+        <!-- Message list -->
+        <div class="msg-list">
+          <div
+            *ngFor="let m of messages"
+            class="msg-row"
+            [class.unread]="!m.read"
+            [class.selected]="selectedMsg?.id === m.id"
+            (click)="openMessage(m)"
+          >
+            <div class="msg-sender">{{ m.sender_name }}</div>
+            <div class="msg-type badge" [ngClass]="m.sender_type === 'seller' ? 'badge-brown' : 'badge-green'">{{ m.sender_type }}</div>
+            <div class="msg-subject">{{ m.subject }}</div>
+            <div class="msg-date">{{ formatDate(m.created_at) }}</div>
+          </div>
+          <div class="td-empty" *ngIf="messages.length === 0">No messages yet.</div>
+        </div>
+
+        <!-- Message detail -->
+        <div class="msg-detail" *ngIf="selectedMsg">
+          <div class="msg-d-header">
+            <div class="msg-d-from">{{ selectedMsg.sender_name }} · {{ selectedMsg.sender_email }}</div>
+            <div class="msg-d-subject">{{ selectedMsg.subject }}</div>
+          </div>
+          <div class="msg-d-body">{{ selectedMsg.body }}</div>
+
+          <div class="msg-reply-sent" *ngIf="selectedMsg.reply">
+            <strong>Your reply:</strong> {{ selectedMsg.reply }}
+          </div>
+
+          <div class="msg-reply-form" *ngIf="!selectedMsg.reply">
+            <textarea [(ngModel)]="replyText" placeholder="Type your reply…" rows="4"></textarea>
+            <button class="btn-primary" (click)="sendReply()" [disabled]="replySending || !replyText.trim()">
+              {{ replySending ? 'Sending…' : 'Send Reply' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="msg-empty" *ngIf="!selectedMsg && messages.length > 0">
+          Select a message to read and reply.
+        </div>
+      </div>
+    </section>
+
+    <!-- ── DONATIONS ───────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'donations'" class="tab-content">
+      <div class="tab-header">
+        <h1>Donations</h1>
+        <p class="tab-sub">All donations received across the platform.</p>
+      </div>
+
+      <div class="donation-summary">
+        <div class="don-stat">
+          <div class="don-val">{{ formatCurrency(stats.totalDonationAmount) }}</div>
+          <div class="don-label">Total raised</div>
+        </div>
+        <div class="don-stat">
+          <div class="don-val">{{ stats.totalDonations }}</div>
+          <div class="don-label">Donations</div>
+        </div>
+        <div class="don-stat">
+          <div class="don-val">{{ stats.totalCentres }}</div>
+          <div class="don-label">Beneficiary centres</div>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Donor</th><th>Email</th><th>Amount</th><th>Centre</th><th>Message</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of donations">
+              <td><strong>{{ d.donor_name }}</strong></td>
+              <td class="td-email">{{ d.donor_email }}</td>
+              <td class="td-amount">{{ formatCurrency(d.amount) }}</td>
+              <td>{{ d.centre_name }}</td>
+              <td class="td-msg">{{ d.message || '—' }}</td>
+              <td>{{ formatDate(d.created_at) }}</td>
+            </tr>
+            <tr *ngIf="donations.length === 0">
+              <td colspan="6" class="td-empty">No donations recorded yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="admin-toast" [class.show]="toastVisible">{{ toastMsg }}</div>

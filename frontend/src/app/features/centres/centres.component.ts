@@ -326,12 +326,7 @@ export class CentresComponent implements OnInit, OnDestroy {
 
   // ── Centre click ──────────────────────────────────────────
   openCentre(centre: Centre): void {
-    this.selectedCentre = centre;
-    if (this.currentUser) {
-      this.activeModal = 'centre-detail';
-    } else {
-      this.activeModal = 'centre-preview';
-    }
+    this.router.navigate(['/centres', centre.id]);
   }
 
   // ── Modals ────────────────────────────────────────────────

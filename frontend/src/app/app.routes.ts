@@ -45,12 +45,21 @@ export const routes: Routes = [
       ),
   },
 
-  // ── Contribute / Centres page (replaces donate in nav) ───
+  // ── Contribute / Centres listing ─────────────────────────
   {
     path: 'centres',
     loadComponent: () =>
       import('./features/centres/centres.component').then(
         (m) => m.CentresComponent
+      ),
+  },
+
+  // ── Centre profile page ───────────────────────────────────
+  {
+    path: 'centres/:id',
+    loadComponent: () =>
+      import('./features/centres/centre-profile.component').then(
+        (m) => m.CentreProfileComponent
       ),
   },
 
@@ -67,7 +76,6 @@ export const routes: Routes = [
       import('./features/centre-dashboard/centre-dashboard.component').then(
         (m) => m.CentreDashboardComponent
       ),
-    // canActivate: [CentreAuthGuard],
   },
   {
     path: 'register-centre',
@@ -85,16 +93,26 @@ export const routes: Routes = [
         .then(m => m.SellerRegisterComponent),
   },
   {
+    path: 'login',
+    loadComponent: () => import('./features/seller-login/seller-login.component')
+      .then(m => m.SellerLoginComponent),
+  },
+  {
     path: 'seller/dashboard',
-    loadComponent: () =>
-      import('./features/seller-dashboard/seller-dashboard.component')
-        .then(m => m.SellerDashboardComponent),
+    loadComponent: () => import('./features/seller-dashboard/seller-dashboard.component')
+      .then(m => m.SellerDashboardComponent),
   },
   {
     path: 'seller/hidden',
+    loadComponent: () => import('./features/seller-hidden/seller-hidden.component')
+      .then(m => m.SellerHiddenComponent),
+  },
+
+  // ── Admin ─────────────────────────────────────────────────
+  {
+    path: 'admin',
     loadComponent: () =>
-      import('./features/seller-hidden/seller-hidden.component')
-        .then(m => m.SellerHiddenComponent),
+      import('./features/admin/admin.component').then(m => m.AdminComponent),
   },
 
   {

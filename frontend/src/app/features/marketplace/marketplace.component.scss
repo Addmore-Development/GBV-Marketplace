@@ -1388,3 +1388,54 @@
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .product-modal-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Inline seller registration ─────────────────────────── */
+.seller-form-header {
+  background: var(--beige);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+
+  h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--brown);
+    margin: 0 0 4px;
+  }
+  p { font-size: .8rem; color: var(--text-mid); margin: 0; }
+}
+
+.mf-hint {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+.id-status {
+  font-size: .75rem;
+  font-weight: 700;
+  margin-top: 5px;
+  &.verified { color: #15803D; }
+  &.error    { color: var(--red); }
+}
+
+.quick-exit-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .78rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .2s;
+
+  &:hover {
+    background: #FEE2E2;
+    border-color: #FECACA;
+    color: var(--red);
+  }
+}

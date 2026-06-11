@@ -52,7 +52,8 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
   authError = '';
   loginEmail = '';
   loginPassword = '';
-  loginRole: 'buyer' | 'seller' | 'centre' = 'buyer';
+  loginRole: 'buyer' | 'seller' | 'centre' | 'admin' = 'buyer';
+  adminPinInput = '';
   registerName = '';
   registerEmail = '';
   registerPassword = '';
@@ -491,10 +492,20 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     this.router.navigate(['/login']);
   }
 
+  doAdminLogin(): void {
+    this.authError = '';
+    if (!this.adminPinInput) { this.authError = 'Please enter the admin PIN.'; return; }
+    if (this.adminPinInput !== 'amani2024') { this.authError = 'Incorrect PIN.'; return; }
+    localStorage.setItem('adminAuth', 'true');
+    this.authModal = '';
+    this.adminPinInput = '';
+    this.router.navigate(['/admin']);
+  }
+
   doLogin(): void {
     this.authError = '';
     if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
-    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole);
+    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole as 'buyer' | 'seller' | 'centre');
     if (!ok) this.authError = 'Invalid credentials.';
     else this.authModal = '';
   }

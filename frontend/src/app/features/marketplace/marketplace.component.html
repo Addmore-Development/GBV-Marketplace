@@ -343,11 +343,21 @@
         <button class="mtab" [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
         <button class="mtab" [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
         <button class="mtab" [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
+        <button class="mtab" [class.active]="loginRole === 'admin'"  (click)="loginRole = 'admin'">Admin</button>
       </div>
-      <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
-      <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
-      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
-      <button class="modal-cta" (click)="doLogin()">Sign In</button>
+
+      <ng-container *ngIf="loginRole !== 'admin'">
+        <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
+        <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
+        <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+        <button class="modal-cta" (click)="doLogin()">Sign In</button>
+      </ng-container>
+
+      <ng-container *ngIf="loginRole === 'admin'">
+        <div class="mf-group"><label>Admin PIN</label><input [(ngModel)]="adminPinInput" type="password" placeholder="Enter admin PIN" inputmode="numeric" /></div>
+        <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+        <button class="modal-cta" (click)="doAdminLogin()">Enter Admin Panel</button>
+      </ng-container>
       <div class="modal-switch">No account? <span (click)="authModal = 'register'">Register here</span></div>
     </div>
 

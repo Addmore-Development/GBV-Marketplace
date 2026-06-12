@@ -90,6 +90,11 @@ async function initDatabase() {
           'constitution','tax_exemption'
         );
       EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+      -- ========== ADDED: professional_type for case sharing ==========
+      DO $$ BEGIN
+        CREATE TYPE professional_type AS ENUM ('lawyer','counsellor','social_worker','doctor','advocate','other');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;
     `);
     console.log('✅ ENUM types created');
 
@@ -619,10 +624,12 @@ async function initDatabase() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
+    // -- ADDED: Ensure 'message' column exists (for existing DBs)
+    await dbClient.query(`ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS message TEXT;`).catch(e => console.log(e.message));
     console.log('✅ Support requests table ready');
 
     // ══════════════════════════════════════════════════════════════════════
-    // PRO BONO PROFESSIONALS
+    // PRO BONO PROFESSIONALS (extended)
     // ══════════════════════════════════════════════════════════════════════
     await dbClient.query(`
       CREATE TABLE IF NOT EXISTS professionals (
@@ -637,7 +644,30 @@ async function initDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    console.log('✅ Professionals table ready');
+    // ========== ADDED: extended columns ==========
+    await dbClient.query(`ALTER TABLE professionals ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT TRUE;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE professionals ADD COLUMN IF NOT EXISTS assigned_count INTEGER DEFAULT 0;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE professionals ADD COLUMN IF NOT EXISTS centre_id UUID REFERENCES centres(id);`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE professionals ADD COLUMN IF NOT EXISTS last_assigned_at TIMESTAMPTZ;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE professionals ADD COLUMN IF NOT EXISTS bio TEXT;`).catch(e => console.log(e.message));
+    await dbClient.query(`ALTER TABLE professionals ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE;`).catch(e => console.log(e.message));
+    console.log('✅ Professionals table ready (extended)');
+
+    // ══════════════════════════════════════════════════════════════════════
+    // NOTIFICATIONS TABLE (for survivors and professionals) – ADDED
+    // ══════════════════════════════════════════════════════════════════════
+    await dbClient.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id         UUID,
+        user_type       VARCHAR(20) NOT NULL CHECK (user_type IN ('seller','professional')),
+        title           VARCHAR(255) NOT NULL,
+        message         TEXT NOT NULL,
+        is_read         BOOLEAN DEFAULT FALSE,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('✅ Notifications table ready');
 
     // ══════════════════════════════════════════════════════════════════════
     // DONATIONS
@@ -731,6 +761,39 @@ async function initDatabase() {
     console.log('✅ Volunteer applications table ready');
 
     // ══════════════════════════════════════════════════════════════════════
+    // UNIFIED CASE FILE SHARING (ADDED)
+    // ══════════════════════════════════════════════════════════════════════
+    await dbClient.query(`
+      CREATE TABLE IF NOT EXISTS case_shares (
+        id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        seller_id             UUID NOT NULL REFERENCES sellers(id) ON DELETE CASCADE,
+        professional_email    VARCHAR(255) NOT NULL,
+        professional_name     VARCHAR(255),
+        professional_type     professional_type,
+        permission            VARCHAR(30) NOT NULL DEFAULT 'journey_and_evidence',
+        share_token           VARCHAR(64) UNIQUE NOT NULL,
+        expires_at            TIMESTAMPTZ NOT NULL,
+        is_active             BOOLEAN DEFAULT TRUE,
+        notes                 TEXT,
+        created_at            TIMESTAMPTZ DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ DEFAULT NOW(),
+        revoked_at            TIMESTAMPTZ
+      );
+    `);
+    console.log('✅ Case shares table ready');
+
+    await dbClient.query(`
+      CREATE TABLE IF NOT EXISTS case_share_views (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        share_id    UUID NOT NULL REFERENCES case_shares(id) ON DELETE CASCADE,
+        viewed_at   TIMESTAMPTZ DEFAULT NOW(),
+        viewer_ip   INET,
+        user_agent  TEXT
+      );
+    `);
+    console.log('✅ Case share views table ready');
+
+    // ══════════════════════════════════════════════════════════════════════
     // INDEXES (safe creation)
     // ══════════════════════════════════════════════════════════════════════
     await safeCreateIndex(dbClient, 'idx_centres_status', 'centres', 'status');
@@ -770,6 +833,16 @@ async function initDatabase() {
     await safeCreateIndex(dbClient, 'idx_volunteer_app_seller', 'volunteer_applications', 'seller_id');
     await safeCreateIndex(dbClient, 'idx_volunteer_app_opp', 'volunteer_applications', 'opportunity_id');
 
+    // ========== ADDED: indexes for new tables ==========
+    await safeCreateIndex(dbClient, 'idx_case_shares_seller', 'case_shares', 'seller_id');
+    await safeCreateIndex(dbClient, 'idx_case_shares_token', 'case_shares', 'share_token');
+    await safeCreateIndex(dbClient, 'idx_case_shares_email', 'case_shares', 'professional_email');
+    await safeCreateIndex(dbClient, 'idx_case_share_views_share', 'case_share_views', 'share_id');
+    await safeCreateIndex(dbClient, 'idx_notifications_user', 'notifications', 'user_id', 'user_type');
+    // Multi‑column indexes (safeCreateIndex only supports single column, so we use direct CREATE INDEX)
+    await dbClient.query(`CREATE INDEX IF NOT EXISTS idx_professionals_available_type ON professionals(professional_type, is_available);`).catch(e => console.log(e.message));
+    await dbClient.query(`CREATE INDEX IF NOT EXISTS idx_professionals_centre ON professionals(centre_id);`).catch(e => console.log(e.message));
+
     console.log('✅ Indexes created');
 
     // ══════════════════════════════════════════════════════════════════════
@@ -778,7 +851,8 @@ async function initDatabase() {
     const triggeredTables = [
       'centres','sellers','products','carts','orders',
       'case_journeys','evidence_items','support_requests',
-      'volunteer_opportunities','volunteer_applications'
+      'volunteer_opportunities','volunteer_applications',
+      'case_shares', 'case_share_views', 'notifications'   // ADDED new tables
     ];
     for (const tbl of triggeredTables) {
       await dbClient.query(`
@@ -814,7 +888,7 @@ async function initDatabase() {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // SEED: VERIFIED CENTRES
+    // SEED: VERIFIED CENTRES (unchanged)
     // ══════════════════════════════════════════════════════════════════════
     const centreCount = await dbClient.query(`SELECT COUNT(*) FROM centres`);
     if (parseInt(centreCount.rows[0].count) === 0) {
@@ -951,25 +1025,22 @@ async function initDatabase() {
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // SEED VOLUNTEER OPPORTUNITIES (fixed – separate inserts)
+    // SEED VOLUNTEER OPPORTUNITIES (unchanged)
     // ──────────────────────────────────────────────────────────────────────
     const oppCount = await dbClient.query(`SELECT COUNT(*) FROM volunteer_opportunities`);
     if (parseInt(oppCount.rows[0].count) === 0) {
-      // Insert for Thistle House
       await dbClient.query(`
         INSERT INTO volunteer_opportunities (centre_id, title, description, skills_required, location)
         SELECT id, 'Event Support Volunteer', 'Help organise community craft fairs and fundraising events.', ARRAY['Organisation','Communication'], city
         FROM centres WHERE centre_name = 'Thistle House'
         ON CONFLICT (id) DO NOTHING;
       `);
-      // Insert for Women of Worth
       await dbClient.query(`
         INSERT INTO volunteer_opportunities (centre_id, title, description, skills_required, location)
         SELECT id, 'Administrative Assistant', 'Assist with data entry, donor comms, and social media updates.', ARRAY['Computer skills','Writing'], city
         FROM centres WHERE centre_name = 'Women of Worth'
         ON CONFLICT (id) DO NOTHING;
       `);
-      // Insert for Ikhaya Labantu
       await dbClient.query(`
         INSERT INTO volunteer_opportunities (centre_id, title, description, skills_required, location)
         SELECT id, 'Craft Workshop Facilitator', 'Help teach beadwork and sewing skills to other survivors.', ARRAY['Beading','Teaching'], city

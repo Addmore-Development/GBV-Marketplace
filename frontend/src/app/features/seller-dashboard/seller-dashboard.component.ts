@@ -168,7 +168,8 @@ export class SellerDashboardComponent implements OnInit {
     hiddenPin = '';
     pinError = '';
     sanctuaryOpen = false;
-    sanctuaryTab: 'journey' | 'vault' | 'support' = 'journey';
+    // IMPORTANT: added 'affidavit' to the union type
+    sanctuaryTab: 'journey' | 'vault' | 'support' | 'share' | 'affidavit' = 'journey';
     caseJourney: CaseJourney = {
         medical_done: false, police_done: false,
         protection_done: false, court_done: false, counselling_done: false,
@@ -189,6 +190,13 @@ export class SellerDashboardComponent implements OnInit {
     applyNotes = '';
     applyError = '';
     applySuccess = false;
+
+    // ── Voice Affidavit (ADDED) ───────────────────────────────
+    isRecording = false;
+    affidavitTranscript = '';
+    recognition: any = null;
+    generatingAffidavit = false;
+    lastAffidavitUrl = '';
 
     constructor(
         private http: HttpClient,
@@ -531,6 +539,12 @@ export class SellerDashboardComponent implements OnInit {
         });
     }
 
+    getFileUrl(fileUrl: string): string {
+        // Use your actual API base URL
+        const baseUrl = 'http://localhost:3000';
+        return fileUrl.startsWith('http') ? fileUrl : `${baseUrl}${fileUrl}`;
+    }
+
     toggleLanguage(lang: string): void {
         const langs = this.profileForm.languages || [];
         const idx = langs.indexOf(lang);
@@ -697,19 +711,19 @@ export class SellerDashboardComponent implements OnInit {
     }
 
     generateCourtPack(): void {
-    this.http.post(`${this.API}/generate-court-pack/${this.seller?.id}`, {}, { responseType: 'blob' })
-        .subscribe({
-            next: (blob) => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `court-pack-${this.seller?.id}.pdf`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-            },
-            error: () => alert('Could not generate court pack')
-        });
-}
+        this.http.post(`${this.API}/generate-court-pack/${this.seller?.id}`, {}, { responseType: 'blob' })
+            .subscribe({
+                next: (blob) => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `court-pack-${this.seller?.id}.pdf`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                },
+                error: () => alert('Could not generate court pack')
+            });
+    }
 
     logout(): void {
         localStorage.clear();
@@ -734,5 +748,104 @@ export class SellerDashboardComponent implements OnInit {
             financial: '💰', wellness: '🌿',
         };
         return map[cat] || '📚';
+    }
+
+    // ============================================================
+    // VOICE AFFIDAVIT BUILDER (ADDED)
+    // ============================================================
+
+    private initSpeechRecognition(): void {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Your browser does not support speech recognition. Please use Chrome, Edge, or Safari.');
+            return;
+        }
+        this.recognition = new SpeechRecognition();
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.lang = 'en-ZA'; // South African English
+
+        this.recognition.onresult = (event: any) => {
+            let final = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    final += transcript + ' ';
+                }
+            }
+            if (final) {
+                this.affidavitTranscript = (this.affidavitTranscript + final).trim();
+                this.cdr.detectChanges();
+            }
+        };
+
+        this.recognition.onerror = (event: any) => {
+            console.error('Speech recognition error', event.error);
+            this.isRecording = false;
+            alert('Microphone error: ' + event.error);
+            this.cdr.detectChanges();
+        };
+
+        this.recognition.onend = () => {
+            this.isRecording = false;
+            this.cdr.detectChanges();
+        };
+    }
+
+    startRecording(): void {
+        if (!this.recognition) {
+            this.initSpeechRecognition();
+        }
+        if (this.recognition) {
+            try {
+                this.recognition.start();
+                this.isRecording = true;
+            } catch (err) {
+                console.error(err);
+                alert('Could not start recording. Please ensure microphone permissions are granted.');
+            }
+        } else {
+            alert('Speech recognition not available in this browser.');
+        }
+    }
+
+    stopRecording(): void {
+        if (this.recognition) {
+            this.recognition.stop();
+            this.isRecording = false;
+        }
+    }
+
+    clearAffidavit(): void {
+        this.affidavitTranscript = '';
+        this.lastAffidavitUrl = '';
+    }
+
+    generateAffidavitPDF(): void {
+        if (!this.affidavitTranscript.trim()) {
+            alert('Please speak or type your statement first.');
+            return;
+        }
+        this.generatingAffidavit = true;
+        this.http.post(`${this.API}/affidavit/generate`, {
+            seller_id: this.seller?.id,
+            statement: this.affidavitTranscript
+        }, { responseType: 'blob' }).subscribe({
+            next: (blob) => {
+                this.generatingAffidavit = false;
+                const url = window.URL.createObjectURL(blob);
+                this.lastAffidavitUrl = url;
+                // Refresh evidence list to show the newly saved affidavit
+                this.loadEvidence();
+                alert('Affidavit PDF generated and saved to your Safe Space.');
+                this.cdr.detectChanges();
+            },
+            error: (err) => {
+                this.generatingAffidavit = false;
+                console.error(err);
+                alert('Failed to generate affidavit: ' + (err.error?.message || 'Please try again.'));
+                this.cdr.detectChanges();
+            }
+        });
     }
 }

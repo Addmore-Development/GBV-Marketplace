@@ -2284,6 +2284,68 @@
   }
 }
 
+.affidavit-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.recording-indicator {
+  color: #e53935;
+  font-weight: bold;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+.affidavit-editor {
+  margin: 20px 0;
+  label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: rgba(255,255,255,0.8);
+  }
+  textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    padding: 12px;
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    resize: vertical;
+    &:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+  }
+  small {
+    color: rgba(255,255,255,0.5);
+    display: block;
+    margin-top: 5px;
+  }
+}
+.affidavit-actions {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+}
+.affidavit-result {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(90,122,58,0.2);
+  border-radius: 12px;
+  text-align: center;
+  a {
+    display: inline-block;
+    margin-top: 10px;
+  }
+}
+
 // ── RESPONSIVE ───────────────────────────────────────────────
 @media (max-width: 960px) {
   .sd-page { flex-direction: column; }

@@ -864,3 +864,83 @@ export const getMyVolunteerApplications = async (req: Request, res: Response) =>
         res.status(500).json({ error: 'Failed to fetch your applications' });
     }
 };
+
+// ── GENERATE AFFIDAVIT PDF FROM VOICE TRANSCRIPT ─────────────
+export const generateAffidavitPDF = async (req: Request, res: Response) => {
+    const { seller_id, statement } = req.body;
+    if (!seller_id || !statement) {
+        return res.status(400).json({ error: 'Missing seller_id or statement' });
+    }
+
+    try {
+        // Fetch seller details
+        const seller = await pool.query(
+            `SELECT alias, real_name, id_number, phone, city FROM sellers WHERE id = $1`,
+            [seller_id]
+        );
+        if (!seller.rows.length) {
+            return res.status(404).json({ error: 'Seller not found' });
+        }
+        const s = seller.rows[0];
+
+        const filename = `affidavit_${s.alias}_${Date.now()}.pdf`;
+        const filePath = path.join(__dirname, '../../uploads/evidence/', filename);
+        const fileUrl = `/uploads/evidence/${filename}`;
+
+        // Create PDF and write to disk
+        const doc = new PDFDocument({ margin: 60, size: 'A4' });
+        const writeStream = fs.createWriteStream(filePath);
+        doc.pipe(writeStream);
+
+        // Title – set font size before writing
+        doc.fontSize(18).font('Helvetica-Bold').text('AFFIDAVIT', { align: 'center' });
+        doc.moveDown();
+
+        // Introduction
+        doc.fontSize(12).font('Helvetica');
+        doc.text(`I, ${s.real_name || s.alias}, do hereby make oath and state that:`);
+        doc.moveDown(0.5);
+
+        // Statement (split into paragraphs)
+        const paragraphs = statement.split(/\n+/);
+        for (const para of paragraphs) {
+            if (para.trim()) {
+                doc.text(para.trim(), { indent: 20 });
+                doc.moveDown(0.5);
+            }
+        }
+
+        doc.moveDown();
+        doc.text(`Deposed and sworn to before me at ${s.city || 'Johannesburg'} on this ${new Date().toLocaleDateString('en-ZA')}.`);
+        doc.moveDown(1.5);
+        doc.text(`_________________________`, { align: 'right' });
+        doc.fontSize(10).text(`Deponent's signature`, { align: 'right' });
+        doc.moveDown(1);
+        doc.fontSize(12).text(`_________________________`, { align: 'right' });
+        doc.fontSize(10).text(`Commissioner of Oaths`, { align: 'right' });
+
+        doc.end();
+
+        // Wait for file to finish writing
+        await new Promise((resolve, reject) => {
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+
+        // Save as evidence item (so it appears in the vault)
+        await pool.query(
+            `INSERT INTO evidence_items (seller_id, item_type, filename, file_url, description, is_court_ready)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [seller_id, 'document', filename, fileUrl, 'Voice‑generated affidavit', true]
+        );
+
+        // Send the file back to the client
+        res.download(filePath, filename, (err) => {
+            if (err) console.error('Download error:', err);
+            // Keep the file on disk – it's now part of the evidence
+        });
+    } catch (err) {
+        console.error('generateAffidavitPDF error:', err);
+        res.status(500).json({ error: 'Could not generate affidavit' });
+    }
+};

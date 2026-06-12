@@ -33,6 +33,7 @@ import {
     getVolunteerOpportunities,
     applyForVolunteer,
     getMyVolunteerApplications,
+    generateAffidavitPDF,
 } from '../controllers/seller.controller';
 
 const router = Router();
@@ -85,5 +86,7 @@ router.get('/volunteer-opportunities', getVolunteerOpportunities);
 router.post('/volunteer-applications', applyForVolunteer);
 router.get('/volunteer-applications/:sellerId', getMyVolunteerApplications);
 
+// ── Voice Affidavit ─────────────────────────────────────────
+router.post('/affidavit/generate', generateAffidavitPDF);
 
 export default router;

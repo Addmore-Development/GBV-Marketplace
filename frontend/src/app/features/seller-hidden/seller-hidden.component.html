@@ -11,13 +11,16 @@
     </div>
   </header>
 
+  <!-- Updated tabs with new entries -->
   <div class="tabs">
-    <button [class.active]="activeSection === 'case'" (click)="activeSection = 'case'">📋 Case Journey</button>
-    <button [class.active]="activeSection === 'evidence'" (click)="activeSection = 'evidence'">🔒 Evidence Vault</button>
-    <button [class.active]="activeSection === 'support'" (click)="activeSection = 'support'">🤝 Support Network</button>
+    <button [class.active]="activeSection === 'case'"      (click)="activeSection = 'case'">📋 Case Journey</button>
+    <button [class.active]="activeSection === 'evidence'"  (click)="activeSection = 'evidence'">🔒 Evidence Vault</button>
+    <button [class.active]="activeSection === 'support'"   (click)="activeSection = 'support'">🤝 Support Network</button>
+    <button [class.active]="activeSection === 'share'"     (click)="activeSection = 'share'">🔗 Share My Case</button>
+    <button [class.active]="activeSection === 'affidavit'" (click)="activeSection = 'affidavit'">🎙️ Voice Affidavit</button>
   </div>
 
-  <!-- Case Journey Tab -->
+  <!-- ========== CASE JOURNEY TAB (unchanged) ========== -->
   <div class="tab-content" *ngIf="activeSection === 'case'">
     <h2>Your Case Journey</h2>
     <p class="subtitle">Track your progress through the system. Tell your story once.</p>
@@ -27,43 +30,152 @@
         <div class="step-content">
           <strong>{{ step.step }}</strong>
           <span *ngIf="step.completed">✓ Completed on {{ step.date || '—' }}</span>
-          <button *ngIf="!step.completed" class="small-btn" (click)="requestSupport()">Need help?</button>
+          <button *ngIf="!step.completed" class="small-btn" (click)="requestSupport('companion')">Need help?</button>
         </div>
       </div>
     </div>
     <button class="btn-primary" (click)="generateCourtPack()">Generate Court Pack (PDF)</button>
   </div>
 
-  <!-- Evidence Vault Tab -->
+  <!-- ========== EVIDENCE VAULT TAB (with real upload) ========== -->
   <div class="tab-content" *ngIf="activeSection === 'evidence'">
     <h2>Evidence Vault</h2>
     <p class="subtitle">All files are encrypted. Only you decide who sees them.</p>
-    <button class="btn-primary" (click)="uploadEvidence()">+ Upload Evidence</button>
-    <div class="evidence-list" *ngIf="evidenceItems.length === 0">
-      <p>No evidence uploaded yet. Click above to add photos, voice notes, or WhatsApp forwards.</p>
+    <button class="btn-primary" (click)="showUploadModal = !showUploadModal">+ Upload Evidence</button>
+
+    <!-- Upload form -->
+    <div *ngIf="showUploadModal" class="upload-form">
+      <div class="form-group">
+        <label>Type</label>
+        <select [(ngModel)]="newEvidence.type">
+          <option value="photo">Photo</option>
+          <option value="voice_note">Voice note</option>
+          <option value="document">Document</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea rows="2" [(ngModel)]="newEvidence.description"></textarea>
+      </div>
+      <div class="form-group">
+        <label>File</label>
+        <input type="file" (change)="onEvidenceFileSelected($event)" accept="image/*,audio/*,application/pdf">
+      </div>
+      <button class="btn-primary" (click)="uploadEvidence()" [disabled]="uploading">
+        {{ uploading ? 'Uploading...' : 'Upload' }}
+      </button>
+      <button class="btn-cancel" (click)="showUploadModal = false">Cancel</button>
+    </div>
+
+    <!-- Evidence list -->
+    <div class="evidence-list" *ngIf="evidenceItems.length > 0">
+      <div class="ev-item" *ngFor="let e of evidenceItems">
+        <span class="ev-icon">{{ e.item_type === 'photo' ? '📷' : e.item_type === 'voice_note' ? '🎤' : '📄' }}</span>
+        <div class="ev-info">
+          <div class="ev-type">{{ e.item_type }}</div>
+          <div class="ev-desc">{{ e.description }}</div>
+          <div class="ev-date">{{ e.created_at | date:'short' }}</div>
+          <a *ngIf="e.file_url" [href]="'http://localhost:3000' + e.file_url" target="_blank">View file ↗</a>
+        </div>
+      </div>
+    </div>
+    <div class="evidence-list" *ngIf="evidenceItems.length === 0 && !showUploadModal">
+      <p>No evidence uploaded yet. Click above to add photos, voice notes, or documents.</p>
     </div>
   </div>
 
-  <!-- Support Network Tab -->
+  <!-- ========== SUPPORT NETWORK TAB (with request status list) ========== -->
   <div class="tab-content" *ngIf="activeSection === 'support'">
     <h2>Support Network</h2>
     <p class="subtitle">Request a companion, pro bono lawyer, or counsellor – all free.</p>
     <div class="support-options">
-      <button class="support-card" (click)="requestSupport()">
+      <button class="support-card" (click)="requestSupport('companion')">
         <span>👥</span>
         <strong>Request Companion</strong>
         <small>Someone to accompany you to police station or court</small>
       </button>
-      <button class="support-card" (click)="requestSupport()">
+      <button class="support-card" (click)="requestSupport('legal')">
         <span>⚖️</span>
         <strong>Pro Bono Lawyer</strong>
         <small>Legal advice and representation</small>
       </button>
-      <button class="support-card" (click)="requestSupport()">
+      <button class="support-card" (click)="requestSupport('counselling')">
         <span>💬</span>
         <strong>Trauma Counsellor</strong>
         <small>Free, confidential counselling sessions</small>
       </button>
+    </div>
+
+    <!-- Request status list -->
+    <div *ngIf="mySupportRequests.length > 0" class="requests-list">
+      <h3>Your requests</h3>
+      <div class="request-item" *ngFor="let req of mySupportRequests">
+        <div class="req-type">{{ req.request_type }}</div>
+        <div class="req-status" [class.matched]="req.status === 'matched'" [class.closed]="req.status === 'closed'">
+          {{ req.status }}
+        </div>
+        <div class="req-date">Requested: {{ req.created_at | date:'short' }}</div>
+        <div class="req-matched" *ngIf="req.matched_to">Matched to: {{ req.matched_to }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SHARE MY CASE TAB ========== -->
+  <div class="tab-content" *ngIf="activeSection === 'share'">
+    <h2>Unified case file sharing</h2>
+    <p class="subtitle">Grant secure, revocable access to your case journey and evidence to a trusted professional.</p>
+    <button class="btn-primary" (click)="openShareModal()">+ Share with a professional</button>
+
+    <div class="share-list" *ngIf="myShares.length > 0; else noShares">
+      <div class="share-card" *ngFor="let share of myShares">
+        <div class="share-header">
+          <span class="share-email">{{ share.professional_email }}</span>
+          <span class="share-status" [class.active]="share.is_active">{{ share.is_active ? 'Active' : 'Revoked' }}</span>
+        </div>
+        <div class="share-details">
+          <span>👤 {{ share.professional_name || 'Professional' }}</span>
+          <span>🔐 {{ share.permission === 'journey_and_evidence' ? 'Full access' : 'Journey only' }}</span>
+          <span>⏱️ Expires: {{ share.expires_at | date:'d MMM y' }}</span>
+        </div>
+        <div class="share-actions" *ngIf="share.is_active">
+          <button class="small-btn" (click)="copyShareLink(share.share_url)">📋 Copy link</button>
+          <button class="small-btn revoke" (click)="revokeShare(share.id)">Revoke access</button>
+        </div>
+        <div class="share-url"><small>{{ truncate(share.share_url, 40) }}</small></div>
+      </div>
+    </div>
+    <ng-template #noShares>
+      <p class="sanc-empty">No active shares. Create one above to let a professional view your case file.</p>
+    </ng-template>
+  </div>
+
+  <!-- ========== VOICE AFFIDAVIT TAB ========== -->
+  <div class="tab-content" *ngIf="activeSection === 'affidavit'">
+    <h2>Voice Affidavit Builder</h2>
+    <p class="subtitle">Speak your statement – we transcribe it into a legal affidavit. No writing required.</p>
+
+    <div class="affidavit-controls">
+      <button class="btn-primary" (click)="startRecording()" [disabled]="isRecording">🎤 Start speaking</button>
+      <button class="btn-primary" (click)="stopRecording()" *ngIf="isRecording" style="background:#c0392b;">⏹️ Stop</button>
+      <span *ngIf="isRecording" class="recording">🔴 Recording...</span>
+    </div>
+
+    <div class="affidavit-editor">
+      <label>Your statement (editable)</label>
+      <textarea rows="8" [(ngModel)]="affidavitTranscript" placeholder="Your spoken words will appear here..."></textarea>
+    </div>
+
+    <div class="affidavit-actions">
+      <button class="btn-primary" (click)="generateAffidavitPDF()" [disabled]="!affidavitTranscript || generatingAffidavit">
+        {{ generatingAffidavit ? 'Generating...' : '📄 Generate Affidavit PDF' }}
+      </button>
+      <button class="btn-cancel" (click)="clearAffidavit()">Clear</button>
+    </div>
+
+    <div *ngIf="lastAffidavitUrl" class="affidavit-result">
+      <p>✓ Affidavit PDF generated.</p>
+      <a [href]="lastAffidavitUrl" target="_blank">📥 Download / View PDF</a>
+      <small>Saved to your Safe Space (evidence vault).</small>
     </div>
   </div>
 
@@ -71,4 +183,30 @@
     <span>🛡️ In danger? Call 10111 first.</span>
     <span>Double‑tap the Amani logo to hide this page.</span>
   </footer>
+</div>
+
+<!-- Share Case Modal -->
+<div class="modal-overlay" *ngIf="showShareModal">
+  <div class="modal-card">
+    <h3>Share your case file</h3>
+    <div><label>Professional's email *</label><input type="email" [(ngModel)]="newShare.email"></div>
+    <div><label>Name (optional)</label><input type="text" [(ngModel)]="newShare.name"></div>
+    <div><label>Type</label>
+      <select [(ngModel)]="newShare.type">
+        <option value="lawyer">Lawyer</option><option value="counsellor">Counsellor</option>
+        <option value="social_worker">Social worker</option><option value="doctor">Doctor</option>
+      </select>
+    </div>
+    <div><label>Access</label>
+      <label><input type="radio" value="journey_and_evidence" [(ngModel)]="newShare.permission"> Full (journey + evidence)</label>
+      <label><input type="radio" value="journey_only" [(ngModel)]="newShare.permission"> Journey only</label>
+    </div>
+    <div><label>Expires after (days)</label><input type="number" [(ngModel)]="newShare.expiresDays" min="1" max="365"></div>
+    <div><label>Notes</label><textarea rows="2" [(ngModel)]="newShare.notes"></textarea></div>
+    <div class="error" *ngIf="shareError">{{ shareError }}</div>
+    <div class="modal-buttons">
+      <button class="btn-primary" (click)="createShare()" [disabled]="shareCreating">Create share link</button>
+      <button class="btn-cancel" (click)="closeShareModal()">Cancel</button>
+    </div>
+  </div>
 </div>

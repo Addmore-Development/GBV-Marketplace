@@ -593,10 +593,12 @@
       <span class="sanc-hint">(double-tap to leave)</span>
     </div>
     <div class="sanc-tabs">
-      <button [class.active]="sanctuaryTab === 'journey'"  (click)="sanctuaryTab = 'journey'">📋 My Journey</button>
-      <button [class.active]="sanctuaryTab === 'vault'"    (click)="sanctuaryTab = 'vault'">🔒 Safe Space</button>
-      <button [class.active]="sanctuaryTab === 'support'"  (click)="sanctuaryTab = 'support'">🤝 Find Help</button>
-    </div>
+  <button [class.active]="sanctuaryTab === 'journey'"   (click)="sanctuaryTab = 'journey'">📋 My Journey</button>
+  <button [class.active]="sanctuaryTab === 'share'"     (click)="sanctuaryTab = 'share'">🔗 Share My Case</button>
+  <button [class.active]="sanctuaryTab === 'vault'"     (click)="sanctuaryTab = 'vault'">🔒 Safe Space</button>
+  <button [class.active]="sanctuaryTab === 'support'"   (click)="sanctuaryTab = 'support'">🤝 Find Help</button>
+  <button [class.active]="sanctuaryTab === 'affidavit'" (click)="sanctuaryTab = 'affidavit'">🎙️ Voice Affidavit</button>
+</div>
     <div class="sanc-actions">
       <button class="sanc-exit-btn" (click)="quickExit()">🚪 Leave quickly</button>
       <button class="sanc-close-btn" (click)="exitSanctuary()">Close sanctuary</button>
@@ -723,6 +725,49 @@
       🛡️ <strong>If you are in immediate danger, call 10111 first.</strong> Then come back here.
     </div>
   </div>
+
+  <!-- Voice Affidavit Tab -->
+<div class="sanc-content" *ngIf="sanctuaryTab === 'affidavit'">
+  <h2>Voice Affidavit Builder</h2>
+  <p class="sanc-sub">
+    Speak your statement. The system will transcribe it into a legal affidavit.<br>
+    No writing required. You can edit the text before generating the PDF.
+  </p>
+
+  <!-- Microphone button and status -->
+  <div class="affidavit-controls">
+    <button class="sanc-btn" (click)="startRecording()" [disabled]="isRecording" *ngIf="!isRecording">
+      🎤 Start speaking
+    </button>
+    <button class="sanc-btn" (click)="stopRecording()" *ngIf="isRecording" style="background:#c0392b;">
+      ⏹️ Stop recording
+    </button>
+    <span *ngIf="isRecording" class="recording-indicator">🔴 Recording...</span>
+    <span *ngIf="!isRecording && affidavitTranscript" class="status-ok">✓ Ready</span>
+  </div>
+
+  <!-- Transcript editor -->
+  <div class="affidavit-editor">
+    <label>Your statement (editable)</label>
+    <textarea rows="10" [(ngModel)]="affidavitTranscript" placeholder="Your spoken words will appear here..."></textarea>
+    <small>You can edit the text – it will be used in the final affidavit PDF.</small>
+  </div>
+
+  <!-- Generate PDF button -->
+  <div class="affidavit-actions">
+    <button class="sanc-btn secondary" (click)="generateAffidavitPDF()" [disabled]="!affidavitTranscript || generatingAffidavit">
+      {{ generatingAffidavit ? 'Generating PDF...' : '📄 Generate Affidavit PDF' }}
+    </button>
+    <button class="sanc-btn cancel" (click)="clearAffidavit()">Clear</button>
+  </div>
+
+  <!-- Success / error messages -->
+  <div class="affidavit-result" *ngIf="lastAffidavitUrl">
+    <p>✓ Affidavit PDF generated.</p>
+    <a [href]="lastAffidavitUrl" target="_blank" class="sanc-btn">📥 Download / View PDF</a>
+    <small>Saved to your Safe Space (evidence vault).</small>
+  </div>
+</div>
 
   <footer class="sanc-footer">
     <span>🛡️ In danger now? Call 10111 first.</span>

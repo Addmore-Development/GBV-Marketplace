@@ -298,9 +298,11 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     return this.categories.find(c => c.key === this.activeCategory)?.label || '';
   }
 
-  formatPrice(p: number): string {
-    return `R${(p || 0).toFixed(2)}`;
-  }
+formatPrice(p: number | string): string {
+  const num = typeof p === 'number' ? p : Number(p);
+  if (isNaN(num)) return 'R0.00';
+  return `R${num.toFixed(2)}`;
+}
 
   formatSurvivorPct(p: Product): string {
     return `${Math.round((p.survivor_income / p.price) * 100)}%`;

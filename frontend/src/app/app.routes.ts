@@ -102,12 +102,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/seller-dashboard/seller-dashboard.component')
       .then(m => m.SellerDashboardComponent),
   },
+{
+    path: 'shared-case/:token',
+    loadComponent: () => import('./features/shared-case/shared-case.component').then(m => m.SharedCaseComponent)
+},
   {
     path: 'seller/hidden',
     loadComponent: () => import('./features/seller-hidden/seller-hidden.component')
       .then(m => m.SellerHiddenComponent),
   },
-
   // ── Admin ─────────────────────────────────────────────────
   {
     path: 'admin',
@@ -120,3 +123,4 @@ export const routes: Routes = [
     redirectTo: 'marketplace',
   },
 ];
+

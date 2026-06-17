@@ -198,6 +198,25 @@ export class SellerDashboardComponent implements OnInit {
     generatingAffidavit = false;
     lastAffidavitUrl = '';
 
+    // ── Unified Case Sharing (ADDED) ─────────────────────────────
+    myShares: any[] = [];
+    showShareModal = false;
+    shareCreating = false;
+    shareError = '';
+    newShare = {
+        email: '',
+        name: '',
+        type: 'lawyer',
+        permission: 'journey_and_evidence',
+        expiresDays: 30,
+        notes: ''
+    };
+
+    // ── Pro‑bono professional matching notifications (ADDED) ─────
+    notifications: any[] = [];
+    unreadCount = 0;
+    showNotifications = false;
+
     constructor(
         private http: HttpClient,
         private router: Router,
@@ -251,6 +270,9 @@ export class SellerDashboardComponent implements OnInit {
                 };
                 this.isLoading = false;
                 this.cdr.detectChanges();
+                // ADDED: load existing shares and notifications
+                this.loadMyShares();
+                this.loadNotifications();
                 this.loadProducts();
                 this.loadEarnings();
                 this.loadTraining();
@@ -847,5 +869,122 @@ export class SellerDashboardComponent implements OnInit {
                 this.cdr.detectChanges();
             }
         });
+    }
+
+    // ── Helper to prepend backend URL for uploaded files ──
+    getFileUrl(fileUrl: string): string {
+        if (!fileUrl) return '';
+        // Backend serves static files on port 3000
+        return `http://localhost:3000${fileUrl}`;
+    }
+
+    // ============================================================
+    // UNIFIED CASE FILE SHARING (ADDED)
+    // ============================================================
+    loadMyShares(): void {
+        if (!this.seller?.id) return;
+        this.http.get<any[]>(`${this.API}/case/shares?seller_id=${this.seller.id}`).subscribe({
+            next: (shares) => {
+                this.myShares = shares.map(s => ({
+                    ...s,
+                    share_url: `${window.location.origin}/shared-case/${s.share_token}`
+                }));
+                this.cdr.detectChanges();
+            },
+            error: (err) => console.error('Load shares error:', err)
+        });
+    }
+
+    openShareModal(): void {
+        this.newShare = {
+            email: '',
+            name: '',
+            type: 'lawyer',
+            permission: 'journey_and_evidence',
+            expiresDays: 30,
+            notes: ''
+        };
+        this.shareError = '';
+        this.showShareModal = true;
+    }
+
+    closeShareModal(): void {
+        this.showShareModal = false;
+    }
+
+    createShare(): void {
+        if (!this.newShare.email) {
+            this.shareError = 'Professional email is required';
+            return;
+        }
+        this.shareCreating = true;
+        this.shareError = '';
+        const payload = {
+            seller_id: this.seller?.id,
+            professional_email: this.newShare.email,
+            professional_name: this.newShare.name || null,
+            professional_type: this.newShare.type,
+            permission: this.newShare.permission,
+            expires_in_days: this.newShare.expiresDays,
+            notes: this.newShare.notes || null
+        };
+        this.http.post<any>(`${this.API}/case/share`, payload).subscribe({
+            next: () => {
+                this.shareCreating = false;
+                this.showShareModal = false;
+                this.loadMyShares();
+                alert('Share link created! The professional can access your case using the link.');
+            },
+            error: (err) => {
+                this.shareCreating = false;
+                this.shareError = err.error?.error || 'Could not create share';
+                this.cdr.detectChanges();
+            }
+        });
+    }
+
+    revokeShare(shareId: string): void {
+        if (!confirm('Revoke this share? The professional will no longer be able to access your case.')) return;
+        this.http.delete(`${this.API}/case/share/${shareId}`, { body: { seller_id: this.seller?.id } }).subscribe({
+            next: () => {
+                this.loadMyShares();
+            },
+            error: (err) => console.error('Revoke error:', err)
+        });
+    }
+
+    copyShareLink(url: string): void {
+        navigator.clipboard.writeText(url);
+        alert('Link copied to clipboard');
+    }
+
+    truncate(str: string, len: number): string {
+        return str.length > len ? str.slice(0, len) + '…' : str;
+    }
+
+    // ============================================================
+    // PRO BONO PROFESSIONAL MATCHING NOTIFICATIONS (ADDED)
+    // ============================================================
+    loadNotifications(): void {
+        if (!this.seller?.id) return;
+        this.http.get<any[]>(`${this.API}/notifications?seller_id=${this.seller.id}`).subscribe({
+            next: (nots) => {
+                this.notifications = nots;
+                this.unreadCount = nots.filter(n => !n.is_read).length;
+                this.cdr.detectChanges();
+            },
+            error: (err) => console.error('Notifications error:', err)
+        });
+    }
+
+    markNotificationRead(notifId: string): void {
+        this.http.post(`${this.API}/notifications/mark-read`, { notification_id: notifId }).subscribe({
+            next: () => this.loadNotifications()
+        });
+    }
+
+    toggleNotifications(): void {
+        this.showNotifications = !this.showNotifications;
+        // Optional: mark all as read when panel is closed? Not needed now.
     }
 }

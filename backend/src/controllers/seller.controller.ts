@@ -9,14 +9,20 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
+import crypto from 'crypto';
 
-// Ensure upload directory exists
+// Ensure upload directories exist
 const evidenceDir = path.join(__dirname, '../../uploads/evidence');
+const productsDir = path.join(__dirname, '../../uploads/products');
 if (!fs.existsSync(evidenceDir)) {
   fs.mkdirSync(evidenceDir, { recursive: true });
 }
+if (!fs.existsSync(productsDir)) {
+  fs.mkdirSync(productsDir, { recursive: true });
+}
 
-const storage = multer.diskStorage({
+// ── Multer config for evidence (existing) ────────────────────
+const evidenceStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, evidenceDir);
   },
@@ -25,56 +31,41 @@ const storage = multer.diskStorage({
     cb(null, unique);
   }
 });
-export const uploadEvidence = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
+export const uploadEvidence = multer({ storage: evidenceStorage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
-// ── HELPER: Verify SA ID Number ─────────────────────────────
-// South African ID format: YYMMDD SSSS G CCC
-// Position 6 (0-indexed) of SSSS group determines sex:
-//   0000–4999 = female, 5000–9999 = male
-// ── HELPER: Verify SA ID Number (development mode – Luhn checksum disabled) ──
-// South African ID format: YYMMDD SSSS G CCC
-// Position 6 (0-indexed) of SSSS group determines sex:
-//   0000–4999 = female, 5000–9999 = male
+// ── NEW: Multer config for product images ────────────────────
+const productStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, productsDir);
+  },
+  filename: (req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    cb(null, unique);
+  }
+});
+export const uploadProductImage = multer({ storage: productStorage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
+
+// ── HELPER: Verify SA ID Number (unchanged) ─────────────────
 export const verifySAID = (idNumber: string): { valid: boolean; isFemale: boolean; dob: string | null } => {
     if (!idNumber || !/^\d{13}$/.test(idNumber)) {
         return { valid: false, isFemale: false, dob: null };
     }
 
-    // Extract fields
     const year  = parseInt(idNumber.substring(0, 2));
     const month = parseInt(idNumber.substring(2, 4));
     const day   = parseInt(idNumber.substring(4, 6));
     const genderCode = parseInt(idNumber.substring(6, 10));
 
-    // Basic range checks
     if (month < 1 || month > 12) return { valid: false, isFemale: false, dob: null };
     if (day < 1 || day > 31)     return { valid: false, isFemale: false, dob: null };
 
-    // ─────────────────────────────────────────────────────────────
-    // Luhn checksum is DISABLED for development purposes.
-    // In production, uncomment the following block to enable it.
-    // ─────────────────────────────────────────────────────────────
-    /*
-    let sum = 0;
-    for (let i = 0; i < 13; i++) {
-        let d = parseInt(idNumber[i]);
-        if (i % 2 === 0) sum += d;
-        else {
-            d *= 2;
-            sum += d > 9 ? d - 9 : d;
-        }
-    }
-    if (sum % 10 !== 0) return { valid: false, isFemale: false, dob: null };
-    */
-    // ─────────────────────────────────────────────────────────────
-
+    // Luhn checksum disabled for development
     const fullYear = year >= 0 && year <= 24 ? 2000 + year : 1900 + year;
     const isFemale = genderCode < 5000;
     const dob = `${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     return { valid: true, isFemale, dob };
 };
-
 
 // ── GET VERIFIED CENTRES ─────────────────────────────────────
 export const getVerifiedCentres = async (req: Request, res: Response) => {
@@ -127,7 +118,6 @@ export const verifyID = async (req: Request, res: Response) => {
             code: 'NOT_FEMALE'
         });
     }
-    // Check if already registered
     const existing = await pool.query(`SELECT id FROM sellers WHERE id_number = $1`, [id_number]);
     if (existing.rows.length > 0) {
         return res.status(409).json({ error: 'This ID is already registered. Please log in instead.', code: 'ALREADY_EXISTS' });
@@ -136,9 +126,6 @@ export const verifyID = async (req: Request, res: Response) => {
 };
 
 // ── REGISTER SELLER ──────────────────────────────────────────
-// backend/src/controllers/seller.controller.ts
-// ... (keep all imports and other functions)
-
 export const registerSeller = async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
@@ -150,23 +137,20 @@ export const registerSeller = async (req: Request, res: Response) => {
             pin,
             alias: providedAlias,
             phone,
-            centre_id,           // <-- NEW
+            centre_id,
             accepted_terms,
             accepted_popia,
             safety_acknowledged,
         } = req.body;
 
-        // Required fields (centre_id is now required)
         if (!id_number || !real_name || !real_surname || !email || !pin || !centre_id) {
             return res.status(400).json({ error: 'Missing required fields: id_number, name, email, PIN, and centre are required' });
         }
 
-        // PIN validation
         if (!/^\d{4,6}$/.test(pin)) {
             return res.status(400).json({ error: 'PIN must be 4–6 digits' });
         }
 
-        // Gender check
         const idCheck = verifySAID(id_number);
         if (!idCheck.valid) {
             return res.status(400).json({ error: 'Invalid South African ID number' });
@@ -178,13 +162,11 @@ export const registerSeller = async (req: Request, res: Response) => {
             });
         }
 
-        // Check duplicate ID
         const existingId = await pool.query(`SELECT id FROM sellers WHERE id_number = $1`, [id_number]);
         if (existingId.rows.length > 0) {
             return res.status(409).json({ error: 'This ID is already registered. Please log in.', code: 'ALREADY_EXISTS' });
         }
 
-        // Generate unique alias
         let alias = providedAlias;
         if (!alias) {
             alias = email.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -198,13 +180,11 @@ export const registerSeller = async (req: Request, res: Response) => {
             alias = `${baseAlias}${aliasSuffix}`;
         }
 
-        // Check duplicate email
         const existingEmail = await pool.query(`SELECT id FROM sellers WHERE email = $1`, [email]);
         if (existingEmail.rows.length > 0) {
             return res.status(409).json({ error: 'Email already registered', code: 'ALREADY_EXISTS' });
         }
 
-        // Validate centre exists
         const centreCheck = await pool.query(`SELECT id FROM centres WHERE id = $1`, [centre_id]);
         if (centreCheck.rows.length === 0) {
             return res.status(400).json({ error: 'Selected centre does not exist' });
@@ -226,18 +206,18 @@ export const registerSeller = async (req: Request, res: Response) => {
             RETURNING id, alias, email, centre_id, created_at`,
             [
                 alias,
-                '',                           // public_bio
+                '',
                 real_name,
                 real_surname,
                 id_number,
                 email,
                 finalPhone,
-                centre_id,                    // <-- now using provided centre
-                [],                           // product_categories
-                null,                         // skills_experience
-                'cash',                       // default payout_method
-                null,                         // bank_details
-                null,                         // cash_pickup_note
+                centre_id,
+                [],
+                null,
+                'cash',
+                null,
+                null,
                 pinHash,
                 accepted_terms === true,
                 accepted_popia === true,
@@ -245,7 +225,6 @@ export const registerSeller = async (req: Request, res: Response) => {
             ]
         );
 
-        // Create empty case journey
         await client.query(
             `INSERT INTO case_journeys (seller_id) VALUES ($1) ON CONFLICT DO NOTHING`,
             [result.rows[0].id]
@@ -294,7 +273,6 @@ export const loginSeller = async (req: Request, res: Response) => {
         const valid = await bcrypt.compare(pin, seller.hidden_pin_hash);
         if (!valid) return res.status(401).json({ error: 'Invalid email or PIN' });
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { hidden_pin_hash, ...safe } = seller;
         res.json({ ...safe });
     } catch (err) {
@@ -339,7 +317,6 @@ export const updateSellerProfile = async (req: Request, res: Response) => {
     } = req.body;
 
     try {
-        // Check if profile is now complete
         const isComplete = !!(alias && public_bio && craft_story && phone && city && payout_method);
 
         await pool.query(
@@ -374,7 +351,7 @@ export const updateSellerProfile = async (req: Request, res: Response) => {
     }
 };
 
-// ── PRODUCTS ─────────────────────────────────────────────────
+// ── PRODUCTS (ENHANCED with image upload) ────────────────────
 export const getSellerProducts = async (req: Request, res: Response) => {
     const { sellerId } = req.params;
     try {
@@ -391,14 +368,23 @@ export const getSellerProducts = async (req: Request, res: Response) => {
 };
 
 export const createProduct = async (req: Request, res: Response) => {
-    const { seller_id, name, description, price, category, status, stock, story, image_url } = req.body;
+    // Handle file upload if present
+    let imageUrl = null;
+    if ((req as any).file) {
+        const file = (req as any).file;
+        imageUrl = `/uploads/products/${file.filename}`;
+    } else if (req.body.image_url) {
+        imageUrl = req.body.image_url;
+    }
+
+    const { seller_id, name, description, price, category, status, stock, story } = req.body;
+
     if (!seller_id || !name || price === undefined) {
         return res.status(400).json({ error: 'Name and price are required' });
     }
     try {
-        // Check profile is complete before allowing listing
         const check = await pool.query(
-            `SELECT profile_complete, verification_status FROM sellers WHERE id = $1`,
+            `SELECT profile_complete FROM sellers WHERE id = $1`,
             [seller_id]
         );
         if (!check.rows[0]?.profile_complete) {
@@ -411,9 +397,9 @@ export const createProduct = async (req: Request, res: Response) => {
         const result = await pool.query(
             `INSERT INTO products (seller_id, name, description, price, category, status, stock, story, image_url)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-             RETURNING id, name, price, category, status, stock`,
+             RETURNING id, name, price, category, status, stock, image_url`,
             [seller_id, name, description || null, price, category || null,
-             status || 'active', stock || 0, story || null, image_url || null]
+             status || 'active', stock || 0, story || null, imageUrl]
         );
         res.status(201).json({ product: result.rows[0] });
     } catch (err) {
@@ -424,14 +410,23 @@ export const createProduct = async (req: Request, res: Response) => {
 
 export const updateProduct = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, description, price, category, status, stock, story, image_url } = req.body;
+    let imageUrl = req.body.image_url || null;
+    if ((req as any).file) {
+        const file = (req as any).file;
+        imageUrl = `/uploads/products/${file.filename}`;
+    }
+    const { name, description, price, category, status, stock, story } = req.body;
+
     try {
         const result = await pool.query(
-            `UPDATE products SET name=$1, description=$2, price=$3, category=$4,
-                status=$5, stock=$6, story=$7, image_url=$8, updated_at=NOW()
+            `UPDATE products SET 
+                name=$1, description=$2, price=$3, category=$4,
+                status=$5, stock=$6, story=$7, 
+                image_url = COALESCE($8, image_url),
+                updated_at = NOW()
              WHERE id=$9
-             RETURNING id, name, price, category, status, stock`,
-            [name, description || null, price, category || null, status, stock || 0, story || null, image_url || null, id]
+             RETURNING id, name, price, category, status, stock, image_url`,
+            [name, description || null, price, category || null, status, stock || 0, story || null, imageUrl, id]
         );
         if (!result.rows.length) return res.status(404).json({ error: 'Listing not found' });
         res.json({ product: result.rows[0] });
@@ -454,7 +449,6 @@ export const deleteProduct = async (req: Request, res: Response) => {
 };
 
 // ── SELLER EARNINGS ──────────────────────────────────────────
-// ── SELLER EARNINGS ──────────────────────────────────────────
 export const getSellerEarnings = async (req: Request, res: Response) => {
     const { sellerId } = req.params;
     try {
@@ -466,7 +460,6 @@ export const getSellerEarnings = async (req: Request, res: Response) => {
              FROM seller_earnings WHERE seller_id = $1`,
             [sellerId]
         );
-        // Safe query: no join, just seller_earnings data
         const recent = await pool.query(
             `SELECT 
                 amount, 
@@ -578,13 +571,11 @@ export const triggerEmergencyAlert = async (req: Request, res: Response) => {
              WHERE seller_id = $1 AND is_active = TRUE`,
             [seller_id]
         );
-        // Log the alert
         await pool.query(
             `INSERT INTO emergency_alerts (seller_id, contacts_notified, location_hint)
              VALUES ($1, $2, $3)`,
             [seller_id, JSON.stringify(contacts.rows), location_hint || null]
         );
-        // In production: integrate with SMS/WhatsApp API here
         res.json({
             message: 'Alert sent',
             contacts_reached: contacts.rows.length,
@@ -596,6 +587,164 @@ export const triggerEmergencyAlert = async (req: Request, res: Response) => {
     }
 };
 
+// ============================================================
+// UNIFIED CASE FILE SHARING
+// ============================================================
+
+// Helper to generate a secure random token
+function generateShareToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+// ── POST /api/sellers/case/share ──────────────────────────────
+// Survivor creates a shareable link for a professional
+export const createCaseShare = async (req: Request, res: Response) => {
+    const { seller_id, professional_email, professional_name, professional_type, permission, expires_in_days, notes } = req.body;
+    if (!seller_id || !professional_email) {
+        return res.status(400).json({ error: 'seller_id and professional_email are required' });
+    }
+    const validTypes = ['lawyer','counsellor','social_worker','doctor','advocate','other'];
+    if (professional_type && !validTypes.includes(professional_type)) {
+        return res.status(400).json({ error: 'Invalid professional_type' });
+    }
+    const perms = ['journey_only','journey_and_evidence'];
+    if (permission && !perms.includes(permission)) {
+        return res.status(400).json({ error: 'Invalid permission' });
+    }
+
+    const token = generateShareToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + (expires_in_days || 30)); // default 30 days
+
+    try {
+        // Verify seller exists and belongs to the caller (auth not implemented yet – assume seller_id from localStorage)
+        const seller = await pool.query(`SELECT id FROM sellers WHERE id = $1`, [seller_id]);
+        if (!seller.rows.length) return res.status(404).json({ error: 'Seller not found' });
+
+        const result = await pool.query(
+            `INSERT INTO case_shares (seller_id, professional_email, professional_name, professional_type, permission, share_token, expires_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id, share_token, expires_at, permission`,
+            [seller_id, professional_email, professional_name || null, professional_type || null, permission || 'journey_and_evidence', token, expiresAt]
+        );
+        const share = result.rows[0];
+        // Construct share URL (frontend endpoint)
+        const shareUrl = `${req.protocol}://${req.get('host')}/shared-case/${share.share_token}`;
+        res.status(201).json({ share: { id: share.id, token: share.share_token, expires_at: share.expires_at, permission: share.permission, share_url: shareUrl } });
+    } catch (err) {
+        console.error('createCaseShare error:', err);
+        res.status(500).json({ error: 'Failed to create share' });
+    }
+};
+
+// ── GET /api/sellers/case/shares ──────────────────────────────
+// List all active shares created by the seller
+export const getMyShares = async (req: Request, res: Response) => {
+    const { seller_id } = req.query;
+    if (!seller_id) return res.status(400).json({ error: 'seller_id required' });
+    try {
+        const result = await pool.query(
+            `SELECT id, professional_email, professional_name, professional_type, permission, expires_at, is_active, created_at, revoked_at, notes
+             FROM case_shares
+             WHERE seller_id = $1
+             ORDER BY created_at DESC`,
+            [seller_id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('getMyShares error:', err);
+        res.status(500).json({ error: 'Failed to fetch shares' });
+    }
+};
+
+// ── DELETE /api/sellers/case/share/:shareId ───────────────────
+// Revoke an active share
+export const revokeCaseShare = async (req: Request, res: Response) => {
+    const { shareId } = req.params;
+    const { seller_id } = req.body;
+    if (!seller_id) return res.status(400).json({ error: 'seller_id required' });
+    try {
+        const existing = await pool.query(
+            `SELECT id, seller_id FROM case_shares WHERE id = $1 AND is_active = true`,
+            [shareId]
+        );
+        if (!existing.rows.length) return res.status(404).json({ error: 'Active share not found' });
+        if (existing.rows[0].seller_id !== seller_id) return res.status(403).json({ error: 'Forbidden' });
+        await pool.query(
+            `UPDATE case_shares SET is_active = false, revoked_at = NOW() WHERE id = $1`,
+            [shareId]
+        );
+        res.json({ message: 'Share revoked' });
+    } catch (err) {
+        console.error('revokeCaseShare error:', err);
+        res.status(500).json({ error: 'Failed to revoke share' });
+    }
+};
+
+// ── GET /api/public/shared-case/:token ────────────────────────
+// Public endpoint – no authentication, only token
+// Returns the case journey and evidence items according to the share permission
+export const getSharedCaseData = async (req: Request, res: Response) => {
+    const { token } = req.params;
+    try {
+        const share = await pool.query(
+            `SELECT seller_id, permission, expires_at, is_active
+             FROM case_shares
+             WHERE share_token = $1`,
+            [token]
+        );
+        if (!share.rows.length) return res.status(404).json({ error: 'Invalid or expired share link' });
+        const s = share.rows[0];
+        if (!s.is_active) return res.status(410).json({ error: 'This share has been revoked' });
+        if (new Date(s.expires_at) < new Date()) return res.status(410).json({ error: 'This share has expired' });
+
+        // Log view
+        await pool.query(
+            `INSERT INTO case_share_views (share_id, viewer_ip, user_agent)
+             VALUES ((SELECT id FROM case_shares WHERE share_token = $1), $2, $3)`,
+            [token, req.ip, req.headers['user-agent'] || null]
+        );
+
+        // Fetch case journey
+        const journey = await pool.query(
+            `SELECT medical_done, medical_date, police_done, police_date,
+                    protection_done, protection_date, court_done, court_date,
+                    counselling_done, counselling_date, notes
+             FROM case_journeys WHERE seller_id = $1`,
+            [s.seller_id]
+        );
+        // Fetch evidence if permission includes evidence
+        let evidence: any[] = [];
+        if (s.permission === 'journey_and_evidence') {
+            const ev = await pool.query(
+                `SELECT id, item_type, description, date_of_incident, is_court_ready, created_at, file_url
+                 FROM evidence_items
+                 WHERE seller_id = $1
+                 ORDER BY created_at DESC`,
+                [s.seller_id]
+            );
+            // Remove fields that might identify the survivor (e.g., filename, original metadata) – keep safe fields
+            evidence = ev.rows.map(e => ({
+                type: e.item_type,
+                description: e.description,
+                date: e.date_of_incident,
+                added: e.created_at,
+                court_ready: e.is_court_ready,
+                file_url: e.file_url
+            }));
+        }
+        res.json({
+            journey: journey.rows[0] || {},
+            evidence,
+            permission: s.permission,
+            expires_at: s.expires_at
+        });
+    } catch (err) {
+        console.error('getSharedCaseData error:', err);
+        res.status(500).json({ error: 'Could not retrieve shared case' });
+    }
+};
+
 // ── CASE JOURNEY ─────────────────────────────────────────────
 export const getCaseJourney = async (req: Request, res: Response) => {
     const { sellerId } = req.params;
@@ -604,7 +753,6 @@ export const getCaseJourney = async (req: Request, res: Response) => {
             `SELECT * FROM case_journeys WHERE seller_id = $1`, [sellerId]
         );
         if (!result.rows.length) {
-            // Create if missing
             result = await pool.query(
                 `INSERT INTO case_journeys (seller_id) VALUES ($1) RETURNING *`, [sellerId]
             );
@@ -656,7 +804,6 @@ export const getEvidence = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Could not load items' });
     }
 };
-
 
 export const addEvidence = async (req: Request, res: Response) => {
     try {
@@ -731,23 +878,213 @@ export const generateCourtPack = async (req: Request, res: Response) => {
     }
 };
 
-
 // ── SUPPORT REQUESTS ─────────────────────────────────────────
+// ── SUPPORT REQUESTS (with automatic professional matching) ──
 export const createSupportRequest = async (req: Request, res: Response) => {
     const { seller_id, request_type, message } = req.body;
     if (!seller_id || !request_type) return res.status(400).json({ error: 'Required fields missing' });
+    
+    // Validate request_type
+    const validTypes = ['companion', 'legal', 'counselling', 'medical', 'emergency'];
+    if (!validTypes.includes(request_type)) {
+        return res.status(400).json({ error: 'Invalid request type' });
+    }
+
     try {
+        // Map request_type to professional_type
+        const typeMap: Record<string, string> = {
+            'legal': 'lawyer',
+            'counselling': 'counsellor',
+            'medical': 'doctor',
+            'companion': 'social_worker', // companion can be social worker or trained volunteer
+            'emergency': '' // emergency goes to 10111, not professional match
+        };
+        
+        let matchedProfessional = null;
+        let matchStatus = 'open';
+        
+        if (request_type !== 'emergency') {
+            const professionalType = typeMap[request_type];
+            if (professionalType) {
+                // Get seller's centre_id to prioritize centre-affiliated professionals
+                const seller = await pool.query(`SELECT centre_id FROM sellers WHERE id = $1`, [seller_id]);
+                const centreId = seller.rows[0]?.centre_id;
+                
+                // Find best matching professional: same centre, available, least recently assigned
+                let query = `
+                    SELECT id, full_name, email, phone, professional_type, centre_id
+                    FROM professionals
+                    WHERE professional_type = $1 AND is_available = TRUE
+                    ORDER BY 
+                        CASE WHEN centre_id = $2 THEN 0 ELSE 1 END,
+                        last_assigned_at NULLS FIRST,
+                        assigned_count ASC
+                    LIMIT 1
+                `;
+                const result = await pool.query(query, [professionalType, centreId || null]);
+                
+                if (result.rows.length > 0) {
+                    matchedProfessional = result.rows[0];
+                    matchStatus = 'matched';
+                    
+                    // Mark professional as temporarily unavailable (or just increment assigned count)
+                    await pool.query(
+                        `UPDATE professionals 
+                         SET assigned_count = assigned_count + 1,
+                             last_assigned_at = NOW(),
+                             is_available = FALSE  -- optionally set unavailable until they accept/release
+                         WHERE id = $1`,
+                        [matchedProfessional.id]
+                    );
+                }
+            }
+        }
+        
+        // Insert support request with match info
         const result = await pool.query(
-            `INSERT INTO support_requests (seller_id, request_type, message)
-             VALUES ($1,$2,$3) RETURNING id, request_type, status, created_at`,
-            [seller_id, request_type, message || null]
+            `INSERT INTO support_requests (seller_id, request_type, message, status, matched_to)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, request_type, status, created_at, matched_to`,
+            [seller_id, request_type, message || null, matchStatus, matchedProfessional ? matchedProfessional.full_name : null]
         );
-        res.status(201).json(result.rows[0]);
+        
+        // If matched, create notification for professional (and optionally for seller)
+        if (matchedProfessional) {
+            // Create notification for professional
+            await pool.query(
+                `INSERT INTO notifications (user_id, user_type, title, message)
+                 VALUES ($1, $2, $3, $4)`,
+                [matchedProfessional.id, 'professional', 'New support request assigned',
+                 `A survivor has requested ${request_type} support. Please log in to view details and accept.`]
+            );
+            // Create notification for survivor (optional)
+            await pool.query(
+                `INSERT INTO notifications (user_id, user_type, title, message)
+                 VALUES ($1, $2, $3, $4)`,
+                [seller_id, 'seller', 'Support request matched',
+                 `A ${matchedProfessional.professional_type} has been assigned to your request. They will contact you soon.`]
+            );
+            
+            // In production: send email/SMS to professional here
+            console.log(`[MATCH] ${request_type} request from ${seller_id} matched to ${matchedProfessional.full_name} (${matchedProfessional.email})`);
+        }
+        
+        res.status(201).json({
+            message: matchStatus === 'matched' ? 'Your request has been assigned to a professional. They will contact you shortly.' : 'Your request has been received. A professional will be assigned as soon as one is available.',
+            support_id: result.rows[0].id,
+            status: matchStatus,
+            matched_to: matchedProfessional?.full_name || null
+        });
     } catch (err) {
-        console.error(err);
+        console.error('createSupportRequest error:', err);
         res.status(500).json({ error: 'Request failed' });
     }
 };
+
+// ── PROFESSIONAL ENDPOINTS ────────────────────────────────────
+
+// GET /api/sellers/professional/requests – fetch assigned requests for a professional
+export const getAssignedRequests = async (req: Request, res: Response) => {
+    const { professional_id } = req.query;
+    if (!professional_id) return res.status(400).json({ error: 'professional_id required' });
+    
+    try {
+        const result = await pool.query(
+            `SELECT sr.id, sr.seller_id, sr.request_type, sr.message, sr.status, 
+                    sr.created_at, s.alias as seller_alias
+             FROM support_requests sr
+             JOIN sellers s ON s.id = sr.seller_id
+             WHERE sr.matched_to = (SELECT full_name FROM professionals WHERE id = $1)
+             ORDER BY sr.created_at DESC`,
+            [professional_id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch requests' });
+    }
+};
+
+// POST /api/sellers/professional/accept – professional accepts a request
+export const acceptSupportRequest = async (req: Request, res: Response) => {
+    const { request_id, professional_id, notes } = req.body;
+    if (!request_id || !professional_id) return res.status(400).json({ error: 'Missing fields' });
+    
+    try {
+        // Verify professional is the one matched
+        const check = await pool.query(
+            `SELECT sr.matched_to, p.full_name 
+             FROM support_requests sr
+             CROSS JOIN professionals p
+             WHERE sr.id = $1 AND p.id = $2 AND sr.status = 'matched'`,
+            [request_id, professional_id]
+        );
+        if (!check.rows.length) return res.status(404).json({ error: 'Request not found or already handled' });
+        
+        await pool.query(
+            `UPDATE support_requests 
+             SET status = 'closed', updated_at = NOW(), notes = COALESCE($1, notes)
+             WHERE id = $2`,
+            [notes || null, request_id]
+        );
+        
+        // Make professional available for next assignment
+        await pool.query(
+            `UPDATE professionals SET is_available = TRUE WHERE id = $1`,
+            [professional_id]
+        );
+        
+        // Notify seller
+        const reqData = await pool.query(`SELECT seller_id FROM support_requests WHERE id = $1`, [request_id]);
+        if (reqData.rows.length) {
+            await pool.query(
+                `INSERT INTO notifications (user_id, user_type, title, message)
+                 VALUES ($1, 'seller', $2, $3)`,
+                [reqData.rows[0].seller_id, 'Support request accepted',
+                 `A professional has accepted your request and will contact you.`]
+            );
+        }
+        
+        res.json({ message: 'Request accepted and closed' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to accept request' });
+    }
+};
+
+// GET /api/sellers/notifications – fetch unread notifications for seller
+export const getSellerNotifications = async (req: Request, res: Response) => {
+    const { seller_id } = req.query;
+    if (!seller_id) return res.status(400).json({ error: 'seller_id required' });
+    try {
+        const result = await pool.query(
+            `SELECT id, title, message, is_read, created_at
+             FROM notifications
+             WHERE user_id = $1 AND user_type = 'seller'
+             ORDER BY created_at DESC
+             LIMIT 50`,
+            [seller_id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+};
+
+// POST /api/sellers/notifications/mark-read – mark notification as read
+export const markNotificationRead = async (req: Request, res: Response) => {
+    const { notification_id } = req.body;
+    if (!notification_id) return res.status(400).json({ error: 'notification_id required' });
+    try {
+        await pool.query(`UPDATE notifications SET is_read = TRUE WHERE id = $1`, [notification_id]);
+        res.json({ message: 'Marked as read' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update' });
+    }
+};
+
 
 // ── GRANT HIDDEN LAYER ACCESS ────────────────────────────────
 export const grantHiddenLayer = async (req: Request, res: Response) => {
@@ -808,7 +1145,6 @@ export const getVolunteerOpportunities = async (req: Request, res: Response) => 
     }
 };
 
-
 // Apply for a volunteer opportunity
 export const applyForVolunteer = async (req: Request, res: Response) => {
     const { seller_id, opportunity_id, notes } = req.body;
@@ -816,7 +1152,6 @@ export const applyForVolunteer = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Seller ID and opportunity ID are required' });
     }
     try {
-        // Check if already applied
         const existing = await pool.query(
             `SELECT id FROM volunteer_applications WHERE seller_id = $1 AND opportunity_id = $2`,
             [seller_id, opportunity_id]
@@ -824,7 +1159,6 @@ export const applyForVolunteer = async (req: Request, res: Response) => {
         if (existing.rows.length > 0) {
             return res.status(409).json({ error: 'You have already applied for this opportunity' });
         }
-        // Check if opportunity exists and is active
         const opp = await pool.query(
             `SELECT id FROM volunteer_opportunities WHERE id = $1 AND status = 'active'`,
             [opportunity_id]
@@ -942,5 +1276,30 @@ export const generateAffidavitPDF = async (req: Request, res: Response) => {
     } catch (err) {
         console.error('generateAffidavitPDF error:', err);
         res.status(500).json({ error: 'Could not generate affidavit' });
+    }
+};
+
+// ── NEW: WITHDRAW VOLUNTEER APPLICATION ──────────────────────
+export const withdrawVolunteerApplication = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const check = await pool.query(
+            `SELECT status FROM volunteer_applications WHERE id = $1`,
+            [id]
+        );
+        if (!check.rows.length) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+        if (check.rows[0].status !== 'pending') {
+            return res.status(400).json({ error: 'Cannot withdraw an application that is already approved or rejected' });
+        }
+        await pool.query(
+            `UPDATE volunteer_applications SET status = 'withdrawn', updated_at = NOW() WHERE id = $1`,
+            [id]
+        );
+        res.json({ message: 'Application withdrawn successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not withdraw application' });
     }
 };

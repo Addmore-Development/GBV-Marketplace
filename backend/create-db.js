@@ -641,7 +641,13 @@ async function initDatabase() {
         professional_registration VARCHAR(100),
         nrso_clearance BOOLEAN DEFAULT false,
         is_verified BOOLEAN DEFAULT false,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        is_available BOOLEAN DEFAULT TRUE,
+        assigned_count INTEGER DEFAULT 0,
+        centre_id UUID REFERENCES centres(id),
+        last_assigned_at TIMESTAMPTZ,
+        bio TEXT,
+        phone_verified BOOLEAN DEFAULT FALSE
       );
     `);
     // ========== ADDED: extended columns ==========
@@ -865,7 +871,7 @@ async function initDatabase() {
     console.log('✅ updated_at triggers set');
 
     // ══════════════════════════════════════════════════════════════════════
-    // SEED: TRAINING MODULES
+    // SEED: TRAINING MODULES (unchanged)
     // ══════════════════════════════════════════════════════════════════════
     const moduleCount = await dbClient.query(`SELECT COUNT(*) FROM training_modules`);
     if (parseInt(moduleCount.rows[0].count) === 0) {
@@ -888,6 +894,7 @@ async function initDatabase() {
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // SEED: VERIFIED CENTRES (unchanged)
     // SEED: VERIFIED CENTRES (unchanged)
     // ══════════════════════════════════════════════════════════════════════
     const centreCount = await dbClient.query(`SELECT COUNT(*) FROM centres`);
@@ -1025,6 +1032,7 @@ async function initDatabase() {
     }
 
     // ──────────────────────────────────────────────────────────────────────
+    // SEED VOLUNTEER OPPORTUNITIES (unchanged)
     // SEED VOLUNTEER OPPORTUNITIES (unchanged)
     // ──────────────────────────────────────────────────────────────────────
     const oppCount = await dbClient.query(`SELECT COUNT(*) FROM volunteer_opportunities`);

@@ -5,7 +5,8 @@ import { Router } from 'express';
 import {
     getVerifiedCentres,
     getCentreById,
-    uploadEvidence, 
+    uploadEvidence,
+    uploadProductImage,           // NEW
     generateCourtPack,
     verifyID,
     registerSeller,
@@ -24,6 +25,10 @@ import {
     addTrustedContact,
     deleteTrustedContact,
     triggerEmergencyAlert,
+    createCaseShare,
+    getMyShares,
+    revokeCaseShare,
+    getSharedCaseData,
     getCaseJourney,
     updateCaseJourney,
     getEvidence,
@@ -33,6 +38,11 @@ import {
     getVolunteerOpportunities,
     applyForVolunteer,
     getMyVolunteerApplications,
+    withdrawVolunteerApplication,
+    getAssignedRequests,
+    acceptSupportRequest,
+    getSellerNotifications,
+    markNotificationRead,
     generateAffidavitPDF,
 } from '../controllers/seller.controller';
 
@@ -50,10 +60,10 @@ router.get('/public/:alias', getSellerPublicProfile);
 router.get('/profile/:id', getSellerProfile);
 router.put('/profile/:id', updateSellerProfile);
 
-// ── Products / Listings ──────────────────────────────────────
+// ── Products / Listings (ENHANCED: image upload) ─────────────
 router.get('/products/:sellerId', getSellerProducts);
-router.post('/products', createProduct);
-router.put('/products/:id', updateProduct);
+router.post('/products', uploadProductImage.single('image'), createProduct);     // <-- changed
+router.put('/products/:id', uploadProductImage.single('image'), updateProduct);  // <-- changed
 router.delete('/products/:productId', deleteProduct);
 
 // ── Earnings ────────────────────────────────────────────────
@@ -69,23 +79,35 @@ router.post('/contacts', addTrustedContact);
 router.delete('/contacts/:id', deleteTrustedContact);
 router.post('/emergency', triggerEmergencyAlert);
 
+// ── Unified Case File Sharing ─────────────────────────────────
+router.post('/case/share', createCaseShare);
+router.get('/case/shares', getMyShares);
+router.delete('/case/share/:shareId', revokeCaseShare);
+
+// Public route (no authentication)
+router.get('/public/shared-case/:token', getSharedCaseData);
+
 // ── Hidden layer (case journey, evidence, support) ───────────
 router.get('/journey/:sellerId', getCaseJourney);
 router.put('/journey/:sellerId', updateCaseJourney);
 router.get('/evidence/:sellerId', getEvidence);
-// Evidence upload with file
 router.post('/evidence', uploadEvidence.single('file'), addEvidence);
-// Court pack generation
 router.post('/generate-court-pack/:sellerId', generateCourtPack);
-router.post('/evidence', addEvidence);
+// Note: duplicate /evidence route below is removed; keep only the one with file upload
 router.post('/support', createSupportRequest);
 router.post('/volunteer', grantHiddenLayer);
 
-// ── Volunteer opportunities ─────────────────────────────────
+// ── Volunteer opportunities and applications ─────────────────
 router.get('/volunteer-opportunities', getVolunteerOpportunities);
 router.post('/volunteer-applications', applyForVolunteer);
 router.get('/volunteer-applications/:sellerId', getMyVolunteerApplications);
+router.delete('/volunteer-applications/:id', withdrawVolunteerApplication);   // NEW
 
+// ── Professional matching & notifications ─────────────────────
+router.get('/professional/requests', getAssignedRequests);
+router.post('/professional/accept', acceptSupportRequest);
+router.get('/notifications', getSellerNotifications);
+router.post('/notifications/mark-read', markNotificationRead);
 // ── Voice Affidavit ─────────────────────────────────────────
 router.post('/affidavit/generate', generateAffidavitPDF);
 

@@ -735,4 +735,14 @@ export class SellerDashboardComponent implements OnInit {
         };
         return map[cat] || '📚';
     }
+
+    getFileUrl(fileUrl: string): string {
+        if (!fileUrl) return '#';
+        // If it's already an absolute URL, return as-is
+        if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+            return fileUrl;
+        }
+        // Otherwise prefix with the API base URL
+        return `http://localhost:3000${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+    }
 }

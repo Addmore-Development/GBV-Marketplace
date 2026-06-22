@@ -7,6 +7,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
+import { SellerAuthService } from '../../services/seller-auth.service';
 import { Centre, NoticePost } from './centres.component';
 
 // Re-use the same static data from centres.component
@@ -510,6 +511,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private authService: AuthService,
+    private sellerAuth: SellerAuthService,
     private fb: FormBuilder,
   ) {}
 
@@ -517,8 +519,27 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     const id = this.route.snapshot.paramMap.get('id');
     this.centre = ALL_CENTRES.find(c => c.id === id) || null;
 
+    // Check seller/centre localStorage session first (survives page reload)
+    const sellerId = localStorage.getItem('sellerId');
+    const centreId = localStorage.getItem('centreId');
+    if (sellerId) {
+      const stored = localStorage.getItem('sellerUser');
+      if (stored) {
+        const s = JSON.parse(stored);
+        this.currentUser = { name: s.alias, email: s.email, role: 'seller', initials: s.alias.slice(0,2).toUpperCase() };
+      }
+    } else if (centreId) {
+      const name = localStorage.getItem('centreName') || 'Centre';
+      const email = localStorage.getItem('centreEmail') || '';
+      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
+    }
     this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => this.currentUser = u);
+      .subscribe(u => { if (u) this.currentUser = u; });
+    this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) this.currentUser = { name: u.alias, email: u.email, role: 'seller', initials: u.alias.slice(0,2).toUpperCase() };
+        else if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+      });
 
     this.donateForm = this.fb.group({
       donor_name:  ['', Validators.required],

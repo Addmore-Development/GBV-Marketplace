@@ -99,6 +99,21 @@
         <button class="tb-exit" (click)="quickExit()" title="Quick exit">🚪</button>
         <div class="tb-avatar">{{ seller.alias.charAt(0).toUpperCase() }}</div>
       </div>
+      <!-- Notifications dropdown panel -->
+<div class="notifications-dropdown" *ngIf="showNotifications">
+  <div class="nd-header">
+    <strong>Notifications</strong>
+    <span class="nd-close" (click)="showNotifications = false">✕</span>
+  </div>
+  <div class="nd-list">
+    <div *ngIf="notifications.length === 0" class="nd-empty">No notifications</div>
+    <div *ngFor="let n of notifications" class="nd-item" [class.unread]="!n.is_read" (click)="markNotificationRead(n.id)">
+      <div class="nd-title">{{ n.title }}</div>
+      <div class="nd-message">{{ n.message }}</div>
+      <div class="nd-date">{{ n.created_at | date:'short' }}</div>
+    </div>
+  </div>
+</div>
     </div>
 
     <!-- Profile incomplete banner -->
@@ -593,10 +608,12 @@
       <span class="sanc-hint">(double-tap to leave)</span>
     </div>
     <div class="sanc-tabs">
-      <button [class.active]="sanctuaryTab === 'journey'"  (click)="sanctuaryTab = 'journey'">📋 My Journey</button>
-      <button [class.active]="sanctuaryTab === 'vault'"    (click)="sanctuaryTab = 'vault'">🔒 Safe Space</button>
-      <button [class.active]="sanctuaryTab === 'support'"  (click)="sanctuaryTab = 'support'">🤝 Find Help</button>
-    </div>
+  <button [class.active]="sanctuaryTab === 'journey'"   (click)="sanctuaryTab = 'journey'">📋 My Journey</button>
+  <button [class.active]="sanctuaryTab === 'share'"     (click)="sanctuaryTab = 'share'">🔗 Share My Case</button>
+  <button [class.active]="sanctuaryTab === 'vault'"     (click)="sanctuaryTab = 'vault'">🔒 Safe Space</button>
+  <button [class.active]="sanctuaryTab === 'support'"   (click)="sanctuaryTab = 'support'">🤝 Find Help</button>
+  <button [class.active]="sanctuaryTab === 'affidavit'" (click)="sanctuaryTab = 'affidavit'">🎙️ Voice Affidavit</button>
+</div>
     <div class="sanc-actions">
       <button class="sanc-exit-btn" (click)="quickExit()">🚪 Leave quickly</button>
       <button class="sanc-close-btn" (click)="exitSanctuary()">Close sanctuary</button>
@@ -724,6 +741,89 @@
     </div>
   </div>
 
+  <!-- Voice Affidavit Tab -->
+<div class="sanc-content" *ngIf="sanctuaryTab === 'affidavit'">
+  <h2>Voice Affidavit Builder</h2>
+  <p class="sanc-sub">
+    Speak your statement. The system will transcribe it into a legal affidavit.<br>
+    No writing required. You can edit the text before generating the PDF.
+  </p>
+
+  <!-- Microphone button and status -->
+  <div class="affidavit-controls">
+    <button class="sanc-btn" (click)="startRecording()" [disabled]="isRecording" *ngIf="!isRecording">
+      🎤 Start speaking
+    </button>
+    <button class="sanc-btn" (click)="stopRecording()" *ngIf="isRecording" style="background:#c0392b;">
+      ⏹️ Stop recording
+    </button>
+    <span *ngIf="isRecording" class="recording-indicator">🔴 Recording...</span>
+    <span *ngIf="!isRecording && affidavitTranscript" class="status-ok">✓ Ready</span>
+  </div>
+
+  <!-- Transcript editor -->
+  <div class="affidavit-editor">
+    <label>Your statement (editable)</label>
+    <textarea rows="10" [(ngModel)]="affidavitTranscript" placeholder="Your spoken words will appear here..."></textarea>
+    <small>You can edit the text – it will be used in the final affidavit PDF.</small>
+  </div>
+
+  <!-- Generate PDF button -->
+  <div class="affidavit-actions">
+    <button class="sanc-btn secondary" (click)="generateAffidavitPDF()" [disabled]="!affidavitTranscript || generatingAffidavit">
+      {{ generatingAffidavit ? 'Generating PDF...' : '📄 Generate Affidavit PDF' }}
+    </button>
+    <button class="sanc-btn cancel" (click)="clearAffidavit()">Clear</button>
+  </div>
+
+  <!-- Success / error messages -->
+  <div class="affidavit-result" *ngIf="lastAffidavitUrl">
+    <p>✓ Affidavit PDF generated.</p>
+    <a [href]="lastAffidavitUrl" target="_blank" class="sanc-btn">📥 Download / View PDF</a>
+    <small>Saved to your Safe Space (evidence vault).</small>
+  </div>
+</div>
+  
+  <!-- Share My Case Tab -->
+<div class="sanc-content" *ngIf="sanctuaryTab === 'share'">
+    <h2>Unified case file sharing</h2>
+    <p class="sanc-sub">
+        Grant secure, revocable access to your case journey and evidence to a trusted professional 
+        (lawyer, counsellor, social worker). They will receive a private link that expires after a set time.
+        You can revoke access at any moment.
+    </p>
+
+    <!-- Create new share -->
+    <button class="sanc-btn" (click)="openShareModal()">+ Share with a professional</button>
+
+    <!-- List existing shares -->
+    <div class="share-list" *ngIf="myShares.length > 0; else noShares">
+        <div class="share-card" *ngFor="let share of myShares">
+            <div class="share-header">
+                <span class="share-email">{{ share.professional_email }}</span>
+                <span class="share-status" [class.active]="share.is_active" [class.expired]="!share.is_active">
+                    {{ share.is_active ? 'Active' : 'Revoked' }}
+                </span>
+            </div>
+            <div class="share-details">
+                <span>👤 {{ share.professional_name || 'Professional' }}</span>
+                <span>🔐 {{ share.permission === 'journey_and_evidence' ? 'Journey + Evidence' : 'Journey only' }}</span>
+                <span>⏱️ Expires: {{ share.expires_at | date:'d MMM y' }}</span>
+            </div>
+            <div class="share-actions" *ngIf="share.is_active">
+                <button class="small-btn" (click)="copyShareLink(share.share_url)">📋 Copy link</button>
+                <button class="small-btn revoke" (click)="revokeShare(share.id)">Revoke access</button>
+            </div>
+            <div class="share-url" *ngIf="share.share_url">
+                <small>Share URL: <a [href]="share.share_url" target="_blank">{{ truncate(share.share_url, 40) }}</a></small>
+            </div>
+        </div>
+    </div>
+    <ng-template #noShares>
+        <div class="sanc-empty">No active shares. Create one above to let a professional view your case file.</div>
+    </ng-template>
+</div>
+
   <footer class="sanc-footer">
     <span>🛡️ In danger now? Call 10111 first.</span>
     <span>Double-tap the Amani leaf to leave immediately.</span>
@@ -838,6 +938,54 @@
       <button class="btn-primary" (click)="showSuppliersPanel = false; alertSent = false">Close</button>
     </div>
   </div>
+</div>
+
+<!-- Share Case Modal -->
+<div class="modal-overlay" *ngIf="showShareModal">
+    <div class="modal-card">
+        <div class="mc-icon">🔗</div>
+        <h3>Share your case file</h3>
+        <p>The professional will be able to view your case journey and (optionally) evidence.</p>
+
+        <div class="mf-group">
+            <label>Professional's email *</label>
+            <input type="email" [(ngModel)]="newShare.email" placeholder="lawyer@example.com">
+        </div>
+        <div class="mf-group">
+            <label>Professional's name (optional)</label>
+            <input type="text" [(ngModel)]="newShare.name" placeholder="e.g., Thandi Nkosi">
+        </div>
+        <div class="mf-group">
+            <label>Professional type</label>
+            <select [(ngModel)]="newShare.type">
+                <option value="lawyer">Lawyer / Advocate</option>
+                <option value="counsellor">Counsellor / Psychologist</option>
+                <option value="social_worker">Social Worker</option>
+                <option value="doctor">Doctor / Medical</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        <div class="mf-group">
+            <label>Access level</label>
+            <div class="radio-group" style="display:flex;gap:16px;">
+                <label><input type="radio" [(ngModel)]="newShare.permission" value="journey_and_evidence"> Journey + Evidence (full)</label>
+                <label><input type="radio" [(ngModel)]="newShare.permission" value="journey_only"> Journey only (no evidence)</label>
+            </div>
+        </div>
+        <div class="mf-group">
+            <label>Link expires after (days)</label>
+            <input type="number" [(ngModel)]="newShare.expiresDays" min="1" max="365" value="30">
+        </div>
+        <div class="mf-group">
+            <label>Notes (optional)</label>
+            <textarea rows="2" [(ngModel)]="newShare.notes" placeholder="Any instructions for the professional..."></textarea>
+        </div>
+        <div class="error" *ngIf="shareError">{{ shareError }}</div>
+        <div class="mc-btns">
+            <button class="btn-primary" (click)="createShare()" [disabled]="shareCreating">Create share link</button>
+            <button class="btn-cancel" (click)="closeShareModal()">Cancel</button>
+        </div>
+    </div>
 </div>
 
 <!-- Volunteer Application Modal (NEW) -->

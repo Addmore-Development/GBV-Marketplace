@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CartService } from '../../services/cart.service';
@@ -248,9 +248,16 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     private sellerAuth: SellerAuthService,
     private router: Router,
     private http: HttpClient,
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(p => {
+      if (p['authRequired']) {
+        setTimeout(() => this.showToast('Please log in or register to view centre profiles.'), 300);
+        this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      }
+    });
     this.loadRealProducts();
     this.cartService.cart$.pipe(takeUntil(this.destroy$))
       .subscribe(c => this.cartCount = c.items.reduce((s, i) => s + i.quantity, 0));
@@ -265,6 +272,9 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
             role: 'seller',
             initials: u.alias.slice(0,2).toUpperCase()
           };
+        } else {
+          // seller logged out — only clear if no buyer session active
+          if (!this.authService.currentUser) this.currentUser = null;
         }
       });
   }
@@ -298,9 +308,11 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     return this.categories.find(c => c.key === this.activeCategory)?.label || '';
   }
 
-  formatPrice(p: number): string {
-    return `R${(p || 0).toFixed(2)}`;
-  }
+formatPrice(p: number | string): string {
+  const num = typeof p === 'number' ? p : Number(p);
+  if (isNaN(num)) return 'R0.00';
+  return `R${num.toFixed(2)}`;
+}
 
   formatSurvivorPct(p: Product): string {
     return `${Math.round((p.survivor_income / p.price) * 100)}%`;
@@ -521,7 +533,18 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     else this.authError = 'Registration failed. Please try again.';
   }
 
-  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
+  logout(): void {
+    this.authService.logout();
+    localStorage.removeItem('sellerId'); localStorage.removeItem('sellerUser');
+    localStorage.removeItem('sellerAlias'); localStorage.removeItem('sellerEmail');
+    localStorage.removeItem('hiddenPin'); localStorage.removeItem('hiddenLayerAccess');
+    localStorage.removeItem('centreId'); localStorage.removeItem('centreName');
+    localStorage.removeItem('centreType'); localStorage.removeItem('centreEmail');
+    localStorage.removeItem('centreManagerName'); localStorage.removeItem('centreCity');
+    localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
+    localStorage.removeItem('centreNpoNumber');
+    this.showToast('Signed out successfully');
+  }
 
   stars(rating: number): boolean[] {
     return Array.from({ length: 5 }, (_, i) => i < Math.round(rating));

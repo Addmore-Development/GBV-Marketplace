@@ -7,6 +7,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { RouterModule, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
+import { SellerAuthService } from '../../services/seller-auth.service';
 
 export interface Centre {
   id: string;
@@ -249,13 +250,27 @@ export class CentresComponent implements OnInit, OnDestroy {
 
   constructor(
     private authService: AuthService,
+    private sellerAuth: SellerAuthService,
     private router: Router,
     private fb: FormBuilder,
   ) {}
 
   ngOnInit(): void {
-    this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => this.currentUser = u);
+    const sellerId = localStorage.getItem('sellerId');
+    const centreId = localStorage.getItem('centreId');
+    if (sellerId) {
+      const stored = localStorage.getItem('sellerUser');
+      if (stored) { const s = JSON.parse(stored); this.currentUser = { name: s.alias, email: s.email, role: 'seller', initials: s.alias.slice(0,2).toUpperCase() }; }
+    } else if (centreId) {
+      const name = localStorage.getItem('centreName') || 'Centre';
+      const email = localStorage.getItem('centreEmail') || '';
+      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
+    }
+    this.authService.user$.pipe(takeUntil(this.destroy$)).subscribe(u => { if (u) this.currentUser = u; });
+    this.sellerAuth.user$.pipe(takeUntil(this.destroy$)).subscribe(u => {
+      if (u) this.currentUser = { name: u.alias, email: u.email, role: 'seller', initials: u.alias.slice(0,2).toUpperCase() };
+      else if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+    });
 
     this.startSlideshow();
 
@@ -326,6 +341,7 @@ export class CentresComponent implements OnInit, OnDestroy {
 
   // ── Centre click ──────────────────────────────────────────
   openCentre(centre: Centre): void {
+    if (!this.currentUser) { this.activeModal = 'auth'; this.authTab = 'login'; return; }
     this.router.navigate(['/centres', centre.id]);
   }
 

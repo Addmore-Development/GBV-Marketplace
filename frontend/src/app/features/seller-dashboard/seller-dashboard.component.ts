@@ -168,7 +168,8 @@ export class SellerDashboardComponent implements OnInit {
     hiddenPin = '';
     pinError = '';
     sanctuaryOpen = false;
-    sanctuaryTab: 'journey' | 'vault' | 'support' = 'journey';
+    // IMPORTANT: added 'affidavit' to the union type
+    sanctuaryTab: 'journey' | 'vault' | 'support' | 'share' | 'affidavit' = 'journey';
     caseJourney: CaseJourney = {
         medical_done: false, police_done: false,
         protection_done: false, court_done: false, counselling_done: false,
@@ -189,6 +190,32 @@ export class SellerDashboardComponent implements OnInit {
     applyNotes = '';
     applyError = '';
     applySuccess = false;
+
+    // ── Voice Affidavit (ADDED) ───────────────────────────────
+    isRecording = false;
+    affidavitTranscript = '';
+    recognition: any = null;
+    generatingAffidavit = false;
+    lastAffidavitUrl = '';
+
+    // ── Unified Case Sharing (ADDED) ─────────────────────────────
+    myShares: any[] = [];
+    showShareModal = false;
+    shareCreating = false;
+    shareError = '';
+    newShare = {
+        email: '',
+        name: '',
+        type: 'lawyer',
+        permission: 'journey_and_evidence',
+        expiresDays: 30,
+        notes: ''
+    };
+
+    // ── Pro‑bono professional matching notifications (ADDED) ─────
+    notifications: any[] = [];
+    unreadCount = 0;
+    showNotifications = false;
 
     constructor(
         private http: HttpClient,
@@ -243,6 +270,9 @@ export class SellerDashboardComponent implements OnInit {
                 };
                 this.isLoading = false;
                 this.cdr.detectChanges();
+                // ADDED: load existing shares and notifications
+                this.loadMyShares();
+                this.loadNotifications();
                 this.loadProducts();
                 this.loadEarnings();
                 this.loadTraining();
@@ -697,19 +727,19 @@ export class SellerDashboardComponent implements OnInit {
     }
 
     generateCourtPack(): void {
-    this.http.post(`${this.API}/generate-court-pack/${this.seller?.id}`, {}, { responseType: 'blob' })
-        .subscribe({
-            next: (blob) => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `court-pack-${this.seller?.id}.pdf`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-            },
-            error: () => alert('Could not generate court pack')
-        });
-}
+        this.http.post(`${this.API}/generate-court-pack/${this.seller?.id}`, {}, { responseType: 'blob' })
+            .subscribe({
+                next: (blob) => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `court-pack-${this.seller?.id}.pdf`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                },
+                error: () => alert('Could not generate court pack')
+            });
+    }
 
     logout(): void {
         localStorage.clear();
@@ -736,13 +766,219 @@ export class SellerDashboardComponent implements OnInit {
         return map[cat] || '📚';
     }
 
-    getFileUrl(fileUrl: string): string {
-        if (!fileUrl) return '#';
-        // If it's already an absolute URL, return as-is
-        if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-            return fileUrl;
+    // ============================================================
+    // VOICE AFFIDAVIT BUILDER (ADDED)
+    // ============================================================
+
+    private initSpeechRecognition(): void {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Your browser does not support speech recognition. Please use Chrome, Edge, or Safari.');
+            return;
         }
-        // Otherwise prefix with the API base URL
-        return `http://localhost:3000${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+        this.recognition = new SpeechRecognition();
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.lang = 'en-ZA'; // South African English
+
+        this.recognition.onresult = (event: any) => {
+            let final = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    final += transcript + ' ';
+                }
+            }
+            if (final) {
+                this.affidavitTranscript = (this.affidavitTranscript + final).trim();
+                this.cdr.detectChanges();
+            }
+        };
+
+        this.recognition.onerror = (event: any) => {
+            console.error('Speech recognition error', event.error);
+            this.isRecording = false;
+            alert('Microphone error: ' + event.error);
+            this.cdr.detectChanges();
+        };
+
+        this.recognition.onend = () => {
+            this.isRecording = false;
+            this.cdr.detectChanges();
+        };
+    }
+
+    startRecording(): void {
+        if (!this.recognition) {
+            this.initSpeechRecognition();
+        }
+        if (this.recognition) {
+            try {
+                this.recognition.start();
+                this.isRecording = true;
+            } catch (err) {
+                console.error(err);
+                alert('Could not start recording. Please ensure microphone permissions are granted.');
+            }
+        } else {
+            alert('Speech recognition not available in this browser.');
+        }
+    }
+
+    stopRecording(): void {
+        if (this.recognition) {
+            this.recognition.stop();
+            this.isRecording = false;
+        }
+    }
+
+    clearAffidavit(): void {
+        this.affidavitTranscript = '';
+        this.lastAffidavitUrl = '';
+    }
+
+    generateAffidavitPDF(): void {
+        if (!this.affidavitTranscript.trim()) {
+            alert('Please speak or type your statement first.');
+            return;
+        }
+        this.generatingAffidavit = true;
+        this.http.post(`${this.API}/affidavit/generate`, {
+            seller_id: this.seller?.id,
+            statement: this.affidavitTranscript
+        }, { responseType: 'blob' }).subscribe({
+            next: (blob) => {
+                this.generatingAffidavit = false;
+                const url = window.URL.createObjectURL(blob);
+                this.lastAffidavitUrl = url;
+                // Refresh evidence list to show the newly saved affidavit
+                this.loadEvidence();
+                alert('Affidavit PDF generated and saved to your Safe Space.');
+                this.cdr.detectChanges();
+            },
+            error: (err) => {
+                this.generatingAffidavit = false;
+                console.error(err);
+                alert('Failed to generate affidavit: ' + (err.error?.message || 'Please try again.'));
+                this.cdr.detectChanges();
+            }
+        });
+    }
+
+    // ── Helper to prepend backend URL for uploaded files ──
+    getFileUrl(fileUrl: string): string {
+        if (!fileUrl) return '';
+        // Backend serves static files on port 3000
+        return `http://localhost:3000${fileUrl}`;
+    }
+
+    // ============================================================
+    // UNIFIED CASE FILE SHARING (ADDED)
+    // ============================================================
+    loadMyShares(): void {
+        if (!this.seller?.id) return;
+        this.http.get<any[]>(`${this.API}/case/shares?seller_id=${this.seller.id}`).subscribe({
+            next: (shares) => {
+                this.myShares = shares.map(s => ({
+                    ...s,
+                    share_url: `${window.location.origin}/shared-case/${s.share_token}`
+                }));
+                this.cdr.detectChanges();
+            },
+            error: (err) => console.error('Load shares error:', err)
+        });
+    }
+
+    openShareModal(): void {
+        this.newShare = {
+            email: '',
+            name: '',
+            type: 'lawyer',
+            permission: 'journey_and_evidence',
+            expiresDays: 30,
+            notes: ''
+        };
+        this.shareError = '';
+        this.showShareModal = true;
+    }
+
+    closeShareModal(): void {
+        this.showShareModal = false;
+    }
+
+    createShare(): void {
+        if (!this.newShare.email) {
+            this.shareError = 'Professional email is required';
+            return;
+        }
+        this.shareCreating = true;
+        this.shareError = '';
+        const payload = {
+            seller_id: this.seller?.id,
+            professional_email: this.newShare.email,
+            professional_name: this.newShare.name || null,
+            professional_type: this.newShare.type,
+            permission: this.newShare.permission,
+            expires_in_days: this.newShare.expiresDays,
+            notes: this.newShare.notes || null
+        };
+        this.http.post<any>(`${this.API}/case/share`, payload).subscribe({
+            next: () => {
+                this.shareCreating = false;
+                this.showShareModal = false;
+                this.loadMyShares();
+                alert('Share link created! The professional can access your case using the link.');
+            },
+            error: (err) => {
+                this.shareCreating = false;
+                this.shareError = err.error?.error || 'Could not create share';
+                this.cdr.detectChanges();
+            }
+        });
+    }
+
+    revokeShare(shareId: string): void {
+        if (!confirm('Revoke this share? The professional will no longer be able to access your case.')) return;
+        this.http.delete(`${this.API}/case/share/${shareId}`, { body: { seller_id: this.seller?.id } }).subscribe({
+            next: () => {
+                this.loadMyShares();
+            },
+            error: (err) => console.error('Revoke error:', err)
+        });
+    }
+
+    copyShareLink(url: string): void {
+        navigator.clipboard.writeText(url);
+        alert('Link copied to clipboard');
+    }
+
+    truncate(str: string, len: number): string {
+        return str.length > len ? str.slice(0, len) + '…' : str;
+    }
+
+    // ============================================================
+    // PRO BONO PROFESSIONAL MATCHING NOTIFICATIONS (ADDED)
+    // ============================================================
+    loadNotifications(): void {
+        if (!this.seller?.id) return;
+        this.http.get<any[]>(`${this.API}/notifications?seller_id=${this.seller.id}`).subscribe({
+            next: (nots) => {
+                this.notifications = nots;
+                this.unreadCount = nots.filter(n => !n.is_read).length;
+                this.cdr.detectChanges();
+            },
+            error: (err) => console.error('Notifications error:', err)
+        });
+    }
+
+    markNotificationRead(notifId: string): void {
+        this.http.post(`${this.API}/notifications/mark-read`, { notification_id: notifId }).subscribe({
+            next: () => this.loadNotifications()
+        });
+    }
+
+    toggleNotifications(): void {
+        this.showNotifications = !this.showNotifications;
+        // Optional: mark all as read when panel is closed? Not needed now.
     }
 }

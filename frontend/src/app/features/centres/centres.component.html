@@ -21,7 +21,7 @@
       <button class="btn-volunteer-nav" (click)="showVolunteer()">Volunteer</button>
       <ng-container *ngIf="!currentUser">
         <button class="btn-ghost" (click)="activeModal = 'auth'; authTab = 'login'">Sign In</button>
-        <button class="btn-solid" (click)="activeModal = 'auth'; authTab = 'register'">Register</button>
+        <button class="btn-solid" (click)="activeModal = 'auth'; authTab = 'register'; loadSellerCentres()">Register</button>
       </ng-container>
       <ng-container *ngIf="currentUser">
         <div class="user-chip">
@@ -125,7 +125,12 @@
 <section class="centres-section">
   <div class="centres-inner">
 
-    <div class="centre-grid" *ngIf="filteredCentres.length > 0">
+    <!-- Loading state -->
+    <div class="centres-loading" *ngIf="centresLoading">
+      <div class="loading-skeleton" *ngFor="let i of [1,2,3,4,5,6]"></div>
+    </div>
+
+    <div class="centre-grid" *ngIf="!centresLoading && filteredCentres.length > 0">
       <div class="centre-card" *ngFor="let c of filteredCentres">
         <!-- Image -->
         <div class="cc-visual" (click)="openCentre(c)" style="cursor:pointer">
@@ -184,7 +189,7 @@
       </div>
     </div>
 
-    <div class="empty-state" *ngIf="filteredCentres.length === 0">
+    <div class="empty-state" *ngIf="!centresLoading && filteredCentres.length === 0">
       <h3>No centres found</h3>
       <p>Try adjusting your search or removing a filter.</p>
       <button class="btn-outline" (click)="searchQuery=''; selectedProvince=''; selectedType=''">Clear filters</button>
@@ -196,63 +201,111 @@
 <!-- ── MODAL BACKDROP ── -->
 <div class="modal-backdrop" [class.open]="activeModal" (click)="closeModal($event)">
 
-  <!-- ── AUTH MODAL ── -->
+  <!-- ── AUTH MODAL (matches marketplace design exactly) ── -->
   <div class="modal auth-modal open" (click)="$event.stopPropagation()" *ngIf="activeModal === 'auth'">
     <button class="modal-close" (click)="closeModalDirect()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    <div class="modal-logo-mark">A</div>
 
-    <div class="modal-tabs-bar">
-      <button class="modal-tab" [class.active]="authTab === 'login'"    (click)="authTab = 'login'">Sign In</button>
-      <button class="modal-tab" [class.active]="authTab === 'register'" (click)="authTab = 'register'">Register</button>
-    </div>
-
-    <!-- Login -->
+    <!-- Login tab -->
     <div *ngIf="authTab === 'login'">
-      <h2 class="modal-title">Welcome back</h2>
-      <p class="modal-sub">Sign in to access contact details, donate, and volunteer</p>
-      <div class="role-tabs">
-        <button [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
-        <button [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
-        <button [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
+      <div class="modal-head">
+        <div class="modal-logo">A</div>
+        <h2 class="modal-title">Welcome back</h2>
+        <p class="modal-sub">Sign in to access contact details, donate, and volunteer</p>
+      </div>
+      <div class="modal-tabs">
+        <button class="mtab" [class.active]="loginRole === 'buyer'"  (click)="loginRole = 'buyer'">Buyer</button>
+        <button class="mtab" [class.active]="loginRole === 'seller'" (click)="loginRole = 'seller'">Seller</button>
+        <button class="mtab" [class.active]="loginRole === 'centre'" (click)="loginRole = 'centre'">Centre</button>
       </div>
       <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
       <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
       <div class="modal-error" *ngIf="authError">{{ authError }}</div>
       <button class="modal-cta" (click)="doLogin()">Sign In</button>
+      <div class="modal-switch">No account? <span (click)="authTab = 'register'">Register here</span></div>
     </div>
 
-    <!-- Register -->
+    <!-- Register tab -->
     <div *ngIf="authTab === 'register'">
-      <h2 class="modal-title">Create an account</h2>
-      <p class="modal-sub">Register to contribute, volunteer, and connect with centres</p>
-      <div class="role-select-grid">
-        <div class="role-opt" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
-          <div class="ro-label">Buyer</div><div class="ro-desc">Shop &amp; donate</div>
+      <div class="modal-head">
+        <div class="modal-logo">A</div>
+        <h2 class="modal-title">Create an account</h2>
+        <p class="modal-sub">Register to contribute, volunteer, and connect with centres</p>
+      </div>
+      <div class="role-grid">
+        <div class="role-card" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
+          <div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
         </div>
-        <div class="role-opt" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
-          <div class="ro-label">Seller</div><div class="ro-desc">Sell creations</div>
+        <div class="role-card" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
+          <div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
         </div>
-        <div class="role-opt" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
-          <div class="ro-label">Centre</div><div class="ro-desc">Register centre</div>
+        <div class="role-card" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
+          <div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
         </div>
       </div>
-      <ng-container *ngIf="registerRole !== 'centre' && registerRole !== 'seller'">
+      <!-- Buyer form -->
+      <ng-container *ngIf="registerRole === 'buyer'">
         <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
         <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
         <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
+        <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+        <button class="modal-cta" (click)="doRegister()">Create Account</button>
       </ng-container>
-      <ng-container *ngIf="registerRole === 'centre' || registerRole === 'seller'">
-        <div class="centre-cta-preview">
-          <p *ngIf="registerRole === 'centre'">Centre registration requires a full 9-step application. Click below to begin.</p>
-          <p *ngIf="registerRole === 'seller'">Seller registration requires NRSO vetting. Click below to begin your application.</p>
+      <!-- Seller: full inline form (identical to marketplace) -->
+      <ng-container *ngIf="registerRole === 'seller'">
+        <div class="seller-form-header">
+          <h3>Join as a maker</h3>
+          <p>Your information is kept private and secure.</p>
         </div>
+        <div class="mf-group">
+          <label>South African ID number</label>
+          <input [(ngModel)]="sellerIdNumber" (input)="onSellerIdInput()"
+            placeholder="13-digit SA ID number"
+            maxlength="13" inputmode="numeric" />
+          <div class="id-status verified" *ngIf="sellerIdVerified">✓ 13 digits entered</div>
+          <div class="id-status error"    *ngIf="sellerIdError">{{ sellerIdError }}</div>
+          <div class="mf-hint">Use a valid female South African ID number. The backend validates format and gender digit.</div>
+        </div>
+        <div class="mf-group">
+          <label>Full name</label>
+          <input [(ngModel)]="sellerFullName" placeholder="Your full name" />
+        </div>
+        <div class="mf-group">
+          <label>Email address</label>
+          <input [(ngModel)]="sellerEmail" type="email" placeholder="you@example.com" />
+        </div>
+        <div class="mf-group">
+          <label>Create a private PIN (4–6 digits)</label>
+          <input [(ngModel)]="sellerPin" type="password" inputmode="numeric"
+            placeholder="4–6 digits" maxlength="6" />
+          <div class="mf-hint">You'll use this PIN to log in. Write it down somewhere safe.</div>
+        </div>
+        <div class="mf-group">
+          <label>Nearest Amani workshop *</label>
+          <select [(ngModel)]="sellerCentreId" [disabled]="sellerCentresLoading">
+            <option value="" disabled selected>{{ sellerCentresLoading ? 'Loading centres…' : 'Select a centre…' }}</option>
+            <option *ngFor="let c of sellerCentres" [value]="c.id">
+              {{ c.name }} — {{ c.city }}, {{ c.province }}
+            </option>
+          </select>
+          <div class="mf-hint">Choose the centre closest to you. Your products will be shipped from here.</div>
+        </div>
+        <div class="modal-error" *ngIf="sellerError">{{ sellerError }}</div>
+        <button class="modal-cta" [disabled]="!sellerCanSubmit || sellerIsLoading" (click)="doSellerRegister()">
+          {{ sellerIsLoading ? 'Submitting…' : 'Join Amani →' }}
+        </button>
       </ng-container>
-      <div class="modal-error" *ngIf="authError">{{ authError }}</div>
-      <button class="modal-cta" (click)="doRegister()">
-        {{ registerRole === 'centre' ? 'Start Centre Registration' : registerRole === 'seller' ? 'Start Seller Application' : 'Create Account' }}
-      </button>
+      <!-- Centre: redirect -->
+      <ng-container *ngIf="registerRole === 'centre'">
+        <div class="centre-register-preview">
+          <h3>Centre Registration</h3>
+          <p>Registering a care centre requires a full 9-step application. This takes approximately 15–20 minutes.</p>
+        </div>
+        <div class="modal-error" *ngIf="authError">{{ authError }}</div>
+        <button class="modal-cta" (click)="doRegister()">Start Centre Registration</button>
+      </ng-container>
+      <div class="modal-switch">Have an account? <span (click)="authTab = 'login'">Sign in</span></div>
     </div>
   </div>
 

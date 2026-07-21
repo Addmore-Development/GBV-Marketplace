@@ -33,12 +33,12 @@ export const getProducts = async (req: Request, res: Response) => {
       params.push(category);
     }
     if (search) {
-      where += ` AND (p.name ILIKE $${idx} OR p.description ILIKE $${idx})`;
+      where += ` AND (p.title ILIKE $${idx} OR p.description ILIKE $${idx})`;
       params.push(`%${search}%`);
       idx++;
     }
     if (centre_id) {
-      where += ` AND s.centre_id = $${idx++}`;
+      where += ` AND p.centre_id = $${idx++}`;
       params.push(centre_id);
     }
     if (min_price) {
@@ -65,29 +65,28 @@ export const getProducts = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT
         p.id,
-        p.name AS title,
+        p.title,
         p.description,
         p.category,
         COALESCE(p.story, p.description) AS story,
         p.price,
-        COALESCE(p.stock, 0) AS stock,
-        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS img,
+        COALESCE(p.stock_quantity, 0) AS stock,
+        COALESCE(p.thumbnail, 'https://placehold.co/600x400?text=No+Image') AS img,
         p.seller_alias,
-        COALESCE(p.seller_type, 'survivor') AS seller_type,
-        5.0 AS rating,
-        0 AS reviews,
+        COALESCE(p.seller_type::text, 'survivor') AS seller_type,
+        COALESCE(p.rating_avg, 5.0) AS rating,
+        COALESCE(p.rating_count, 0) AS reviews,
         COALESCE(p.total_sold, 0) AS sold,
         c.centre_name,
         c.city,
         ROUND(p.price * COALESCE(p.survivor_pct, 70) / 100, 2) AS survivor_income,
         ROUND(p.price * COALESCE(p.centre_pct, 28) / 100, 2) AS centre_funding,
         ROUND(p.price * COALESCE(p.platform_pct, 2) / 100, 2) AS platform_fee,
-        CASE WHEN COALESCE(p.stock, 0) = 0 THEN 'out-of-stock'
-             WHEN COALESCE(p.stock, 0) <= 5 THEN 'low-stock'
+        CASE WHEN COALESCE(p.stock_quantity, 0) = 0 THEN 'out-of-stock'
+             WHEN COALESCE(p.stock_quantity, 0) <= 5 THEN 'low-stock'
              ELSE NULL END AS badge
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
-       JOIN centres c ON c.id = s.centre_id
+       JOIN centres c ON c.id = p.centre_id
        ${where}
        ORDER BY p.${safeSort} ${safeOrder}
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -121,8 +120,7 @@ export const getProduct = async (req: Request, res: Response) => {
         ROUND(p.price * p.centre_pct   / 100, 2) as centre_funding,
         ROUND(p.price * p.platform_pct / 100, 2) as platform_fee
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
-       JOIN centres c ON c.id = s.centre_id
+       JOIN centres c ON c.id = p.centre_id
        WHERE p.id = $1 AND p.status = 'active'`,
       [id]
     );
@@ -200,13 +198,12 @@ export const updateCart = async (req: Request, res: Response) => {
 
     // Fetch product
     const prod = await pool.query(
-      `SELECT p.id, p.name AS title, p.price, COALESCE(p.image_url, '') AS thumbnail,
+      `SELECT p.id, p.title, p.price, COALESCE(p.thumbnail, '') AS thumbnail,
               p.seller_alias, p.currency, p.survivor_pct, p.centre_pct, p.platform_pct,
-              COALESCE(p.stock, 0) AS stock_quantity,
+              COALESCE(p.stock_quantity, 0) AS stock_quantity,
               c.centre_name
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
-       JOIN centres c ON c.id = s.centre_id
+       JOIN centres c ON c.id = p.centre_id
        WHERE p.id = $1 AND p.status = 'active'`,
       [product_id]
     );
@@ -283,9 +280,8 @@ export const placeOrder = async (req: Request, res: Response) => {
 
     // Find nearest hub centre (simplified: use seller's centre of first item)
     const hubCentreId = items[0] ? await client.query(
-      `SELECT s.centre_id
+      `SELECT p.centre_id
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
        WHERE p.id = $1`,
       [items[0].product_id]
     ).then(r => r.rows[0]?.centre_id) : null;
@@ -299,12 +295,11 @@ export const placeOrder = async (req: Request, res: Response) => {
 
     for (const item of items) {
       const prod = await client.query(
-        `SELECT p.id, p.name AS title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
-                COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias,
-                c.centre_name, s.centre_id
+        `SELECT p.id, p.title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
+                COALESCE(p.stock_quantity, 0) AS stock_quantity, p.seller_alias,
+                c.centre_name, p.centre_id
          FROM products p
-         JOIN sellers s ON s.id = p.seller_id
-         JOIN centres c ON c.id = s.centre_id
+         JOIN centres c ON c.id = p.centre_id
          WHERE p.id = $1 AND p.status = 'active' FOR UPDATE`,
         [item.product_id]
       );
@@ -339,7 +334,7 @@ export const placeOrder = async (req: Request, res: Response) => {
 
       // Decrement stock
       await client.query(
-        `UPDATE products SET stock = stock - $1, total_sold = total_sold + $1 WHERE id = $2`,
+        `UPDATE products SET stock_quantity = stock_quantity - $1, total_sold = total_sold + $1 WHERE id = $2`,
         [item.quantity, p.id]
       );
     }

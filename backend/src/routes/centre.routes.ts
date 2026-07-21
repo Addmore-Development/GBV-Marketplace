@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre } from '../controllers/centre.controller';
+import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, getAllCentres } from '../controllers/centre.controller';
 import { verifyAdminToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -48,6 +48,7 @@ const documentFields = upload.fields([
 ]);
 
 // Public routes
+router.get('/all', getAllCentres);
 router.post('/register', documentFields, registerCentre);
 router.post('/login', loginCentre);
 router.get('/status/:id', getCentreStatus);

@@ -20,6 +20,8 @@ import {
   markMessageRead,
   replyToMessage,
   getDonations,
+  getEmergencyAlerts,
+  getEmergencyStats,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -63,5 +65,9 @@ router.post('/messages/:id/reply',   requireAdmin, replyToMessage);
 
 // ── Donations ─────────────────────────────────────────────
 router.get('/donations', requireAdmin, getDonations);
+
+// ── Emergency / SOS alerts ────────────────────────────────
+router.get('/emergency',       requireAdmin, getEmergencyAlerts);
+router.get('/emergency/stats', requireAdmin, getEmergencyStats);
 
 export default router;

@@ -25,6 +25,9 @@ import {
     addTrustedContact,
     deleteTrustedContact,
     triggerEmergencyAlert,
+    attachEmergencyRecording,
+    uploadAlarmRecording,
+    getCentreEmergencyAlerts,
     createCaseShare,
     getMyShares,
     revokeCaseShare,
@@ -78,6 +81,8 @@ router.get('/contacts/:sellerId', getTrustedContacts);
 router.post('/contacts', addTrustedContact);
 router.delete('/contacts/:id', deleteTrustedContact);
 router.post('/emergency', triggerEmergencyAlert);
+router.post('/emergency/:alertId/recording', uploadAlarmRecording.single('recording'), attachEmergencyRecording);
+router.get('/emergency/centre/:centreId', getCentreEmergencyAlerts);
 
 // ── Unified Case File Sharing ─────────────────────────────────
 router.post('/case/share', createCaseShare);

@@ -51,6 +51,10 @@
       <button [class.active]="activeTab === 'donations'" (click)="activeTab = 'donations'">
         <span class="nav-icon">💛</span> Donations
       </button>
+      <button class="nav-danger" [class.active]="activeTab === 'safety'" (click)="activeTab = 'safety'">
+        <span class="nav-icon">🚨</span> Safety Alerts
+        <span class="badge-count danger" *ngIf="emergencyStats.alertsLast7Days > 0">{{ emergencyStats.alertsLast7Days }}</span>
+      </button>
     </nav>
 
     <div class="sb-footer">
@@ -374,6 +378,95 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ── SAFETY ALERTS ───────────────────────────────────── -->
+    <section *ngIf="activeTab === 'safety'" class="tab-content">
+      <div class="tab-header">
+        <h1>Safety alerts</h1>
+        <p class="tab-sub">Every silent alarm a seller has triggered from "Checkout Suppliers" on their dashboard — with the same location and recording the receiving centre sees. Use this to confirm the panic button is actually firing and capturing evidence in practice.</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card highlight">
+          <div class="stat-icon">🚨</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ emergencyStats.totalAlerts }}</div>
+            <div class="stat-label">Total alerts triggered</div>
+            <div class="stat-sub">{{ emergencyStats.alertsLast7Days }} in the last 7 days · {{ emergencyStats.alertsLast30Days }} in the last 30</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🎙️</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ emergencyStats.recordingSuccessRate }}%</div>
+            <div class="stat-label">Recording captured</div>
+            <div class="stat-sub">{{ emergencyStats.alertsWithRecording }} of {{ emergencyStats.totalAlerts }} alerts have audio attached</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📍</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ emergencyStats.locationSuccessRate }}%</div>
+            <div class="stat-label">Location captured</div>
+            <div class="stat-sub">{{ emergencyStats.alertsWithLocation }} of {{ emergencyStats.totalAlerts }} alerts include a location hint</div>
+          </div>
+        </div>
+        <div class="stat-card" *ngIf="emergencyStats.avgUploadSeconds !== null">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-body">
+            <div class="stat-val">{{ emergencyStats.avgUploadSeconds }}s</div>
+            <div class="stat-label">Avg. time to upload recording</div>
+            <div class="stat-sub">From trigger to the recording landing on the alert</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="safety-by-centre" *ngIf="emergencyStats.byCentre.length > 0">
+        <h3>Alerts by centre</h3>
+        <div class="sbc-row" *ngFor="let c of emergencyStats.byCentre">
+          <span class="sbc-name">{{ c.centreName }}</span>
+          <span class="sbc-count">{{ c.count }}</span>
+        </div>
+      </div>
+
+      <div class="sos-empty" *ngIf="!loadingEmergency && emergencyAlerts.length === 0">
+        <div class="sos-empty-icon">🕊️</div>
+        <p>No safety alerts have been triggered. This page updates automatically when a seller uses the panic button.</p>
+      </div>
+
+      <div class="sos-loading" *ngIf="loadingEmergency">Loading alerts…</div>
+
+      <div class="sos-list" *ngIf="!loadingEmergency && emergencyAlerts.length > 0">
+        <div class="sos-card" *ngFor="let a of emergencyAlerts">
+          <div class="sos-card-header">
+            <span class="sos-pulse">🚨</span>
+            <div class="sos-card-title">
+              <div class="sos-seller">{{ a.seller_alias || 'Seller' }} <span class="sos-centre" *ngIf="a.centre_name">— {{ a.centre_name }}</span></div>
+              <div class="sos-time">{{ formatDate(a.created_at) }}</div>
+            </div>
+          </div>
+
+          <div class="sos-detail-row" *ngIf="a.location_hint">
+            <span class="sos-detail-label">📍 Location:</span>
+            <a *ngIf="isCoords(a.location_hint)" [href]="'https://www.google.com/maps?q=' + a.location_hint" target="_blank" rel="noopener">
+              {{ a.location_hint }} — open in Maps →
+            </a>
+            <span *ngIf="!isCoords(a.location_hint)">{{ a.location_hint }}</span>
+          </div>
+
+          <div class="sos-detail-row">
+            <span class="sos-detail-label">🎙️ Recording:</span>
+            <span *ngIf="!a.recording_path" class="sos-recording-pending">Not yet received — still uploading or unavailable on the seller's device.</span>
+            <audio *ngIf="a.recording_path" controls [src]="mediaUrl(a.recording_path)"></audio>
+          </div>
+
+          <div class="sos-actions">
+            <a class="sos-action-btn" href="tel:10111">📞 Call SAPS (10111)</a>
+            <a class="sos-action-btn" href="tel:0800428428">☎️ GBV Command Centre</a>
+          </div>
+        </div>
       </div>
     </section>
 

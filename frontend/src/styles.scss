@@ -1,1 +1,33 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* ── Global responsive foundation ───────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img, svg, video {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  max-width: 100%;
+}
+
+/* Generic scroll wrapper for wide tables/dashboards on small screens */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media screen and (max-width: 768px) {
+  html { font-size: 15px; }
+}
+
+@media screen and (max-width: 480px) {
+  html { font-size: 14px; }
+}

@@ -257,3 +257,42 @@ export const loginCentre = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Server error' });
   }
 };
+
+// ─── GET ALL CENTRES (public listing) ────────────────────────
+export const getAllCentres = async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+        id,
+        COALESCE(centre_name, '')       AS name,
+        COALESCE(centre_type::text, '') AS type,
+        COALESCE(city, '')              AS city,
+        COALESCE(province, '')          AS province,
+        COALESCE(suburb, city, '')      AS suburb,
+        COALESCE(description, '')       AS description,
+        COALESCE(mission_statement, '') AS mission,
+        COALESCE(services_offered, '{}') AS services,
+        COALESCE(languages_spoken, '{}') AS languages,
+        COALESCE(is_24_hour, false)          AS is_24_hour,
+        COALESCE(has_shelter, false)         AS has_shelter,
+        COALESCE(provides_counselling, false) AS provides_counselling,
+        COALESCE(provides_legal_support, false) AS provides_legal_support,
+        COALESCE(capacity_total, 0)     AS capacity,
+        COALESCE(contact_email, '')     AS contact_email,
+        COALESCE(contact_phone, '')     AS contact_phone,
+        COALESCE(whatsapp_number, '')   AS whatsapp,
+        COALESCE(website_url, '')       AS website,
+        COALESCE(year_established, 0)   AS year_established,
+        COALESCE(annual_beneficiaries, 0) AS beneficiaries_per_year,
+        status::text                    AS status,
+        (status = 'approved')           AS verified
+       FROM centres
+       WHERE status IN ('approved', 'pending', 'under_review')
+       ORDER BY centre_name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getAllCentres error:', err);
+    res.status(500).json({ error: 'Failed to fetch centres' });
+  }
+};

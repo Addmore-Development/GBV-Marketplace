@@ -557,6 +557,27 @@ interface Centre {
     .gi-icon { font-size: 1.1rem; }
     .gi-label { font-size: .86rem; font-weight: 500; color: var(--text-dark); }
     .cf-group { margin-bottom: 13px; label { display: block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text-dark); margin-bottom: 5px; } input { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: .86rem; outline: none; box-sizing: border-box; &:focus { border-color: var(--forest); } } }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .d-nav { padding: 0 16px; }
+      .nav-links { display: none; }
+      .donate-hero { padding: 40px 16px; }
+      .filter-bar-inner { padding: 10px 16px; }
+      .centres-section { padding: 20px 16px 40px; }
+      .footer-inner { grid-template-columns: 1fr; padding: 28px 16px 20px; gap: 24px; }
+      .footer-links { grid-template-columns: repeat(2, 1fr); }
+      .footer-bottom { padding: 12px 16px; }
+    }
+    @media (max-width: 600px) {
+      .dh-stats { gap: 12px; }
+      .dhs-div { display: none; }
+      .centres-grid { grid-template-columns: 1fr; }
+      .why-grid { grid-template-columns: 1fr 1fr; }
+      .modal { padding: 24px 18px; }
+      .amount-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .dt-options { flex-direction: column; }
+    }
   `]
 })
 export class DonateComponent {

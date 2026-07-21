@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 
-type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations';
+type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety';
 
 interface AdminStats {
   totalSellers: number;
@@ -79,6 +79,31 @@ interface DonationRow {
   created_at: string;
 }
 
+interface EmergencyAlert {
+  id: string;
+  seller_id: string;
+  seller_alias: string;
+  seller_email: string;
+  centre_id: string | null;
+  centre_name: string | null;
+  location_hint: string | null;
+  recording_path: string | null;
+  recording_uploaded_at: string | null;
+  created_at: string;
+}
+
+interface EmergencyStats {
+  totalAlerts: number;
+  alertsWithRecording: number;
+  alertsWithLocation: number;
+  recordingSuccessRate: number;
+  locationSuccessRate: number;
+  alertsLast7Days: number;
+  alertsLast30Days: number;
+  avgUploadSeconds: number | null;
+  byCentre: { centreName: string; count: number }[];
+}
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -112,6 +137,17 @@ export class AdminComponent implements OnInit {
   buyers: BuyerRow[] = [];
   messages: MessageRow[] = [];
   donations: DonationRow[] = [];
+
+  // ── Emergency / SOS alerts ──────────────────────────────────
+  emergencyAlerts: EmergencyAlert[] = [];
+  emergencyStats: EmergencyStats = {
+    totalAlerts: 0, alertsWithRecording: 0, alertsWithLocation: 0,
+    recordingSuccessRate: 0, locationSuccessRate: 0,
+    alertsLast7Days: 0, alertsLast30Days: 0, avgUploadSeconds: null, byCentre: [],
+  };
+  loadingEmergency = false;
+  private readonly MEDIA_BASE = 'http://localhost:3000';
+  private emergencyPollHandle: any = null;
 
   // ── Filters ───────────────────────────────────────────────
   sellerFilter = 'all';
@@ -163,14 +199,18 @@ export class AdminComponent implements OnInit {
   logout(): void {
     localStorage.removeItem('adminAuth');
     this.isAuthenticated = false;
+    if (this.emergencyPollHandle) { clearInterval(this.emergencyPollHandle); this.emergencyPollHandle = null; }
     this.router.navigate(['/marketplace']);
+  }
+
+  private get adminHeaders() {
+    return { headers: { 'x-admin-pin': this.ADMIN_PIN } };
   }
 
   // ── Load data ─────────────────────────────────────────────
   loadAll(): void {
     this.isLoading = true;
-    // Load stats
-    this.http.get<AdminStats>(`${this.API}/stats`).subscribe({
+    this.http.get<AdminStats>(`${this.API}/stats`, this.adminHeaders).subscribe({
       next: (s) => { this.stats = s; this.cdr.detectChanges(); },
       error: () => this.loadMockStats()
     });
@@ -179,7 +219,40 @@ export class AdminComponent implements OnInit {
     this.loadBuyers();
     this.loadMessages();
     this.loadDonations();
+    this.loadEmergencyAlerts();
+    this.loadEmergencyStats();
+    // Poll for new SOS alerts — a survivor triggering the panic button
+    // needs the admin view to update without a manual refresh.
+    if (!this.emergencyPollHandle) {
+      this.emergencyPollHandle = setInterval(() => {
+        this.loadEmergencyAlerts();
+        this.loadEmergencyStats();
+      }, 15000);
+    }
     this.isLoading = false;
+  }
+
+  loadEmergencyAlerts(): void {
+    this.loadingEmergency = this.emergencyAlerts.length === 0;
+    this.http.get<EmergencyAlert[]>(`${this.API}/emergency`, this.adminHeaders).subscribe({
+      next: (d) => { this.emergencyAlerts = d; this.loadingEmergency = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingEmergency = false; }
+    });
+  }
+
+  loadEmergencyStats(): void {
+    this.http.get<EmergencyStats>(`${this.API}/emergency/stats`, this.adminHeaders).subscribe({
+      next: (d) => { this.emergencyStats = d; this.cdr.detectChanges(); },
+      error: () => {}
+    });
+  }
+
+  isCoords(hint: string | null): boolean {
+    return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test((hint || '').trim());
+  }
+
+  mediaUrl(path: string): string {
+    return path.startsWith('http') ? path : `${this.MEDIA_BASE}${path}`;
   }
 
   loadMockStats(): void {
@@ -200,35 +273,35 @@ export class AdminComponent implements OnInit {
   }
 
   loadSellers(): void {
-    this.http.get<SellerRow[]>(`${this.API}/sellers`).subscribe({
+    this.http.get<SellerRow[]>(`${this.API}/sellers`, this.adminHeaders).subscribe({
       next: (d) => { this.sellers = d; this.cdr.detectChanges(); },
       error: () => {}
     });
   }
 
   loadCentres(): void {
-    this.http.get<CentreRow[]>(`${this.API}/centres`).subscribe({
+    this.http.get<CentreRow[]>(`${this.API}/centres`, this.adminHeaders).subscribe({
       next: (d) => { this.centres = d; this.cdr.detectChanges(); },
       error: () => {}
     });
   }
 
   loadBuyers(): void {
-    this.http.get<BuyerRow[]>(`${this.API}/buyers`).subscribe({
+    this.http.get<BuyerRow[]>(`${this.API}/buyers`, this.adminHeaders).subscribe({
       next: (d) => { this.buyers = d; this.cdr.detectChanges(); },
       error: () => {}
     });
   }
 
   loadMessages(): void {
-    this.http.get<MessageRow[]>(`${this.API}/messages`).subscribe({
+    this.http.get<MessageRow[]>(`${this.API}/messages`, this.adminHeaders).subscribe({
       next: (d) => { this.messages = d; this.cdr.detectChanges(); },
       error: () => {}
     });
   }
 
   loadDonations(): void {
-    this.http.get<DonationRow[]>(`${this.API}/donations`).subscribe({
+    this.http.get<DonationRow[]>(`${this.API}/donations`, this.adminHeaders).subscribe({
       next: (d) => { this.donations = d; this.cdr.detectChanges(); },
       error: () => {}
     });
@@ -236,7 +309,7 @@ export class AdminComponent implements OnInit {
 
   // ── Seller actions ────────────────────────────────────────
   approveSeller(id: string): void {
-    this.http.put(`${this.API}/sellers/${id}/approve`, {}).subscribe({
+    this.http.put(`${this.API}/sellers/${id}/approve`, {}, this.adminHeaders).subscribe({
       next: () => {
         const s = this.sellers.find(x => x.id === id);
         if (s) s.verification_status = 'approved';
@@ -250,7 +323,7 @@ export class AdminComponent implements OnInit {
 
   rejectSeller(id: string): void {
     if (!confirm('Reject this seller application?')) return;
-    this.http.put(`${this.API}/sellers/${id}/reject`, {}).subscribe({
+    this.http.put(`${this.API}/sellers/${id}/reject`, {}, this.adminHeaders).subscribe({
       next: () => {
         const s = this.sellers.find(x => x.id === id);
         if (s) s.verification_status = 'rejected';
@@ -263,7 +336,7 @@ export class AdminComponent implements OnInit {
 
   deleteSeller(id: string): void {
     if (!confirm('Permanently delete this seller account? This cannot be undone.')) return;
-    this.http.delete(`${this.API}/sellers/${id}`).subscribe({
+    this.http.delete(`${this.API}/sellers/${id}`, this.adminHeaders).subscribe({
       next: () => {
         this.sellers = this.sellers.filter(s => s.id !== id);
         this.showToast('Seller deleted');
@@ -275,7 +348,7 @@ export class AdminComponent implements OnInit {
 
   // ── Centre actions ────────────────────────────────────────
   approveCentre(id: string): void {
-    this.http.put(`${this.API}/centres/${id}/approve`, {}).subscribe({
+    this.http.put(`${this.API}/centres/${id}/approve`, {}, this.adminHeaders).subscribe({
       next: () => {
         const c = this.centres.find(x => x.id === id);
         if (c) c.status = 'approved';
@@ -289,7 +362,7 @@ export class AdminComponent implements OnInit {
 
   rejectCentre(id: string): void {
     if (!confirm('Reject this centre application?')) return;
-    this.http.put(`${this.API}/centres/${id}/reject`, {}).subscribe({
+    this.http.put(`${this.API}/centres/${id}/reject`, {}, this.adminHeaders).subscribe({
       next: () => {
         const c = this.centres.find(x => x.id === id);
         if (c) c.status = 'rejected';
@@ -302,7 +375,7 @@ export class AdminComponent implements OnInit {
 
   deleteCentre(id: string): void {
     if (!confirm('Permanently delete this centre? This will affect all associated sellers.')) return;
-    this.http.delete(`${this.API}/centres/${id}`).subscribe({
+    this.http.delete(`${this.API}/centres/${id}`, this.adminHeaders).subscribe({
       next: () => {
         this.centres = this.centres.filter(c => c.id !== id);
         this.showToast('Centre deleted');
@@ -318,7 +391,7 @@ export class AdminComponent implements OnInit {
     if (!this.newBuyer.name || !this.newBuyer.email || !this.newBuyer.password) {
       this.buyerSaveError = 'All fields required.'; return;
     }
-    this.http.post<BuyerRow>(`${this.API}/buyers`, this.newBuyer).subscribe({
+    this.http.post<BuyerRow>(`${this.API}/buyers`, this.newBuyer, this.adminHeaders).subscribe({
       next: (b) => {
         this.buyers.unshift(b);
         this.showAddBuyer = false;
@@ -332,7 +405,7 @@ export class AdminComponent implements OnInit {
 
   deleteBuyer(id: string): void {
     if (!confirm('Delete this buyer account?')) return;
-    this.http.delete(`${this.API}/buyers/${id}`).subscribe({
+    this.http.delete(`${this.API}/buyers/${id}`, this.adminHeaders).subscribe({
       next: () => {
         this.buyers = this.buyers.filter(b => b.id !== id);
         this.showToast('Buyer deleted');
@@ -347,7 +420,7 @@ export class AdminComponent implements OnInit {
     this.selectedMsg = msg;
     this.replyText = '';
     if (!msg.read) {
-      this.http.put(`${this.API}/messages/${msg.id}/read`, {}).subscribe({
+      this.http.put(`${this.API}/messages/${msg.id}/read`, {}, this.adminHeaders).subscribe({
         next: () => { msg.read = true; this.cdr.detectChanges(); },
         error: () => {}
       });
@@ -357,7 +430,7 @@ export class AdminComponent implements OnInit {
   sendReply(): void {
     if (!this.selectedMsg || !this.replyText.trim()) return;
     this.replySending = true;
-    this.http.post(`${this.API}/messages/${this.selectedMsg.id}/reply`, { reply: this.replyText }).subscribe({
+    this.http.post(`${this.API}/messages/${this.selectedMsg.id}/reply`, { reply: this.replyText }, this.adminHeaders).subscribe({
       next: () => {
         if (this.selectedMsg) this.selectedMsg.reply = this.replyText;
         this.replyText = '';

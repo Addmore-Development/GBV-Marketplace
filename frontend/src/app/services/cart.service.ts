@@ -3,6 +3,7 @@
 // ============================================================
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
+import { AuthService } from './auth.service';
 
 export interface CartItem {
   product_id: string;
@@ -30,7 +31,17 @@ export class CartService {
   cart$ = this.cartSubject.asObservable();
   cartCount$ = new BehaviorSubject<number>(this.cartSubject.value.items.reduce((s, i) => s + i.quantity, 0));
 
+  constructor(authService: AuthService) {
+    // Register clearCart so AuthService can wipe it on logout without circular DI
+    authService.registerCartClear(() => this.clearCart());
+  }
+
   private loadFromStorage(): Cart {
+    // Only restore cart if someone is actually signed in
+    const isSignedIn = !!localStorage.getItem('sellerId') ||
+                       !!localStorage.getItem('centreId') ||
+                       !!localStorage.getItem('buyerUser');
+    if (!isSignedIn) return { items: [], subtotal: 0 };
     try {
       const stored = localStorage.getItem('amani_cart');
       if (stored) return JSON.parse(stored);
@@ -39,6 +50,13 @@ export class CartService {
   }
 
   private persist(cart: Cart): void {
+    const isSignedIn = !!localStorage.getItem('sellerId') ||
+                       !!localStorage.getItem('centreId') ||
+                       !!localStorage.getItem('buyerUser');
+    if (!isSignedIn) {
+      localStorage.removeItem('amani_cart');
+      return;
+    }
     localStorage.setItem('amani_cart', JSON.stringify(cart));
   }
 
@@ -95,6 +113,11 @@ export class CartService {
 
   updateQuantity(productId: string, quantity: number): Observable<Cart> {
     return this.addToCart(productId, quantity);
+  }
+
+  clearCart(): void {
+    const empty: Cart = { items: [], subtotal: 0 };
+    this.emit(empty);
   }
 
   placeOrder(orderData: any): Observable<any> {

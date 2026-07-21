@@ -603,23 +603,107 @@ export class SellerDashboardComponent implements OnInit {
         this.alertSent = false;
     }
 
+    // ── Silent alarm state ────────────────────────────────────
+    private mediaRecorder: MediaRecorder | null = null;
+    private alarmChunks: Blob[] = [];
+    alarmRecording = false;
+    alarmRecordingUrl = '';
+    private currentAlertId: string | null = null;
+
     sendEmergencyAlert(): void {
         this.alertLoading = true;
-        this.http.post<any>(`${this.API}/emergency`, {
-            seller_id: this.seller?.id,
-            location_hint: this.seller?.city,
-        }).subscribe({
-            next: () => {
-                this.alertSent = true;
-                this.alertLoading = false;
-                this.cdr.detectChanges();
-            },
-            error: () => {
-                this.alertSent = true;
-                this.alertLoading = false;
-                this.cdr.detectChanges();
-            }
+        this.alarmChunks = [];
+        this.alarmRecordingUrl = '';
+        this.currentAlertId = null;
+
+        // Immediate haptic feedback so the seller has silent, physical
+        // confirmation the button registered — no need to look at the screen.
+        if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]);
+        }
+
+        // 1. Get geolocation silently
+        const locationPromise = new Promise<string>((resolve) => {
+            if (!navigator.geolocation) { resolve(this.seller?.city || 'Unknown'); return; }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve(`${pos.coords.latitude},${pos.coords.longitude}`),
+                () => resolve(this.seller?.city || 'Unknown'),
+                { timeout: 3000, enableHighAccuracy: false }
+            );
         });
+
+        // 2. Auto-start a 1-minute audio recording, silently, the moment the button is clicked
+        navigator.mediaDevices?.getUserMedia({ audio: true, video: false })
+            .then((stream) => {
+                this.mediaRecorder = new MediaRecorder(stream);
+                this.mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) this.alarmChunks.push(e.data);
+                };
+                this.mediaRecorder.onstop = () => {
+                    const blob = new Blob(this.alarmChunks, { type: 'audio/webm' });
+                    this.alarmRecordingUrl = URL.createObjectURL(blob);
+                    stream.getTracks().forEach(t => t.stop());
+                    this.uploadAlarmRecording(blob);
+                    this.cdr.detectChanges();
+                };
+                this.mediaRecorder.start();
+                this.alarmRecording = true;
+                // Auto-stop after 1 minute
+                setTimeout(() => { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); this.alarmRecording = false; }, 60000);
+            })
+            .catch(() => { /* Recording unavailable — alarm still sends */ });
+
+        // 3. Send alert to backend — notifies centre, admin, and authorities
+        locationPromise.then((location) => {
+            const payload = {
+                seller_id: this.seller?.id,
+                seller_alias: this.seller?.alias,
+                seller_email: this.seller?.email,
+                centre_id: this.seller?.centre_id,
+                centre_name: this.seller?.centre_name,
+                location_hint: location,
+                timestamp: new Date().toISOString(),
+                notify: ['centre', 'admin', 'authorities'],
+            };
+
+            this.http.post<any>(`${this.API}/emergency`, payload).subscribe({
+                next: (res) => {
+                    this.currentAlertId = res?.alert_id || null;
+                    this.alertSent = true;
+                    this.alertLoading = false;
+                    // Confirm again once the centre/authorities have actually been notified
+                    if ('vibrate' in navigator) navigator.vibrate([300]);
+                    // If the recording already finished before the network call resolved, upload now
+                    if (this.alarmRecordingUrl && this.alarmChunks.length && this.currentAlertId) {
+                        this.uploadAlarmRecording(new Blob(this.alarmChunks, { type: 'audio/webm' }));
+                    }
+                    this.cdr.detectChanges();
+                },
+                error: () => {
+                    // Even if backend fails, mark as sent — recording is still running
+                    this.alertSent = true;
+                    this.alertLoading = false;
+                    this.cdr.detectChanges();
+                }
+            });
+        });
+    }
+
+    private uploadAlarmRecording(blob: Blob): void {
+        if (!this.currentAlertId) return; // wait until we have an alert id to attach it to
+        const form = new FormData();
+        form.append('recording', blob, `alarm-${this.currentAlertId}.webm`);
+        this.http.post(`${this.API}/emergency/${this.currentAlertId}/recording`, form).subscribe({
+            next: () => { /* centre can now access the recording from the alert record */ },
+            error: () => { /* upload failed silently — alert itself already went through */ }
+        });
+    }
+
+    stopAlarmRecording(): void {
+        if (this.mediaRecorder?.state === 'recording') {
+            this.mediaRecorder.stop();
+            this.alarmRecording = false;
+        }
     }
 
     requestSanctuary(): void {

@@ -436,6 +436,89 @@
   &.outline { background: transparent; color: var(--brown); border: 1.5px solid var(--brown); &:hover { background: var(--brown); color: white; } }
 }
 
+.centres-loading {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.loading-skeleton {
+  height: 380px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #f0ece8 25%, #e8e2dc 50%, #f0ece8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.seller-form-header {
+  background: var(--beige); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+  h3 { font-family: 'Playfair Display', serif; font-size: .95rem; color: var(--brown); margin: 0 0 4px; }
+  p  { font-size: .8rem; color: var(--text-mid); margin: 0; }
+}
+
+.id-status {
+  font-size: .76rem; font-weight: 600; margin-top: 5px;
+  &.verified { color: #16A34A; }
+  &.error    { color: var(--red); }
+}
+
+.mf-hint {
+  font-size: .74rem; color: var(--text-muted); margin-top: 5px; line-height: 1.5;
+}
+
+/* Marketplace-matching auth modal styles */
+.modal-head { margin-bottom: 22px; }
+
+.modal-logo {
+  width: 38px; height: 38px; border-radius: 8px; background: var(--brown);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700;
+  color: white; margin-bottom: 12px;
+}
+
+.modal-tabs {
+  display: flex; background: var(--beige); border-radius: 8px; padding: 3px;
+  margin-bottom: 18px; gap: 2px;
+}
+
+.mtab {
+  flex: 1; padding: 7px; border-radius: 6px; border: none; background: none;
+  font-family: 'DM Sans', sans-serif; font-size: .82rem; font-weight: 500;
+  color: var(--text-muted); cursor: pointer; transition: all .2s;
+  &.active { background: white; color: var(--brown); font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+}
+
+.role-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 16px;
+}
+
+.role-card {
+  border: 2px solid var(--border); border-radius: 9px; padding: 13px 8px;
+  text-align: center; cursor: pointer; transition: all .2s; background: white;
+  &:hover   { border-color: var(--brown-light); }
+  &.selected { border-color: var(--brown); background: var(--beige); }
+}
+
+.rc-label { font-size: .82rem; font-weight: 700; color: var(--text-dark); }
+.rc-desc  { font-size: .68rem; color: var(--text-muted); margin-top: 3px; }
+
+.centre-register-preview {
+  background: var(--beige); border-radius: 10px; padding: 16px; margin-bottom: 14px;
+  h3 { font-family: 'Playfair Display', serif; font-size: .95rem; color: var(--brown); margin: 0 0 8px; }
+  p  { font-size: .82rem; color: var(--text-mid); line-height: 1.55; margin: 0; }
+}
+
+.modal-switch {
+  text-align: center; font-size: .82rem; color: var(--text-muted); margin-top: 10px;
+  span { color: var(--brown); font-weight: 700; cursor: pointer; text-decoration: underline; }
+}
+
 /* Centre detail modal */
 .centre-detail-grid { display: grid; grid-template-columns: 1fr 1fr; min-height: 500px;
   @media (max-width:700px) { grid-template-columns: 1fr; } }
@@ -542,6 +625,11 @@
   .nb-slide-img { display: none; }
   .centre-detail-grid { grid-template-columns: 1fr; }
   .cd-info { max-height: none; }
+}
+
+@media (max-width: 480px) {
+  .brand-sub { display: none; }
+  .back-btn { padding: 6px 8px; font-size: 0; svg { font-size: initial; } }
 }
 /* ── Noticeboard background overlay ── */
 .noticeboard {

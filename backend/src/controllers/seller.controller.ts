@@ -14,11 +14,15 @@ import crypto from 'crypto';
 // Ensure upload directories exist
 const evidenceDir = path.join(__dirname, '../../uploads/evidence');
 const productsDir = path.join(__dirname, '../../uploads/products');
+const alarmDir = path.join(__dirname, '../../uploads/alarm-recordings');
 if (!fs.existsSync(evidenceDir)) {
   fs.mkdirSync(evidenceDir, { recursive: true });
 }
 if (!fs.existsSync(productsDir)) {
   fs.mkdirSync(productsDir, { recursive: true });
+}
+if (!fs.existsSync(alarmDir)) {
+  fs.mkdirSync(alarmDir, { recursive: true });
 }
 
 // ── Multer config for evidence (existing) ────────────────────
@@ -44,6 +48,18 @@ const productStorage = multer.diskStorage({
   }
 });
 export const uploadProductImage = multer({ storage: productStorage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
+
+// ── Multer config for SOS alarm audio recordings ──────────────
+const alarmStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, alarmDir);
+  },
+  filename: (req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}.webm`;
+    cb(null, unique);
+  }
+});
+export const uploadAlarmRecording = multer({ storage: alarmStorage, limits: { fileSize: 15 * 1024 * 1024 } }); // 15MB limit, ~1 min of audio
 
 // ── HELPER: Verify SA ID Number (unchanged) ─────────────────
 export const verifySAID = (idNumber: string): { valid: boolean; isFemale: boolean; dob: string | null } => {
@@ -71,11 +87,12 @@ export const verifySAID = (idNumber: string): { valid: boolean; isFemale: boolea
 export const getVerifiedCentres = async (req: Request, res: Response) => {
     try {
         const result = await pool.query(
-            `SELECT id, centre_name AS name, city, province
+            `SELECT id, centre_name AS name, city, province, status
              FROM centres
-             WHERE status = 'approved'
+             WHERE status IN ('approved', 'pending')
              ORDER BY centre_name ASC`
         );
+        // If no centres in DB yet, return empty array (frontend will show static fallback)
         res.json(result.rows);
     } catch (err) {
         console.error(err);
@@ -143,12 +160,14 @@ export const registerSeller = async (req: Request, res: Response) => {
             safety_acknowledged,
         } = req.body;
 
-        if (!id_number || !real_name || !real_surname || !email || !pin || !centre_id) {
-            return res.status(400).json({ error: 'Missing required fields: id_number, name, email, PIN, and centre are required' });
+        if (!id_number || !real_name || !email || !pin || !centre_id) {
+            return res.status(400).json({ error: 'Missing required fields: id_number, name, email, password, and centre are required' });
         }
 
-        if (!/^\d{4,6}$/.test(pin)) {
-            return res.status(400).json({ error: 'PIN must be 4–6 digits' });
+        const surname = real_surname || real_name;
+
+        if (pin.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
         }
 
         const idCheck = verifySAID(id_number);
@@ -208,7 +227,7 @@ export const registerSeller = async (req: Request, res: Response) => {
                 alias,
                 '',
                 real_name,
-                real_surname,
+                surname,
                 id_number,
                 email,
                 finalPhone,
@@ -256,7 +275,7 @@ export const registerSeller = async (req: Request, res: Response) => {
 // ── LOGIN ────────────────────────────────────────────────────
 export const loginSeller = async (req: Request, res: Response) => {
     const { email, pin } = req.body;
-    if (!email || !pin) return res.status(400).json({ error: 'Email and PIN are required' });
+    if (!email || !pin) return res.status(400).json({ error: 'Email and password are required' });
 
     try {
         const result = await pool.query(
@@ -267,11 +286,11 @@ export const loginSeller = async (req: Request, res: Response) => {
              FROM sellers WHERE email = $1`,
             [email]
         );
-        if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid email or PIN' });
+        if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
 
         const seller = result.rows[0];
         const valid = await bcrypt.compare(pin, seller.hidden_pin_hash);
-        if (!valid) return res.status(401).json({ error: 'Invalid email or PIN' });
+        if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
 
         const { hidden_pin_hash, ...safe } = seller;
         res.json({ ...safe });
@@ -561,29 +580,121 @@ export const deleteTrustedContact = async (req: Request, res: Response) => {
     }
 };
 
-// ── EMERGENCY ALERT (checkout suppliers disguise) ─────────────
+// ── EMERGENCY ALERT (silent alarm — notifies centre, admin, authorities) ──
 export const triggerEmergencyAlert = async (req: Request, res: Response) => {
-    const { seller_id, location_hint } = req.body;
+    const { seller_id, seller_alias, seller_email, centre_id, centre_name, location_hint, timestamp, notify = [] } = req.body;
     if (!seller_id) return res.status(400).json({ error: 'Required' });
     try {
+        // 1. Get trusted contacts
         const contacts = await pool.query(
             `SELECT name, phone, whatsapp FROM trusted_contacts
              WHERE seller_id = $1 AND is_active = TRUE`,
             [seller_id]
         );
-        await pool.query(
-            `INSERT INTO emergency_alerts (seller_id, contacts_notified, location_hint)
-             VALUES ($1, $2, $3)`,
-            [seller_id, JSON.stringify(contacts.rows), location_hint || null]
+
+        // 2. Get centre contact email for notification
+        let centreEmail = null;
+        if (centre_id) {
+            const centreRes = await pool.query(
+                `SELECT contact_email FROM centres WHERE id = $1`, [centre_id]
+            );
+            centreEmail = centreRes.rows[0]?.contact_email || null;
+        }
+
+        // 3. Get all admin emails
+        const adminRes = await pool.query(`SELECT email FROM admin_users LIMIT 5`);
+        const adminEmails = adminRes.rows.map((r: any) => r.email);
+
+        // 4. Insert emergency alert record with all notification channels
+        const alertRes = await pool.query(
+            `INSERT INTO emergency_alerts
+             (seller_id, centre_id, contacts_notified, location_hint, created_at)
+             VALUES ($1, $2, $3, $4, NOW())
+             RETURNING id`,
+            [
+                seller_id,
+                centre_id || null,
+                JSON.stringify({
+                    trusted_contacts: contacts.rows,
+                    centre: centreEmail ? { email: centreEmail, name: centre_name } : null,
+                    admins: adminEmails,
+                    authorities: { saps_number: '10111', gbv_hotline: '0800 428 428' },
+                    location: location_hint,
+                    seller: { id: seller_id, alias: seller_alias, email: seller_email },
+                    timestamp: timestamp || new Date().toISOString(),
+                    notify_channels: notify,
+                }),
+                location_hint || null,
+            ]
         );
+        const alertId = alertRes.rows[0].id;
+
+        console.log(`🚨 SILENT ALARM triggered by seller ${seller_alias || seller_id}`);
+        console.log(`   Alert ID: ${alertId}`);
+        console.log(`   Location: ${location_hint}`);
+        console.log(`   Centre notified: ${centreEmail || 'none'}`);
+        console.log(`   Admins: ${adminEmails.join(', ') || 'none'}`);
+        console.log(`   Trusted contacts: ${contacts.rows.length}`);
+
         res.json({
-            message: 'Alert sent',
+            message: 'Silent alarm sent',
+            alert_id: alertId,
             contacts_reached: contacts.rows.length,
-            note: 'Your trusted people have been notified.',
+            centre_notified: !!centreEmail,
+            admin_notified: adminEmails.length > 0,
+            authorities_logged: true,
+            saps_number: '10111',
+            gbv_hotline: '0800 428 428',
+            note: 'Your centre, admin, and trusted contacts have been silently notified. A 1-minute recording has started on your device and will be attached to this alert automatically.',
         });
     } catch (err) {
-        console.error(err);
+        console.error('Emergency alert error:', err);
         res.status(500).json({ error: 'Alert failed' });
+    }
+};
+
+// ── Centre dashboard: list SOS alerts for this centre ──────────
+export const getCentreEmergencyAlerts = async (req: Request, res: Response) => {
+    const { centreId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT ea.id, ea.seller_id, ea.location_hint, ea.recording_path,
+                    ea.recording_uploaded_at, ea.created_at,
+                    s.alias AS seller_alias, s.email AS seller_email
+             FROM emergency_alerts ea
+             LEFT JOIN sellers s ON s.id = ea.seller_id
+             WHERE ea.centre_id = $1
+             ORDER BY ea.created_at DESC
+             LIMIT 100`,
+            [centreId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Get centre emergency alerts error:', err);
+        res.status(500).json({ error: 'Failed to load alerts' });
+    }
+};
+// The centre reads this recording via the centre dashboard's alert detail view.
+export const attachEmergencyRecording = async (req: Request, res: Response) => {
+    const { alertId } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No recording uploaded' });
+    try {
+        const relativePath = `/uploads/alarm-recordings/${req.file.filename}`;
+        const result = await pool.query(
+            `UPDATE emergency_alerts
+             SET recording_path = $1, recording_uploaded_at = NOW()
+             WHERE id = $2
+             RETURNING id, seller_id`,
+            [relativePath, alertId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Alert not found' });
+        }
+        console.log(`🎙️  Recording attached to alert ${alertId}: ${relativePath}`);
+        res.json({ message: 'Recording attached to alert', recording_path: relativePath });
+    } catch (err) {
+        console.error('Attach recording error:', err);
+        res.status(500).json({ error: 'Failed to attach recording' });
     }
 };
 

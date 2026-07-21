@@ -211,3 +211,72 @@ export const getDonations = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ error: err.message });
   }
 };
+
+// ── Emergency / SOS alerts ──────────────────────────────────
+// Platform-wide view of every silent alarm ("Checkout Suppliers")
+// a seller has triggered, across all centres — so admin can see the
+// same alert + recording the centre sees, and confirm the feature
+// is actually firing and capturing location/audio in practice.
+export const getEmergencyAlerts = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT ea.id, ea.seller_id, ea.centre_id, ea.location_hint,
+              ea.recording_path, ea.recording_uploaded_at, ea.created_at,
+              s.alias AS seller_alias, s.email AS seller_email,
+              c.centre_name
+       FROM emergency_alerts ea
+       LEFT JOIN sellers s ON s.id = ea.seller_id
+       LEFT JOIN centres c ON c.id = ea.centre_id
+       ORDER BY ea.created_at DESC
+       LIMIT 200`
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[Admin] emergency alerts error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Summary stats: how often the panic button is used, and whether
+// the pipeline (location + 1-minute recording) is actually completing.
+export const getEmergencyStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [totals, byCentre] = await Promise.all([
+      pool.query(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE recording_path IS NOT NULL)::int AS with_recording,
+           COUNT(*) FILTER (WHERE location_hint IS NOT NULL AND location_hint <> '')::int AS with_location,
+           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS last_7_days,
+           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS last_30_days,
+           AVG(EXTRACT(EPOCH FROM (recording_uploaded_at - created_at)))
+             FILTER (WHERE recording_uploaded_at IS NOT NULL) AS avg_upload_seconds
+         FROM emergency_alerts`
+      ),
+      pool.query(
+        `SELECT c.centre_name, COUNT(ea.id)::int AS count
+         FROM emergency_alerts ea
+         LEFT JOIN centres c ON c.id = ea.centre_id
+         GROUP BY c.centre_name
+         ORDER BY count DESC`
+      ),
+    ]);
+
+    const t = totals.rows[0];
+    const total = t.total || 0;
+    res.json({
+      totalAlerts: total,
+      alertsWithRecording: t.with_recording || 0,
+      alertsWithLocation: t.with_location || 0,
+      recordingSuccessRate: total > 0 ? Math.round((t.with_recording / total) * 100) : 0,
+      locationSuccessRate: total > 0 ? Math.round((t.with_location / total) * 100) : 0,
+      alertsLast7Days: t.last_7_days || 0,
+      alertsLast30Days: t.last_30_days || 0,
+      avgUploadSeconds: t.avg_upload_seconds ? Math.round(t.avg_upload_seconds) : null,
+      byCentre: byCentre.rows.map((r: any) => ({ centreName: r.centre_name || 'Unassigned', count: r.count })),
+    });
+  } catch (err: any) {
+    console.error('[Admin] emergency stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};

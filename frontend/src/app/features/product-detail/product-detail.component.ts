@@ -528,6 +528,13 @@ interface Product {
       display: grid; grid-template-columns: 1fr 1fr; gap: 0;
       @media (max-width: 860px) { grid-template-columns: 1fr; }
     }
+    @media (max-width: 860px) {
+      .detail-nav { padding: 0 16px; }
+      .nav-breadcrumb { display: none; }
+      .images-panel { position: static; padding: 16px; }
+      .info-panel { border-left: none; border-top: 1px solid var(--border); padding: 20px 16px; }
+      .detail-wrapper { padding-bottom: 40px; }
+    }
 
     /* IMAGES */
     .images-panel { padding: 28px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: 64px; align-self: start; }

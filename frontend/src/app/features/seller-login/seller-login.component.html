@@ -29,16 +29,16 @@
       </div>
 
       <div class="form-group">
-        <label>Your private PIN</label>
+        <label>Password</label>
         <input
           type="password"
           [(ngModel)]="pin"
           name="pin"
-          autocomplete="off"
-          placeholder="4–6 digits"
+          autocomplete="current-password"
+          placeholder="Your password"
           (keyup.enter)="login()"
         >
-        <small>The same PIN you set when you joined Amani.</small>
+        <small>The same password you set when you joined Amani.</small>
       </div>
 
       <div class="error-msg" *ngIf="error">
@@ -59,7 +59,7 @@
     </div>
 
     <div class="safety-strip">
-      <span>🔐 Your PIN is never stored in plain text.</span>
+      <span>🔐 Your password is never stored in plain text.</span>
       <span>Double-tap the leaf to leave safely.</span>
     </div>
 

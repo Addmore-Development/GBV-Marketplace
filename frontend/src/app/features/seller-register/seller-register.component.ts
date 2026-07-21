@@ -38,7 +38,8 @@ export class SellerRegisterComponent implements OnInit {
   pin = '';
   selectedCentreId = '';
 
-  readonly centres: Centre[] = STATIC_CENTRES;
+  centres: Centre[] = [];
+  centresLoading = false;
 
   isLoading = false;
   error = '';
@@ -51,14 +52,38 @@ export class SellerRegisterComponent implements OnInit {
       this.idVerified &&
       this.fullName.trim().length > 0 &&
       this.email.trim().length > 0 &&
-      /^\d{4,6}$/.test(this.pin) &&
+      /^.{8,}$/.test(this.pin) &&
       this.selectedCentreId.length > 0 &&
       !this.isLoading
     );
   }
 
   constructor(private http: HttpClient, private router: Router) {}
-  ngOnInit(): void {}
+
+  ngOnInit(): void {
+    this.centresLoading = true;
+    this.http.get<any[]>(`${this.API}/centres/verified`).subscribe({
+      next: (data) => {
+        if (data && data.length > 0) {
+          this.centres = data.map((c: any) => ({
+            id: c.id,
+            name: c.name || c.centre_name,
+            city: c.city,
+            province: c.province,
+          }));
+        } else {
+          // Backend returned empty — use static fallback
+          this.centres = STATIC_CENTRES;
+        }
+        this.centresLoading = false;
+      },
+      error: () => {
+        // Network error — use static fallback
+        this.centres = STATIC_CENTRES;
+        this.centresLoading = false;
+      }
+    });
+  }
 
   // ── BUG FIX: write cleaned digits BACK to the bound field ──
   onIdInput(): void {

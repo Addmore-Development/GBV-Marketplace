@@ -84,7 +84,7 @@
       </div>
       <div class="hg-col">
         <div class="hg-img hg-sm">
-          <img src="https://images.unsplash.com/photo-1590736969955-71cc94901144?w=400&q=80" alt="Woven baskets" />
+          <img src="https://images.unsplash.com/photo-1455669175216-9017c9b02fc6?w=400&q=80" alt="Woven baskets" />
           <div class="hg-label">Crafts</div>
         </div>
         <div class="hg-img hg-sm">
@@ -105,8 +105,16 @@
   <h2 class="section-heading">Shop by category</h2>
   <div class="feat-cats-row">
     <div class="feat-cat" *ngFor="let c of featuredCats" (click)="activeCategory = c.key; scrollToProducts()">
-      <div class="feat-cat-img">
-        <img [src]="c.img" [alt]="c.label" />
+      <div class="feat-cat-img" [class.is-collage]="c.key === 'all'">
+        <ng-container *ngIf="c.key === 'all'; else singleImg">
+          <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=200&q=80" alt="Jewellery" />
+          <img src="https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&q=80" alt="Textiles" />
+          <img src="https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&q=80" alt="Food" />
+          <img src="https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&q=80" alt="Crafts" />
+        </ng-container>
+        <ng-template #singleImg>
+          <img [src]="c.img" [alt]="c.label" />
+        </ng-template>
       </div>
       <span class="feat-cat-label">{{ c.label }}</span>
     </div>
@@ -418,10 +426,10 @@
         </div>
 
         <div class="mf-group">
-          <label>Create a private PIN (4–6 digits)</label>
-          <input [(ngModel)]="sellerPin" type="password" inputmode="numeric"
-            placeholder="4–6 digits" maxlength="6" />
-          <div class="mf-hint">You'll use this PIN to log in. Write it down somewhere safe.</div>
+          <label>Create a password</label>
+          <input [(ngModel)]="sellerPin" type="password"
+            placeholder="Minimum 8 characters" autocomplete="new-password" />
+          <div class="mf-hint">You'll use this password to sign in — it also opens your safety space quickly, so choose one you can type from memory.</div>
         </div>
 
         <div class="mf-group">

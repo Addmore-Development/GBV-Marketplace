@@ -94,7 +94,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     { key: 'textiles',  label: 'Clothing & Textiles',     img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80' },
     { key: 'food',      label: 'Food & Jams',             img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&q=80' },
     { key: 'crafts',    label: 'Art & Crafts',            img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
-    { key: 'all',       label: 'Shop All',                img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=400&q=80' },
+    { key: 'all',       label: 'Shop All' },
   ];
 
   readonly staticProducts: Product[] = [
@@ -173,7 +173,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       centre_name: 'Khayelitsha Hub', category: 'food', price: 89,
       survivor_income: 62.3, centre_funding: 26.7, platform_fee: 4.45,
       stock: 22, rating: 4.7, reviews: 19, sold: 48,
-      img: 'https://images.unsplash.com/photo-1622428051717-dcd7a1af09a5?w=600&q=80',
+      img: 'https://images.unsplash.com/photo-1683944433023-027a3f443ae4?w=600&q=80',
       description: 'All-natural exfoliating scrub made with South African rooibos, raw honey, and brown sugar.',
       story: '"I started mixing scrubs during lockdown. Now it pays school fees." — Amahle',
       seller_type: 'survivor'
@@ -193,7 +193,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       centre_name: 'Ubuntu Youth Programme', category: 'crafts', price: 280,
       survivor_income: 196, centre_funding: 84, platform_fee: 14,
       stock: 6, rating: 4.8, reviews: 12, sold: 29,
-      img: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=600&q=80',
+      img: 'https://images.unsplash.com/photo-1695742968499-4555230b1d3f?w=600&q=80',
       description: 'Intricate wire bicycle sculpture, approx. 25cm.',
       story: '"I started making wire toys at 8 to sell at robots. Now I sell internationally." — Lebo, 22',
       seller_type: 'youth'
@@ -213,7 +213,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       centre_name: 'Empilweni Centre', category: 'crafts', price: 295,
       survivor_income: 206.5, centre_funding: 88.5, platform_fee: 14.75,
       stock: 9, rating: 4.9, reviews: 24, sold: 58,
-      img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=600&q=80',
+      img: 'https://images.unsplash.com/photo-1455669175216-9017c9b02fc6?w=600&q=80',
       description: 'Large hand-woven sisal basket with leather handles.',
       story: '"My mother taught me this weave. I am teaching my daughter. Three generations." — Nomvula',
       badge: 'bestseller', seller_type: 'survivor'
@@ -273,7 +273,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
             initials: u.alias.slice(0,2).toUpperCase()
           };
         } else {
-          // seller logged out � only clear if no buyer session active
+          // seller logged out � only clear if no buyer session active
           if (!this.authService.currentUser) this.currentUser = null;
         }
       });
@@ -319,6 +319,10 @@ formatPrice(p: number | string): string {
   }
 
   openProduct(p: Product): void {
+    if (!this.currentUser) {
+      this.showAuthModal('login');
+      return;
+    }
     this.selectedProduct = p;
     this.selectedQty = 1;
   }
@@ -437,7 +441,7 @@ formatPrice(p: number | string): string {
     return this.sellerIdVerified &&
       this.sellerFullName.trim().length > 0 &&
       this.sellerEmail.trim().length > 0 &&
-      /^\d{4,6}$/.test(this.sellerPin) &&
+      /^.{8,}$/.test(this.sellerPin) &&
       this.sellerCentreId.length > 0 &&
       !this.sellerIsLoading;
   }
@@ -448,7 +452,7 @@ formatPrice(p: number | string): string {
 
     const nameParts = this.sellerFullName.trim().split(/\s+/);
     const real_name = nameParts[0];
-    const real_surname = nameParts.slice(1).join(' ') || '';
+    const real_surname = nameParts.slice(1).join(' ') || nameParts[0];
     let alias = this.sellerEmail.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
     if (!alias) alias = `maker_${Date.now()}`;
 
@@ -517,7 +521,50 @@ formatPrice(p: number | string): string {
   doLogin(): void {
     this.authError = '';
     if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
-    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole as 'buyer' | 'seller' | 'centre');
+
+    if (this.loginRole === 'seller') {
+      // Seller uses email + PIN via real API
+      this.http.post<any>('http://localhost:3000/api/sellers/login', {
+        email: this.loginEmail, pin: this.loginPassword
+      }).subscribe({
+        next: (res) => {
+          localStorage.setItem('sellerId', res.id);
+          localStorage.setItem('sellerAlias', res.alias);
+          localStorage.setItem('sellerEmail', res.email);
+          localStorage.setItem('hiddenPin', this.loginPassword);
+          localStorage.setItem('hiddenLayerAccess', 'false');
+          this.authModal = '';
+          this.router.navigate(['/seller/dashboard']);
+        },
+        error: (err) => { this.authError = err.error?.error || 'Invalid email or PIN.'; }
+      });
+      return;
+    }
+
+    if (this.loginRole === 'centre') {
+      this.http.post<any>('http://localhost:3000/api/centres/login', {
+        email: this.loginEmail, password: this.loginPassword
+      }).subscribe({
+        next: (res) => {
+          localStorage.setItem('centreId', res.centre_id);
+          localStorage.setItem('centreName', res.centre_name);
+          localStorage.setItem('centreEmail', res.contact_email);
+          this.authModal = '';
+          this.router.navigate(['/centre-dashboard']);
+        },
+        error: (err) => { this.authError = err.error?.error || 'Invalid email or password.'; }
+      });
+      return;
+    }
+
+    if (this.loginRole === 'admin') {
+      this.authModal = '';
+      this.router.navigate(['/admin']);
+      return;
+    }
+
+    // Buyer — local auth service
+    const ok = this.authService.login(this.loginEmail, this.loginPassword, 'buyer');
     if (!ok) this.authError = 'Invalid credentials.';
     else this.authModal = '';
   }

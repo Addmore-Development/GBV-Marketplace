@@ -55,24 +55,23 @@
         >
       </div>
 
-      <!-- PIN -->
+      <!-- Password -->
       <div class="form-group">
-        <label>Create a private PIN (4–6 digits)</label>
+        <label>Create a password</label>
         <input
           type="password"
           [(ngModel)]="pin"
-          placeholder="e.g. 4892"
-          maxlength="6"
-          autocomplete="off"
+          placeholder="Minimum 8 characters"
+          autocomplete="new-password"
         >
-        <small>You'll use this PIN to log in. Write it down somewhere safe.</small>
+        <small>You'll use this password to sign in — it also opens your safety space quickly, so choose one you can type from memory.</small>
       </div>
 
       <!-- Centre Selection — proper dropdown -->
       <div class="form-group">
         <label>Nearest Amani workshop *</label>
         <select [(ngModel)]="selectedCentreId">
-          <option value="">Select a centre…</option>
+          <option value="">{{ centresLoading ? 'Loading centres…' : 'Select a centre…' }}</option>
           <option *ngFor="let c of centres" [value]="c.id">
             {{ c.name }} — {{ c.city }}, {{ c.province }}
           </option>

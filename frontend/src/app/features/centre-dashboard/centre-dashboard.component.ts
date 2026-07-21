@@ -1,10 +1,22 @@
 // ============================================================
 // frontend/src/app/features/centre-dashboard/centre-dashboard.component.ts
 // ============================================================
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+
+interface SosAlert {
+  id: string;
+  seller_id: string;
+  seller_alias: string;
+  seller_email: string;
+  location_hint: string;
+  recording_path: string | null;
+  recording_uploaded_at: string | null;
+  created_at: string;
+}
 
 interface DashboardStats {
   totalDonations: number;
@@ -87,10 +99,12 @@ interface Need {
     <nav class="sb-nav">
       <button class="sb-link" *ngFor="let item of navItems"
         [class.active]="activeTab === item.key"
+        [class.sos-link]="item.key === 'sos' && sosAlerts.length > 0"
         (click)="activeTab = item.key">
         <span class="sb-icon">{{ item.icon }}</span>
         <span class="sb-label" *ngIf="!sidebarCollapsed">{{ item.label }}</span>
-        <span class="sb-badge" *ngIf="item.badge && !sidebarCollapsed">{{ item.badge }}</span>
+        <span class="sb-badge sos-badge" *ngIf="item.key === 'sos' && sosAlerts.length > 0 && !sidebarCollapsed">{{ sosAlerts.length }}</span>
+        <span class="sb-badge" *ngIf="item.key !== 'sos' && item.badge && !sidebarCollapsed">{{ item.badge }}</span>
       </button>
     </nav>
 
@@ -120,6 +134,11 @@ interface Need {
           <span class="tb-username">{{ centreManagerName }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- SOS BANNER — visible on every tab while an alert is unresolved -->
+    <div class="sos-banner" *ngIf="sosAlerts.length > 0" (click)="activeTab = 'sos'">
+      🚨 <strong>{{ sosAlerts.length }} active SOS alert{{ sosAlerts.length > 1 ? 's' : '' }}</strong> from sellers at your centre — tap to view
     </div>
 
     <!-- ════════════════════════════════════
@@ -243,6 +262,54 @@ interface Need {
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         TAB: SOS ALERTS
+    ════════════════════════════════════ -->
+    <div class="tab-content" *ngIf="activeTab === 'sos'">
+
+      <div class="sos-intro">
+        <p>These are silent alarms triggered by sellers at your centre. Each alert includes the seller's last known location and a 1-minute audio recording captured automatically the moment they hit the button. Please follow your centre's emergency protocol for any active alert.</p>
+      </div>
+
+      <div class="sos-empty" *ngIf="!loadingAlerts && sosAlerts.length === 0">
+        <div class="sos-empty-icon">🕊️</div>
+        <p>No SOS alerts. This page updates automatically when a seller triggers one.</p>
+      </div>
+
+      <div class="sos-loading" *ngIf="loadingAlerts">Loading alerts…</div>
+
+      <div class="sos-list" *ngIf="!loadingAlerts && sosAlerts.length > 0">
+        <div class="sos-card" *ngFor="let a of sosAlerts">
+          <div class="sos-card-header">
+            <span class="sos-pulse">🚨</span>
+            <div class="sos-card-title">
+              <div class="sos-seller">{{ a.seller_alias || 'Seller' }}</div>
+              <div class="sos-time">{{ a.created_at | date:'medium' }}</div>
+            </div>
+          </div>
+
+          <div class="sos-detail-row" *ngIf="a.location_hint">
+            <span class="sos-detail-label">📍 Location:</span>
+            <a *ngIf="isCoords(a.location_hint)" [href]="'https://www.google.com/maps?q=' + a.location_hint" target="_blank" rel="noopener">
+              {{ a.location_hint }} — open in Maps →
+            </a>
+            <span *ngIf="!isCoords(a.location_hint)">{{ a.location_hint }}</span>
+          </div>
+
+          <div class="sos-detail-row">
+            <span class="sos-detail-label">🎙️ Recording:</span>
+            <span *ngIf="!a.recording_path" class="sos-recording-pending">Not yet received — still uploading or unavailable on the seller's device.</span>
+            <audio *ngIf="a.recording_path" controls [src]="mediaUrl(a.recording_path)"></audio>
+          </div>
+
+          <div class="sos-actions">
+            <a class="sos-action-btn" href="tel:10111">📞 Call SAPS (10111)</a>
+            <a class="sos-action-btn" href="tel:0800428428">☎️ GBV Command Centre</a>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -862,9 +929,55 @@ interface Need {
     .impact-story-form { background: var(--white); border: 1px solid var(--border); border-radius: 13px; padding: 24px; max-width: 620px; h4 { font-size: .96rem; font-weight: 700; color: var(--text-dark); margin: 0 0 6px; } }
     .isf-sub { font-size: .82rem; color: var(--text-muted); margin-bottom: 18px; }
 
+    /* SOS Alerts */
+    .sos-link.sos-link { background: rgba(139,38,53,.18); color: #FFD9D9; }
+    .sos-badge { background: var(--red); color: white; font-weight: 800; animation: sosPulse 1.4s infinite; }
+    @keyframes sosPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(139,38,53,.55); } 50% { box-shadow: 0 0 0 5px rgba(139,38,53,0); } }
+    .sos-banner {
+      background: var(--red); color: white; font-size: .86rem; font-weight: 700;
+      padding: 12px 20px; border-radius: 10px; margin: 0 0 18px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px; animation: sosPulse 1.4s infinite;
+      &:hover { background: #7a2130; }
+    }
+    .sos-intro p { font-size: .86rem; color: var(--text-mid); max-width: 640px; margin: 0 0 20px; line-height: 1.6; }
+    .sos-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .sos-empty-icon { font-size: 2rem; margin-bottom: 10px; }
+    .sos-loading { padding: 40px; text-align: center; color: var(--text-muted); font-size: .86rem; }
+    .sos-list { display: flex; flex-direction: column; gap: 14px; max-width: 700px; }
+    .sos-card { background: var(--white); border: 1.5px solid var(--red); border-radius: 13px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(139,38,53,.08); }
+    .sos-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .sos-pulse { font-size: 1.3rem; animation: sosPulse 1.4s infinite; border-radius: 50%; }
+    .sos-card-title { flex: 1; }
+    .sos-seller { font-size: .94rem; font-weight: 700; color: var(--text-dark); }
+    .sos-time { font-size: .74rem; color: var(--text-muted); }
+    .sos-detail-row { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--text-mid); margin-bottom: 10px; flex-wrap: wrap; }
+    .sos-detail-label { font-weight: 700; color: var(--text-dark); flex-shrink: 0; }
+    .sos-detail-row a { color: var(--red); font-weight: 600; text-decoration: none; &:hover { text-decoration: underline; } }
+    .sos-recording-pending { color: var(--text-muted); font-style: italic; }
+    .sos-detail-row audio { flex: 1; min-width: 220px; height: 34px; }
+    .sos-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .sos-action-btn {
+      background: var(--red); color: white; text-decoration: none; padding: 8px 14px;
+      border-radius: 8px; font-size: .78rem; font-weight: 700;
+      &:hover { background: #7a2130; }
+    }
+
     /* Math shortcut */
     @media (max-width: 900px) {
-      .sidebar { display: none; }
+      .cd-page { flex-direction: column; }
+      .sidebar {
+        width: 100%; min-height: unset; height: auto; position: relative;
+        flex-direction: row; flex-wrap: wrap; align-items: center;
+        &.collapsed { width: 100%; }
+      }
+      .sb-header { border-bottom: none; padding: 10px 12px; flex-shrink: 0; }
+      .sb-status { display: none !important; }
+      .sb-nav {
+        flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
+        -webkit-overflow-scrolling: touch; padding: 6px 8px; gap: 4px;
+      }
+      .sb-link { white-space: nowrap; flex-shrink: 0; }
+      .sb-footer { display: none !important; }
       .overview-grid { grid-template-columns: 1fr; }
       .ov-card.wide { grid-column: span 1; }
       .donations-summary, .orders-summary { grid-template-columns: repeat(2, 1fr); }
@@ -873,7 +986,14 @@ interface Need {
     }
   `]
 })
-export class CentreDashboardComponent implements OnInit {
+export class CentreDashboardComponent implements OnInit, OnDestroy {
+  private readonly API = 'http://localhost:3000/api/sellers';
+  private readonly MEDIA_BASE = 'http://localhost:3000';
+  private centreId = '';
+  private pollHandle: any;
+
+  constructor(private http: HttpClient) {}
+
   sidebarCollapsed = false;
   activeTab = 'overview';
   hasAlert = true;
@@ -906,8 +1026,12 @@ export class CentreDashboardComponent implements OnInit {
 
   newNeed: any = { title: '', category: 'goods', urgency: 'moderate', description: '' };
 
+  sosAlerts: SosAlert[] = [];
+  loadingAlerts = false;
+
   readonly navItems = [
     { key: 'overview',   icon: '🏠', label: 'Overview',        badge: null },
+    { key: 'sos',        icon: '🚨', label: 'SOS Alerts',      badge: null },
     { key: 'donations',  icon: '💰', label: 'Donations',       badge: null },
     { key: 'volunteers', icon: '🤝', label: 'Volunteers',      badge: 3 },
     { key: 'orders',     icon: '🛒', label: 'Marketplace',     badge: null },
@@ -1038,6 +1162,34 @@ export class CentreDashboardComponent implements OnInit {
       // Newly registered centres are pending verification
       this.verificationStatus = 'pending';
     }
+
+    // ── SOS alerts: load now, then poll for new ones ──────────
+    this.centreId = localStorage.getItem('centreId') || '';
+    if (this.centreId) {
+      this.loadSosAlerts();
+      this.pollHandle = setInterval(() => this.loadSosAlerts(), 15000);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollHandle) clearInterval(this.pollHandle);
+  }
+
+  loadSosAlerts(): void {
+    if (!this.centreId) return;
+    this.loadingAlerts = this.sosAlerts.length === 0; // only show spinner on first load
+    this.http.get<SosAlert[]>(`${this.API}/emergency/centre/${this.centreId}`).subscribe({
+      next: (alerts) => { this.sosAlerts = alerts; this.loadingAlerts = false; },
+      error: () => { this.loadingAlerts = false; }
+    });
+  }
+
+  isCoords(hint: string): boolean {
+    return /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test((hint || '').trim());
+  }
+
+  mediaUrl(path: string): string {
+    return path.startsWith('http') ? path : `${this.MEDIA_BASE}${path}`;
   }
 
   formatK(n: number): string {

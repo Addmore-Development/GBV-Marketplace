@@ -15,8 +15,12 @@ export interface User {
 export class AuthService {
   private userSubject = new BehaviorSubject<User | null>(null);
   user$ = this.userSubject.asObservable();
+  // Lazy reference to avoid circular DI — set by CartService
+  private _cartClear?: () => void;
 
   get currentUser(): User | null { return this.userSubject.value; }
+
+  registerCartClear(fn: () => void): void { this._cartClear = fn; }
 
   login(email: string, password: string, role: 'buyer' | 'seller' | 'centre'): boolean {
     if (!email || !password) return false;
@@ -35,5 +39,9 @@ export class AuthService {
     return true;
   }
 
-  logout(): void { this.userSubject.next(null); }
+  logout(): void {
+    this.userSubject.next(null);
+    if (this._cartClear) this._cartClear();
+    localStorage.removeItem('amani_cart');
+  }
 }

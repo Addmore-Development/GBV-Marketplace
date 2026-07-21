@@ -22,6 +22,8 @@ import {
   getDonations,
   getEmergencyAlerts,
   getEmergencyStats,
+  getLoginActivity,
+  getSales,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -69,5 +71,11 @@ router.get('/donations', requireAdmin, getDonations);
 // ── Emergency / SOS alerts ────────────────────────────────
 router.get('/emergency',       requireAdmin, getEmergencyAlerts);
 router.get('/emergency/stats', requireAdmin, getEmergencyStats);
+
+// ── Login / Logout Activity ────────────────────────────────
+router.get('/activity', requireAdmin, getLoginActivity);
+
+// ── Sales ─────────────────────────────────────────────────
+router.get('/sales', requireAdmin, getSales);
 
 export default router;

@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../index';
+import { logActivity, getClientIp } from '../utils/activityLog';
 
 import multer from 'multer';
 import path from 'path';
@@ -293,11 +294,22 @@ export const loginSeller = async (req: Request, res: Response) => {
         if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
 
         const { hidden_pin_hash, ...safe } = seller;
+
+        await logActivity('seller', seller.id, seller.alias, seller.email, 'login', getClientIp(req));
+
         res.json({ ...safe });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
     }
+};
+
+// ── LOGOUT ────────────────────────────────────────────────────
+export const logoutSeller = async (req: Request, res: Response) => {
+    const { seller_id, alias, email } = req.body || {};
+    if (!seller_id) return res.status(400).json({ error: 'seller_id required' });
+    await logActivity('seller', seller_id, alias || null, email || null, 'logout', getClientIp(req));
+    res.json({ ok: true });
 };
 
 // ── GET FULL DASHBOARD PROFILE ───────────────────────────────

@@ -47,6 +47,15 @@ export class SellerAuthService {
   }
 
   logout(): void {
+    const id = localStorage.getItem('sellerId');
+    const user = this.userSubject.value;
+    if (id) {
+      this.http.post('http://localhost:3000/api/sellers/logout', {
+        seller_id: id,
+        alias: user?.alias,
+        email: user?.email,
+      }).subscribe({ error: () => {} });
+    }
     localStorage.removeItem('sellerUser');
     localStorage.removeItem('sellerId');
     localStorage.removeItem('hiddenPin');

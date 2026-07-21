@@ -4,7 +4,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 
 interface SosAlert {
@@ -977,7 +977,16 @@ interface Need {
         -webkit-overflow-scrolling: touch; padding: 6px 8px; gap: 4px;
       }
       .sb-link { white-space: nowrap; flex-shrink: 0; }
-      .sb-footer { display: none !important; }
+      .sb-footer {
+        display: flex !important;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        border-top: none;
+        padding: 8px 12px;
+        margin-left: auto;
+        gap: 6px;
+      }
+      .sb-footer-link, .sb-signout { white-space: nowrap; padding: 6px 8px; font-size: .7rem; }
       .overview-grid { grid-template-columns: 1fr; }
       .ov-card.wide { grid-column: span 1; }
       .donations-summary, .orders-summary { grid-template-columns: repeat(2, 1fr); }
@@ -992,7 +1001,7 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   private centreId = '';
   private pollHandle: any;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private router: Router) {}
 
   sidebarCollapsed = false;
   activeTab = 'overview';
@@ -1214,5 +1223,21 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   saveProfile(): void { this.profileSaved = true; setTimeout(() => this.profileSaved = false, 3000); }
   submitImpactReport(): void { this.reportSubmitted = true; setTimeout(() => this.reportSubmitted = false, 4000); }
   exportDonations(): void { alert('CSV export would download here.'); }
-  signOut(): void { alert('Signed out.'); }
+  signOut(): void {
+    const centreId = localStorage.getItem('centreId') || this.centreId;
+    const centreName = localStorage.getItem('centreName');
+    const centreEmail = localStorage.getItem('centreEmail');
+    if (centreId) {
+      this.http.post('http://localhost:3000/api/centres/logout', {
+        centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
+      }).subscribe({ error: () => {} });
+    }
+    localStorage.removeItem('centreId'); localStorage.removeItem('centreName');
+    localStorage.removeItem('centreType'); localStorage.removeItem('centreEmail');
+    localStorage.removeItem('centreManagerName'); localStorage.removeItem('centreCity');
+    localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
+    localStorage.removeItem('centreNpoNumber'); localStorage.removeItem('centreDescription');
+    localStorage.removeItem('centreMission'); localStorage.removeItem('centreWebsite');
+    this.router.navigate(['/marketplace']);
+  }
 }

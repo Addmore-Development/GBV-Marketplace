@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../index';
+import { logActivity, getClientIp } from '../utils/activityLog';
 
 // ─── REGISTER A CENTRE ──────────────────────────────────────
 export const registerCentre = async (req: Request, res: Response) => {
@@ -240,6 +241,9 @@ export const loginCentre = async (req: Request, res: Response) => {
     const centre = result.rows[0];
     const isValid = await bcrypt.compare(password, centre.password_hash);
     if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
+
+    await logActivity('centre', centre.id, centre.centre_name, centre.contact_email, 'login', getClientIp(req));
+
     return res.json({
       centre_id: centre.id,
       centre_name: centre.centre_name,
@@ -256,6 +260,14 @@ export const loginCentre = async (req: Request, res: Response) => {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
+};
+
+// ─── LOGOUT ───────────────────────────────────────────────────
+export const logoutCentre = async (req: Request, res: Response) => {
+  const { centre_id, centre_name, contact_email } = req.body || {};
+  if (!centre_id) return res.status(400).json({ error: 'centre_id required' });
+  await logActivity('centre', centre_id, centre_name || null, contact_email || null, 'logout', getClientIp(req));
+  return res.json({ ok: true });
 };
 
 // ─── GET ALL CENTRES (public listing) ────────────────────────

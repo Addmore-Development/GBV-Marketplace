@@ -28,7 +28,7 @@
       </a>
       <ng-container *ngIf="!currentUser">
         <button class="btn-ghost" (click)="showAuthModal('login')">Sign In</button>
-        <button class="btn-solid" (click)="showAuthModal('register')">Register</button>
+        <button class="btn-solid nav-register-btn" (click)="showAuthModal('register')">Register</button>
       </ng-container>
       <div class="user-chip" *ngIf="currentUser" (click)="showAuthModal('profile')">
         <div class="user-avatar">{{ currentUser.initials }}</div>
@@ -37,33 +37,13 @@
       <button class="btn-ghost small" *ngIf="currentUser" (click)="logout()">Sign out</button>
     </div>
   </div>
-
-  <!-- Category nav strip (Etsy-style) -->
-  <div class="cat-strip">
-    <div class="cat-strip-inner">
-      <button class="cat-nav-btn" *ngFor="let c of categories"
-        [class.active]="activeCategory === c.key"
-        (click)="activeCategory = c.key">
-        {{ c.label }}
-      </button>
-    </div>
-  </div>
 </nav>
 
-<!-- ── HERO (with background image + announce bar overlay) ── -->
+<!-- ── HERO (with background image) ── -->
 <section class="hero">
   <!-- Background image layer -->
   <div class="hero-bg"></div>
   <div class="hero-bg-overlay"></div>
-
-  <!-- Announce bar inside hero -->
-  <div class="announce-bar-hero">
-    <span>Free delivery on orders over R500</span>
-    <span class="ab-dot">·</span>
-    <span>70% of every sale goes directly to the maker</span>
-    <span class="ab-dot">·</span>
-    <span>Anonymous shipping via verified Centre Hub</span>
-  </div>
 
   <div class="hero-inner">
     <!-- Left: text -->
@@ -99,6 +79,15 @@
     </div>
   </div>
 </section>
+
+<!-- ── ANNOUNCE BAR (before Shop by category) ── -->
+<div class="announce-bar">
+  <span>Free delivery on orders over R500</span>
+  <span class="ab-dot">·</span>
+  <span>70% of every sale goes directly to the maker</span>
+  <span class="ab-dot">·</span>
+  <span>Anonymous shipping via verified Centre Hub</span>
+</div>
 
 <!-- ── FEATURED CATEGORIES (Etsy circle links) ── -->
 <section class="featured-cats">

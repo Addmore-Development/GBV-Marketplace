@@ -55,9 +55,16 @@
         <span class="nav-icon">🚨</span> Safety Alerts
         <span class="badge-count danger" *ngIf="emergencyStats.alertsLast7Days > 0">{{ emergencyStats.alertsLast7Days }}</span>
       </button>
+      <button [class.active]="activeTab === 'activity'" (click)="activeTab = 'activity'">
+        <span class="nav-icon">🕒</span> Login Activity
+      </button>
+      <button [class.active]="activeTab === 'sales'" (click)="activeTab = 'sales'">
+        <span class="nav-icon">💳</span> Sales
+      </button>
     </nav>
 
     <div class="sb-footer">
+      <a routerLink="/marketplace" class="sb-return">↩ Return to Marketplace</a>
       <button class="sb-logout" (click)="logout()">Sign out</button>
     </div>
   </aside>
@@ -467,6 +474,116 @@
             <a class="sos-action-btn" href="tel:0800428428">☎️ GBV Command Centre</a>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ── LOGIN ACTIVITY ──────────────────────────────────── -->
+    <section *ngIf="activeTab === 'activity'" class="tab-content">
+      <div class="tab-header">
+        <h1>Login activity</h1>
+        <p class="tab-sub">Every centre and seller login/logout, most recent first.</p>
+      </div>
+
+      <div class="table-controls">
+        <div class="filter-tabs">
+          <button [class.active]="activityFilter === 'all'"    (click)="activityFilter = 'all'">All</button>
+          <button [class.active]="activityFilter === 'centre'" (click)="activityFilter = 'centre'">Centres</button>
+          <button [class.active]="activityFilter === 'seller'" (click)="activityFilter = 'seller'">Sellers</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Type</th><th>Name</th><th>Email</th><th>Action</th><th>IP</th><th>When</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let a of filteredActivity">
+              <td><span class="badge" [ngClass]="a.user_type === 'centre' ? 'badge-green' : 'badge-brown'">{{ a.user_type }}</span></td>
+              <td><strong>{{ a.display_name || '—' }}</strong></td>
+              <td class="td-email">{{ a.email || '—' }}</td>
+              <td><span class="badge" [ngClass]="a.action === 'login' ? 'badge-green' : 'badge-amber'">{{ a.action }}</span></td>
+              <td>{{ a.ip_address || '—' }}</td>
+              <td>{{ formatDate(a.created_at) }}</td>
+            </tr>
+            <tr *ngIf="!loadingActivity && filteredActivity.length === 0">
+              <td colspan="6" class="td-empty">No login activity recorded yet.</td>
+            </tr>
+            <tr *ngIf="loadingActivity">
+              <td colspan="6" class="td-empty">Loading…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── SALES ───────────────────────────────────────────── -->
+    <section *ngIf="activeTab === 'sales'" class="tab-content">
+      <div class="tab-header">
+        <h1>Sales</h1>
+        <p class="tab-sub">Every sale made on the marketplace, with the survivor / centre / platform split per item.</p>
+      </div>
+
+      <div class="donation-summary">
+        <div class="don-stat">
+          <div class="don-val">{{ stats.totalOrders }}</div>
+          <div class="don-label">Total orders</div>
+        </div>
+        <div class="don-stat">
+          <div class="don-val">{{ formatCurrency(stats.totalSalesAmount) }}</div>
+          <div class="don-label">Seller earnings</div>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th></th><th>Buyer</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let s of sales">
+              <tr (click)="toggleSale(s.id)" class="sale-row">
+                <td>{{ expandedSaleId === s.id ? '▾' : '▸' }}</td>
+                <td>
+                  <div><strong>{{ s.buyer_name }}</strong></div>
+                  <div class="td-email">{{ s.buyer_email }}</div>
+                </td>
+                <td class="td-amount">{{ formatCurrency(s.total) }}</td>
+                <td>{{ s.payment_method || '—' }} <span *ngIf="s.payment_confirmed">✓</span></td>
+                <td><span class="badge" [ngClass]="statusClass(s.status)">{{ s.status }}</span></td>
+                <td>{{ formatDate(s.created_at) }}</td>
+              </tr>
+              <tr *ngIf="expandedSaleId === s.id" class="sale-detail-row">
+                <td colspan="6">
+                  <table class="data-table sale-items">
+                    <thead>
+                      <tr><th>Product</th><th>Seller</th><th>Centre</th><th>Qty</th><th>Unit</th><th>Total</th><th>Survivor</th><th>Centre split</th><th>Platform</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let it of s.items">
+                        <td>{{ it.product_title }}</td>
+                        <td>{{ it.seller_alias }}</td>
+                        <td>{{ it.centre_name }}</td>
+                        <td>{{ it.quantity }}</td>
+                        <td>{{ formatCurrency(it.unit_price) }}</td>
+                        <td>{{ formatCurrency(it.total_price) }}</td>
+                        <td>{{ formatCurrency(it.survivor_amount) }}</td>
+                        <td>{{ formatCurrency(it.centre_amount) }}</td>
+                        <td>{{ formatCurrency(it.platform_amount) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </ng-container>
+            <tr *ngIf="!loadingSales && sales.length === 0">
+              <td colspan="6" class="td-empty">No sales recorded yet.</td>
+            </tr>
+            <tr *ngIf="loadingSales">
+              <td colspan="6" class="td-empty">Loading…</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

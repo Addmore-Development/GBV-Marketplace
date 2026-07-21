@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 
-type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety';
+type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety' | 'activity' | 'sales';
 
 interface AdminStats {
   totalSellers: number;
@@ -104,6 +104,44 @@ interface EmergencyStats {
   byCentre: { centreName: string; count: number }[];
 }
 
+interface ActivityRow {
+  id: string;
+  user_type: 'centre' | 'seller';
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
+  action: 'login' | 'logout';
+  ip_address: string | null;
+  created_at: string;
+}
+
+interface OrderItemRow {
+  product_title: string;
+  seller_alias: string;
+  centre_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  survivor_amount: number;
+  centre_amount: number;
+  platform_amount: number;
+}
+
+interface SaleRow {
+  id: string;
+  buyer_name: string;
+  buyer_email: string;
+  subtotal: number;
+  platform_fee_total: number;
+  delivery_fee: number;
+  total: number;
+  payment_method: string | null;
+  payment_confirmed: boolean;
+  status: string;
+  created_at: string;
+  items: OrderItemRow[];
+}
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -148,6 +186,16 @@ export class AdminComponent implements OnInit {
   loadingEmergency = false;
   private readonly MEDIA_BASE = 'http://localhost:3000';
   private emergencyPollHandle: any = null;
+
+  // ── Login/Logout Activity ────────────────────────────────
+  activity: ActivityRow[] = [];
+  activityFilter: 'all' | 'centre' | 'seller' = 'all';
+  loadingActivity = false;
+
+  // ── Sales ─────────────────────────────────────────────────
+  sales: SaleRow[] = [];
+  expandedSaleId: string | null = null;
+  loadingSales = false;
 
   // ── Filters ───────────────────────────────────────────────
   sellerFilter = 'all';
@@ -221,6 +269,8 @@ export class AdminComponent implements OnInit {
     this.loadDonations();
     this.loadEmergencyAlerts();
     this.loadEmergencyStats();
+    this.loadActivity();
+    this.loadSales();
     // Poll for new SOS alerts — a survivor triggering the panic button
     // needs the admin view to update without a manual refresh.
     if (!this.emergencyPollHandle) {
@@ -305,6 +355,32 @@ export class AdminComponent implements OnInit {
       next: (d) => { this.donations = d; this.cdr.detectChanges(); },
       error: () => {}
     });
+  }
+
+  loadActivity(): void {
+    this.loadingActivity = this.activity.length === 0;
+    this.http.get<ActivityRow[]>(`${this.API}/activity`, this.adminHeaders).subscribe({
+      next: (d) => { this.activity = d; this.loadingActivity = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingActivity = false; }
+    });
+  }
+
+  loadSales(): void {
+    this.loadingSales = this.sales.length === 0;
+    this.http.get<SaleRow[]>(`${this.API}/sales`, this.adminHeaders).subscribe({
+      next: (d) => { this.sales = d; this.loadingSales = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingSales = false; }
+    });
+  }
+
+  toggleSale(id: string): void {
+    this.expandedSaleId = this.expandedSaleId === id ? null : id;
+  }
+
+  get filteredActivity(): ActivityRow[] {
+    let list = this.activity;
+    if (this.activityFilter !== 'all') list = list.filter(a => a.user_type === this.activityFilter);
+    return list;
   }
 
   // ── Seller actions ────────────────────────────────────────

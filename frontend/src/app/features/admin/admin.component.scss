@@ -156,6 +156,25 @@
   .sb-footer {
     padding: 16px 20px;
     border-top: 1px solid rgba(255,255,255,.12);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .sb-return {
+      display: block;
+      text-align: center;
+      width: 100%;
+      padding: 9px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 8px;
+      color: rgba(255,255,255,.8);
+      font-size: .85rem;
+      text-decoration: none;
+      font-family: 'DM Sans', sans-serif;
+      box-sizing: border-box;
+      &:hover { background: rgba(255,255,255,.1); }
+    }
 
     .sb-logout {
       width: 100%;
@@ -796,4 +815,15 @@
   .stats-grid { grid-template-columns: 1fr !important; }
   .tab-content { padding: 18px 14px 32px; }
   .tab-header h1 { font-size: 1.4rem; }
+}
+
+/* ── Sales tab ───────────────────────────────────────────── */
+.sale-row { cursor: pointer; }
+.sale-row:hover { background: var(--cream, #FAF6EF); }
+.sale-detail-row td { padding: 0 !important; background: var(--cream, #FAF6EF); }
+.sale-items {
+  margin: 12px 16px 16px;
+  width: calc(100% - 32px);
+  font-size: .82rem;
+  th, td { padding: 6px 10px; }
 }

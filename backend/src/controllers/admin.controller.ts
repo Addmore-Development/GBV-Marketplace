@@ -9,11 +9,12 @@ import { v4 as uuidv4 } from 'uuid';
 // ── Stats ──────────────────────────────────────────────────
 export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [sellers, centres, buyers, donations] = await Promise.all([
+    const [sellers, centres, buyers, donations, orders] = await Promise.all([
       pool.query('SELECT verification_status, total_earned FROM sellers'),
       pool.query('SELECT status FROM centres'),
       pool.query("SELECT id FROM users WHERE role = $1", ['buyer']),
       pool.query('SELECT amount FROM donations'),
+      pool.query('SELECT id FROM orders'),
     ]);
 
     const totalDonationAmount = (donations.rows as { amount: string }[])
@@ -208,6 +209,61 @@ export const getDonations = async (req: Request, res: Response): Promise<void> =
     );
     res.json(result.rows);
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ── Login / Logout Activity ──────────────────────────────────
+// Every centre & seller login/logout, most recent first, so admin
+// can see who is signing in/out of the platform and when.
+export const getLoginActivity = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limit = Math.min(parseInt((req.query['limit'] as string) || '200', 10) || 200, 500);
+    const result = await pool.query(
+      `SELECT id, user_type, user_id, display_name, email, action, ip_address, created_at
+       FROM login_activity
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[Admin] login activity error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ── Sales / Orders ────────────────────────────────────────────
+// Every sale made on the marketplace, with per-order line items
+// so admin can see exactly what sold, to whom, and the impact split.
+export const getSales = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const orders = await pool.query(
+      `SELECT o.id, o.buyer_name, o.buyer_email, o.subtotal, o.platform_fee_total,
+              o.delivery_fee, o.total, o.payment_method, o.payment_confirmed,
+              o.status, o.created_at,
+              COALESCE(json_agg(
+                json_build_object(
+                  'product_title', oi.product_title,
+                  'seller_alias', oi.seller_alias,
+                  'centre_name', oi.centre_name,
+                  'quantity', oi.quantity,
+                  'unit_price', oi.unit_price,
+                  'total_price', oi.total_price,
+                  'survivor_amount', oi.survivor_amount,
+                  'centre_amount', oi.centre_amount,
+                  'platform_amount', oi.platform_amount
+                )
+              ) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
+       FROM orders o
+       LEFT JOIN order_items oi ON oi.order_id = o.id
+       GROUP BY o.id
+       ORDER BY o.created_at DESC
+       LIMIT 500`
+    );
+    res.json(orders.rows);
+  } catch (err: any) {
+    console.error('[Admin] sales error:', err);
     res.status(500).json({ error: err.message });
   }
 };

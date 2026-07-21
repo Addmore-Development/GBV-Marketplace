@@ -581,6 +581,24 @@ formatPrice(p: number | string): string {
   }
 
   logout(): void {
+    const sellerId = localStorage.getItem('sellerId');
+    const sellerAlias = localStorage.getItem('sellerAlias');
+    const sellerEmail = localStorage.getItem('sellerEmail');
+    const centreId = localStorage.getItem('centreId');
+    const centreName = localStorage.getItem('centreName');
+    const centreEmail = localStorage.getItem('centreEmail');
+
+    if (sellerId) {
+      this.http.post('http://localhost:3000/api/sellers/logout', {
+        seller_id: sellerId, alias: sellerAlias, email: sellerEmail,
+      }).subscribe({ error: () => {} });
+    }
+    if (centreId) {
+      this.http.post('http://localhost:3000/api/centres/logout', {
+        centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
+      }).subscribe({ error: () => {} });
+    }
+
     this.authService.logout();
     localStorage.removeItem('sellerId'); localStorage.removeItem('sellerUser');
     localStorage.removeItem('sellerAlias'); localStorage.removeItem('sellerEmail');

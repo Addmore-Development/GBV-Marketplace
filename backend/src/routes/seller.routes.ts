@@ -11,6 +11,7 @@ import {
     verifyID,
     registerSeller,
     loginSeller,
+    logoutSeller,
     getSellerPublicProfile,
     getSellerProfile,
     updateSellerProfile,
@@ -57,6 +58,7 @@ router.get('/centres/:id', getCentreById);
 router.post('/verify-id', verifyID);
 router.post('/register', registerSeller);
 router.post('/login', loginSeller);
+router.post('/logout', logoutSeller);
 router.get('/public/:alias', getSellerPublicProfile);
 
 // ── Profile ─────────────────────────────────────────────────

@@ -32,25 +32,19 @@
   color: var(--text-dark);
 }
 
-/* ── Announce Bar ──────────────────────────────────────────── */
-/* ── Announce Bar (now inside hero) ────────────────────────── */
-.announce-bar-hero {
-  position: relative;
-  z-index: 2;
+/* ── Announce Bar (standalone, before Shop by category) ────── */
+.announce-bar {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
   flex-wrap: wrap;
-  background: rgba(61,43,31,.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--brown);
   color: rgba(255,255,255,.92);
   font-size: .75rem;
   text-align: center;
   padding: 10px 24px;
   letter-spacing: .3px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
 
   .ab-dot { opacity: .45; font-size: .9rem; }
 }
@@ -249,39 +243,6 @@
 }
 
 .user-name { font-size: .82rem; font-weight: 500; color: var(--text-dark); }
-
-/* Category strip */
-.cat-strip {
-  border-top: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-}
-
-.cat-strip-inner {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 32px;
-  display: flex;
-  gap: 0;
-}
-
-.cat-nav-btn {
-  padding: 12px 20px;
-  border: none;
-  background: none;
-  font-family: 'DM Sans', sans-serif;
-  font-size: .83rem;
-  font-weight: 400;
-  color: var(--text-light);
-  cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  transition: all .2s;
-
-  &:hover { color: var(--brown); }
-  &.active { color: var(--brown); border-bottom-color: var(--brown); font-weight: 600; }
-}
 
 /* ── Hero (Etsy split layout) ──────────────────────────────── */
 .hero {
@@ -1390,7 +1351,7 @@
 @media (max-width: 900px) {
   .nav-inner { padding: 0 16px; height: 60px; flex-wrap: wrap; }
   .nav-search-wrap { order: 3; width: 100%; margin: 8px 0 0; }
-  .btn-contribute { display: none; }
+  .btn-contribute { padding: 8px 12px; font-size: .78rem; }
   .hero { padding: 0 0 28px; }
   .hero-inner { gap: 24px; padding: 28px 16px; }
   .footer-inner { grid-template-columns: 1fr; gap: 32px; padding: 40px 16px; }
@@ -1417,6 +1378,7 @@
   .nav-actions { gap: 8px; flex-wrap: wrap; }
   .nav-cart span:not(.cart-badge) { display: none; }
   .user-name { display: none; }
+  .nav-register-btn { display: none; } /* Sign In stays; Register reachable via "Register here" inside the Sign In modal */
   .hero-title { font-size: 1.6rem; }
   .hero-sub { font-size: .85rem; }
   .hero-actions { flex-direction: column; align-items: stretch; }

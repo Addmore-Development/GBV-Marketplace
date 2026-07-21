@@ -826,6 +826,13 @@ export class SellerDashboardComponent implements OnInit {
     }
 
     logout(): void {
+        if (this.seller?.id) {
+            this.http.post('http://localhost:3000/api/sellers/logout', {
+                seller_id: this.seller.id,
+                alias: this.seller.alias,
+                email: this.seller.email,
+            }).subscribe({ error: () => {} });
+        }
         localStorage.clear();
         this.router.navigate(['/login/maker']);
     }

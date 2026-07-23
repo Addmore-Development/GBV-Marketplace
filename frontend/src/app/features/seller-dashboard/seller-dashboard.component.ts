@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { environment } from '../../../environments/environment';
 
 type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary' | 'centre' | 'volunteer';
 
@@ -117,7 +118,7 @@ interface CentreInfo {
     encapsulation: ViewEncapsulation.None,
 })
 export class SellerDashboardComponent implements OnInit {
-    private readonly API = 'http://localhost:3000/api/sellers';
+    private readonly API = `${environment.apiUrl}/api/sellers`;
 
     seller: SellerProfile | null = null;
     activeTab: DashTab = 'home';
@@ -827,7 +828,7 @@ export class SellerDashboardComponent implements OnInit {
 
     logout(): void {
         if (this.seller?.id) {
-            this.http.post('http://localhost:3000/api/sellers/logout', {
+            this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
                 seller_id: this.seller.id,
                 alias: this.seller.alias,
                 email: this.seller.email,
@@ -960,7 +961,7 @@ export class SellerDashboardComponent implements OnInit {
     getFileUrl(fileUrl: string): string {
         if (!fileUrl) return '';
         // Backend serves static files on port 3000
-        return `http://localhost:3000${fileUrl}`;
+        return `${environment.apiUrl}${fileUrl}`;
     }
 
     // ============================================================

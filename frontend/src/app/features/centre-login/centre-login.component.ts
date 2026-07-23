@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-centre-login',
@@ -76,7 +77,7 @@ export class CentreLoginComponent {
     if (!this.email || !this.password) { this.error = 'Email and password are required'; return; }
     this.isLoading = true;
     this.error = '';
-    this.http.post<any>('http://localhost:3000/api/centres/login', { email: this.email, password: this.password })
+    this.http.post<any>(`${environment.apiUrl}/api/centres/login`, { email: this.email, password: this.password })
       .subscribe({
         next: (res) => {
           localStorage.setItem('centreId', res.centre_id || '');

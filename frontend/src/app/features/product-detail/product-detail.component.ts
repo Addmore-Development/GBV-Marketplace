@@ -9,6 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { CartService } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Review {
   buyer_name: string;
@@ -843,7 +844,7 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
 
   loadProduct(id: string): void {
     this.isLoading = true;
-    this.http.get<Product>(`http://localhost:3000/api/marketplace/products/${id}`)
+    this.http.get<Product>(`${environment.apiUrl}/api/marketplace/products/${id}`)
       .subscribe({
         next: p => {
           this.product = p;

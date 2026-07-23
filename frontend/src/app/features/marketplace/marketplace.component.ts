@@ -7,6 +7,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CartService } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService, SellerUser } from '../../services/seller-auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Product {
   id: string;
@@ -286,7 +287,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
 
   loadRealProducts(): void {
     this.isLoadingProducts = true;
-    this.http.get<any>('http://localhost:3000/api/marketplace/products')
+    this.http.get<any>(`${environment.apiUrl}/api/marketplace/products`)
       .subscribe({
         next: (res) => {
           this.products = res.products ?? [];
@@ -383,7 +384,7 @@ formatPrice(p: number | string): string {
 
   loadSellerCentres(): void {
     this.sellerCentresLoading = true;
-    this.http.get<any[]>('http://localhost:3000/api/sellers/centres/verified').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/centres/verified`).subscribe({
       next: (data) => {
         this.sellerCentres = (data || []).map((c: any) => ({
           id: c.id,
@@ -469,7 +470,7 @@ formatPrice(p: number | string): string {
       accepted_terms: true, accepted_popia: true, safety_acknowledged: true,
     };
 
-    this.http.post<any>('http://localhost:3000/api/sellers/register', payload).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/api/sellers/register`, payload).subscribe({
       next: (res) => {
         localStorage.setItem('sellerId', res.seller_id);
         localStorage.setItem('sellerAlias', res.alias);
@@ -524,7 +525,7 @@ formatPrice(p: number | string): string {
 
     if (this.loginRole === 'seller') {
       // Seller uses email + PIN via real API
-      this.http.post<any>('http://localhost:3000/api/sellers/login', {
+      this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
         email: this.loginEmail, pin: this.loginPassword
       }).subscribe({
         next: (res) => {
@@ -542,7 +543,7 @@ formatPrice(p: number | string): string {
     }
 
     if (this.loginRole === 'centre') {
-      this.http.post<any>('http://localhost:3000/api/centres/login', {
+      this.http.post<any>(`${environment.apiUrl}/api/centres/login`, {
         email: this.loginEmail, password: this.loginPassword
       }).subscribe({
         next: (res) => {
@@ -589,12 +590,12 @@ formatPrice(p: number | string): string {
     const centreEmail = localStorage.getItem('centreEmail');
 
     if (sellerId) {
-      this.http.post('http://localhost:3000/api/sellers/logout', {
+      this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
         seller_id: sellerId, alias: sellerAlias, email: sellerEmail,
       }).subscribe({ error: () => {} });
     }
     if (centreId) {
-      this.http.post('http://localhost:3000/api/centres/logout', {
+      this.http.post(`${environment.apiUrl}/api/centres/logout`, {
         centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
       }).subscribe({ error: () => {} });
     }

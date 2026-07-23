@@ -5,6 +5,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 interface SharedCase {
   seller_alias: string;
@@ -25,7 +26,7 @@ interface SharedCase {
   styleUrls: ['./shared-case.component.scss'],
 })
 export class SharedCaseComponent implements OnInit {
-  private readonly API = 'http://localhost:3000/api/sellers';
+  private readonly API = `${environment.apiUrl}/api/sellers`;
 
   token = '';
   caseData: SharedCase | null = null;
@@ -76,6 +77,6 @@ export class SharedCaseComponent implements OnInit {
 
   getFileUrl(url: string): string {
     if (!url) return '';
-    return url.startsWith('http') ? url : `http://localhost:3000${url}`;
+    return url.startsWith('http') ? url : `${environment.apiUrl}${url}`;
   }
 }

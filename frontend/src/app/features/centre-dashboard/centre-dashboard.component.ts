@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 interface SosAlert {
   id: string;
@@ -996,8 +997,8 @@ interface Need {
   `]
 })
 export class CentreDashboardComponent implements OnInit, OnDestroy {
-  private readonly API = 'http://localhost:3000/api/sellers';
-  private readonly MEDIA_BASE = 'http://localhost:3000';
+  private readonly API = `${environment.apiUrl}/api/sellers`;
+  private readonly MEDIA_BASE = environment.apiUrl;
   private centreId = '';
   private pollHandle: any;
 
@@ -1228,7 +1229,7 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     const centreName = localStorage.getItem('centreName');
     const centreEmail = localStorage.getItem('centreEmail');
     if (centreId) {
-      this.http.post('http://localhost:3000/api/centres/logout', {
+      this.http.post(`${environment.apiUrl}/api/centres/logout`, {
         centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
       }).subscribe({ error: () => {} });
     }

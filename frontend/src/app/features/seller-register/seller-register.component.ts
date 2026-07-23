@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 interface Centre {
   id: string;
@@ -30,7 +31,7 @@ const STATIC_CENTRES: Centre[] = [
   styleUrls: ['./seller-register.component.scss'],
 })
 export class SellerRegisterComponent implements OnInit {
-  private readonly API = 'http://localhost:3000/api/sellers';
+  private readonly API = `${environment.apiUrl}/api/sellers`;
 
   idNumber = '';
   fullName = '';

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { Router } from '@angular/router';
+import { environment } from '../../environments/environment';
 
 export interface SellerUser {
   id: string;
@@ -22,7 +23,7 @@ export class SellerAuthService {
   }
 
   login(email: string, pin: string): Observable<any> {
-    return this.http.post('http://localhost:3000/api/sellers/login', { email, pin })
+    return this.http.post(`${environment.apiUrl}/api/sellers/login`, { email, pin })
       .pipe(tap((res: any) => {
         const user: SellerUser = {
           id: res.seller_id,
@@ -39,18 +40,18 @@ export class SellerAuthService {
   }
 
   register(data: any): Observable<any> {
-    return this.http.post('http://localhost:3000/api/sellers/register', data);
+    return this.http.post(`${environment.apiUrl}/api/sellers/register`, data);
   }
 
   grantHiddenLayer(sellerId: string): Observable<any> {
-    return this.http.post('http://localhost:3000/api/sellers/volunteer', { sellerId });
+    return this.http.post(`${environment.apiUrl}/api/sellers/volunteer`, { sellerId });
   }
 
   logout(): void {
     const id = localStorage.getItem('sellerId');
     const user = this.userSubject.value;
     if (id) {
-      this.http.post('http://localhost:3000/api/sellers/logout', {
+      this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
         seller_id: id,
         alias: user?.alias,
         email: user?.email,

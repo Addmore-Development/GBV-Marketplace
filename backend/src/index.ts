@@ -27,13 +27,20 @@ app.use('/uploads', express.static('uploads'));
 
 
 // PostgreSQL connection
-export const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT) || 5432,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: String(process.env.DB_PASSWORD ?? ''),
-});
+// Supabase (or any hosted Postgres) — set DATABASE_URL and this takes over.
+// Falls back to the individual DB_* vars for local development.
+export const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    })
+  : new Pool({
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT) || 5432,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: String(process.env.DB_PASSWORD ?? ''),
+    });
 
 // Test DB connection
 pool.connect((err, client, release) => {

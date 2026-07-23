@@ -9,6 +9,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService } from '../../services/seller-auth.service';
+import { environment } from '../../../environments/environment';
 
 export interface Centre {
   id: string;
@@ -367,7 +368,7 @@ export class CentresComponent implements OnInit, OnDestroy {
       }
     }, 5000);
 
-    this.http.get<any[]>('http://localhost:3000/api/centres/all').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).subscribe({
       next: (data) => {
         clearTimeout(timeout);
         if (data && data.length > 0) {
@@ -480,7 +481,7 @@ export class CentresComponent implements OnInit, OnDestroy {
   // ── Auth ──────────────────────────────────────────────────
   loadSellerCentres(): void {
     this.sellerCentresLoading = true;
-    this.http.get<any[]>('http://localhost:3000/api/sellers/centres/verified').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/centres/verified`).subscribe({
       next: (data) => {
         if (data && data.length > 0) {
           this.sellerCentres = data.map((c: any) => ({ id: c.id, name: c.name || c.centre_name, city: c.city, province: c.province }));
@@ -532,7 +533,7 @@ export class CentresComponent implements OnInit, OnDestroy {
       centre_id: this.sellerCentreId,
       accepted_terms: true, accepted_popia: true, safety_acknowledged: true,
     };
-    this.http.post<any>('http://localhost:3000/api/sellers/register', payload).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/api/sellers/register`, payload).subscribe({
       next: (res) => {
         localStorage.setItem('sellerId', res.seller_id);
         localStorage.setItem('sellerAlias', res.alias);
@@ -562,7 +563,7 @@ export class CentresComponent implements OnInit, OnDestroy {
     if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
 
     if (this.loginRole === 'seller') {
-      this.http.post<any>('http://localhost:3000/api/sellers/login', {
+      this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
         email: this.loginEmail, pin: this.loginPassword
       }).subscribe({
         next: (res) => {
@@ -580,7 +581,7 @@ export class CentresComponent implements OnInit, OnDestroy {
     }
 
     if (this.loginRole === 'centre') {
-      this.http.post<any>('http://localhost:3000/api/centres/login', {
+      this.http.post<any>(`${environment.apiUrl}/api/centres/login`, {
         email: this.loginEmail, password: this.loginPassword
       }).subscribe({
         next: (res) => {

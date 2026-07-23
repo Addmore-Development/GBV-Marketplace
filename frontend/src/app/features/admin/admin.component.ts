@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety' | 'activity' | 'sales';
 
@@ -150,7 +151,7 @@ interface SaleRow {
   styleUrls: ['./admin.component.scss'],
 })
 export class AdminComponent implements OnInit {
-  private readonly API = 'http://localhost:3000/api/admin';
+  private readonly API = `${environment.apiUrl}/api/admin`;
 
   // ── Auth ──────────────────────────────────────────────────
   isAuthenticated = false;
@@ -184,7 +185,7 @@ export class AdminComponent implements OnInit {
     alertsLast7Days: 0, alertsLast30Days: 0, avgUploadSeconds: null, byCentre: [],
   };
   loadingEmergency = false;
-  private readonly MEDIA_BASE = 'http://localhost:3000';
+  private readonly MEDIA_BASE = environment.apiUrl;
   private emergencyPollHandle: any = null;
 
   // ── Login/Logout Activity ────────────────────────────────

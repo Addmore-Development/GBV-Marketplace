@@ -107,7 +107,7 @@ export const registerCentre = async (req: Request, res: Response) => {
     }
 
     // Required document check
-    const requiredDocs = ['npo_certificate', 'id_document', 'proof_of_address'];
+    const requiredDocs = ['profile_picture', 'npo_certificate', 'id_document', 'proof_of_address'];
     for (const doc of requiredDocs) {
       if (!files?.[doc]?.length) {
         return res.status(400).json({
@@ -203,8 +203,22 @@ export const registerCentre = async (req: Request, res: Response) => {
 
     const centre = centreResult.rows[0];
 
+    // The profile picture isn't a verification document — it goes on the
+    // centre row itself (centre_documents.document_type is a fixed enum
+    // that doesn't include it), so pull it out before the doc-insert loop.
+    let profilePictureUrl: string | null = null;
+    const profilePicFile = files.profile_picture?.[0];
+    if (profilePicFile) {
+      profilePictureUrl = `/uploads/centre-profile/${profilePicFile.filename}`;
+      await client.query(
+        `UPDATE centres SET profile_picture_url = $1 WHERE id = $2`,
+        [profilePictureUrl, centre.id]
+      );
+    }
+
     // Insert documents
     for (const [fieldName, fileArray] of Object.entries(files)) {
+      if (fieldName === 'profile_picture') continue;
       for (const file of fileArray) {
         await client.query(
           `INSERT INTO centre_documents (centre_id, document_type, file_name, file_path, file_size, mime_type)
@@ -228,6 +242,7 @@ export const registerCentre = async (req: Request, res: Response) => {
       centre_id: centre.id,
       centre_name: centre.centre_name,
       status: centre.status,
+      profile_picture_url: profilePictureUrl,
       token: signCentreToken(centre.id),
     });
   } catch (err: any) {

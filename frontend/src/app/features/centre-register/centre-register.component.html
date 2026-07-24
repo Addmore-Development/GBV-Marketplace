@@ -590,6 +590,28 @@
 
         <div class="doc-grid">
 
+          <!-- Profile Picture -->
+          <div class="doc-item" [class.uploaded]="uploadedFiles['profile_picture']">
+            <div class="doc-header">
+              <div class="doc-info">
+                <span class="doc-name">Centre Profile Picture <span class="req-star">*</span></span>
+                <span class="doc-desc">Shown on your public centre profile and in the centre listing</span>
+              </div>
+              <span class="doc-status">{{ uploadedFiles['profile_picture'] ? '✓' : '📎' }}</span>
+            </div>
+            <div class="doc-upload" *ngIf="!uploadedFiles['profile_picture']">
+              <label class="upload-btn">
+                <input type="file" accept=".jpg,.jpeg,.png,.webp" (change)="onFileSelect($event, 'profile_picture')" hidden />
+                Choose File
+              </label>
+            </div>
+            <div class="doc-uploaded" *ngIf="uploadedFiles['profile_picture']">
+              <span class="file-name">{{ uploadedFiles['profile_picture']?.name }}</span>
+              <span class="file-size">{{ getFileSize(uploadedFiles['profile_picture']!) }}</span>
+              <button type="button" class="remove-btn" (click)="removeFile('profile_picture')">✕</button>
+            </div>
+          </div>
+
           <!-- NPO Certificate -->
           <div class="doc-item" [class.uploaded]="uploadedFiles['npo_certificate']">
             <div class="doc-header">

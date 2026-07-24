@@ -229,7 +229,7 @@ export class CentreRegisterComponent implements OnInit, OnDestroy {
         f.get('emergency_protocol')?.valid &&
         f.get('confidentiality_policy')?.valid
       );
-      case 7: return true;   // documents optional
+      case 7: return !!this.uploadedFiles['profile_picture'];   // profile picture required; other docs optional client-side
       case 8: return !!(
         f.get('password')?.valid &&
         f.get('confirm_password')?.value &&
@@ -393,6 +393,7 @@ export class CentreRegisterComponent implements OnInit, OnDestroy {
         if (v.mission_statement) localStorage.setItem('centreMission',     v.mission_statement);
         if (v.website_url)       localStorage.setItem('centreWebsite',     v.website_url);
         if (v.whatsapp_number)   localStorage.setItem('centreWhatsapp',    v.whatsapp_number);
+        if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
 
         this.submitSuccess = true;
         this.isSubmitting  = false;

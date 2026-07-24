@@ -24,7 +24,14 @@ if (!fs.existsSync(centreProfilePicDir)) {
 // File upload config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/centre-documents/');
+    // The profile picture goes in its own folder (same one the
+    // post-login profile-picture endpoint uses) so both routes serve
+    // it from the same place; every other field is a verification doc.
+    if (file.fieldname === 'profile_picture') {
+      cb(null, 'uploads/centre-profile/');
+    } else {
+      cb(null, 'uploads/centre-documents/');
+    }
   },
   filename: (req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -36,17 +43,18 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
   fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowed.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF, JPG, and PNG files are allowed'));
+      cb(new Error('Only PDF, JPG, PNG, and WEBP files are allowed'));
     }
   },
 });
 
 const documentFields = upload.fields([
+  { name: 'profile_picture', maxCount: 1 },
   { name: 'npo_certificate', maxCount: 1 },
   { name: 'dsd_registration', maxCount: 1 },
   { name: 'id_document', maxCount: 1 },

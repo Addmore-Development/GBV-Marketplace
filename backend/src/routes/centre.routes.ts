@@ -4,8 +4,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres } from '../controllers/centre.controller';
-import { verifyAdminToken } from '../middleware/auth.middleware';
+import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture } from '../controllers/centre.controller';
+import { verifyAdminToken, verifyCentreToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -47,12 +47,45 @@ const documentFields = upload.fields([
   { name: 'tax_exemption', maxCount: 1 },
 ]);
 
+// Profile picture upload config
+const profilePictureStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/centre-profile/');
+  },
+  filename: (req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${path.extname(file.originalname)}`);
+  },
+});
+
+const profilePictureUpload = multer({
+  storage: profilePictureStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPG, PNG, and WEBP images are allowed'));
+    }
+  },
+});
+
 // Public routes
 router.get('/all', getAllCentres);
 router.post('/register', documentFields, registerCentre);
 router.post('/login', loginCentre);
 router.post('/logout', logoutCentre);
 router.get('/status/:id', getCentreStatus);
+
+// Centre self-service routes (requires the centre to be logged in)
+router.post(
+  '/:id/profile-picture',
+  verifyCentreToken,
+  profilePictureUpload.single('profile_picture'),
+  uploadCentreProfilePicture
+);
 
 // Admin routes
 router.get('/admin/pending', verifyAdminToken, adminGetPending);

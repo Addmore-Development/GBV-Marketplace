@@ -471,11 +471,18 @@ export class SellerDashboardComponent implements OnInit {
 
     get activeListings(): number { return this.products.filter(p => p.status === 'active').length; }
     get totalSold(): number { return this.products.reduce((s, p) => s + (p.total_sold || 0), 0); }
+    get canListProducts(): boolean {
+        return !!this.seller?.profile_complete && this.seller?.verification_status === 'approved';
+    }
 
     openAddProduct(): void {
         if (!this.seller?.profile_complete) {
             this.activeTab = 'profile';
             alert('Please complete your profile before adding a listing.');
+            return;
+        }
+        if (this.seller?.verification_status !== 'approved') {
+            alert('Your account is still pending admin approval. You can add listings once approved.');
             return;
         }
         this.isEditing = false;
@@ -505,6 +512,8 @@ export class SellerDashboardComponent implements OnInit {
                         if (err.error?.code === 'PROFILE_INCOMPLETE') {
                             alert('Your profile is not complete. Please complete it first.');
                             this.activeTab = 'profile';
+                        } else if (err.error?.code === 'NOT_APPROVED') {
+                            alert('Your account is still pending admin approval.');
                         }
                     }
                 });
@@ -518,6 +527,8 @@ export class SellerDashboardComponent implements OnInit {
                         if (err.error?.code === 'PROFILE_INCOMPLETE') {
                             alert('Your profile is not complete. Please complete it first.');
                             this.activeTab = 'profile';
+                        } else if (err.error?.code === 'NOT_APPROVED') {
+                            alert('Your account is still pending admin approval.');
                         }
                     }
                 });

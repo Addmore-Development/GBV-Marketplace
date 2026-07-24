@@ -146,6 +146,8 @@ export class SellerRegisterComponent implements OnInit {
         this.isLoading = false;
         if (err.error?.code === 'ALREADY_EXISTS' || err.status === 409) {
           this.error = 'This email is already registered. Please sign in instead.';
+        } else if (err.error?.code === 'CENTRE_NOT_APPROVED') {
+          this.error = 'The centre you selected is still awaiting admin approval and cannot accept new sellers yet. Please choose another centre or check back soon.';
         } else {
           this.error = err.error?.error || 'Something went wrong. Please try again.';
         }

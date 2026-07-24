@@ -81,6 +81,7 @@ export class CentreLoginComponent {
       .subscribe({
         next: (res) => {
           localStorage.setItem('centreId', res.centre_id || '');
+          localStorage.setItem('centreToken', res.token || '');
           localStorage.setItem('centreName', res.centre_name || '');
           localStorage.setItem('centreType', res.centre_type || '');
           localStorage.setItem('centreEmail', res.contact_email || '');
@@ -89,6 +90,9 @@ export class CentreLoginComponent {
           localStorage.setItem('centreProvince', res.province || '');
           localStorage.setItem('centrePhone', res.contact_phone || '');
           localStorage.setItem('centreNpoNumber', res.npo_number || '');
+          localStorage.setItem('centreStatus', res.status || '');
+          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
+          else localStorage.removeItem('centreProfilePic');
           this.isLoading = false;
           this.router.navigate(['/centre-dashboard']);
         },

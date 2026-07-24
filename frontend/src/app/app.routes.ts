@@ -80,11 +80,11 @@ export const routes: Routes = [
       ),
   },
   {
+    // Legacy URL — the real, backend-wired registration form lives at
+    // /register/centre. Redirect so old links/buttons still work.
     path: 'register-centre',
-    loadComponent: () =>
-      import('./features/centres/register-centre.component').then(
-        (m) => m.RegisterCentreComponent
-      ),
+    redirectTo: 'register/centre',
+    pathMatch: 'full',
   },
 
   // ── Seller routes ─────────────────────────────────────────

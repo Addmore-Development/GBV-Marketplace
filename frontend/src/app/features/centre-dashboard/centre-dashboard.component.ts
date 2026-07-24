@@ -131,7 +131,9 @@ interface Need {
           <span class="notif-badge" *ngIf="unreadNotifications > 0">{{ unreadNotifications }}</span>
         </div>
         <div class="tb-user">
-          <div class="tb-avatar">{{ centreInitials }}</div>
+          <div class="tb-avatar" [style.background-image]="profilePicUrl ? 'url(' + profilePicUrl + ')' : null">
+            <span *ngIf="!profilePicUrl">{{ centreInitials }}</span>
+          </div>
           <span class="tb-username">{{ centreManagerName }}</span>
         </div>
       </div>
@@ -535,6 +537,23 @@ interface Need {
         <h3>Centre profile — public listing</h3>
         <p class="pfc-sub">This information appears on your Amani profile page, visible to donors and volunteers.</p>
 
+        <div class="pf-group pf-photo-group">
+          <label>Profile picture</label>
+          <div class="pf-photo-row">
+            <div class="pf-photo-preview" [style.background-image]="profilePicUrl ? 'url(' + profilePicUrl + ')' : ''">
+              <span *ngIf="!profilePicUrl">🏠</span>
+            </div>
+            <div class="pf-photo-actions">
+              <label class="upload-btn">
+                <input type="file" accept=".jpg,.jpeg,.png,.webp" (change)="onProfilePicSelect($event)" hidden />
+                {{ uploadingProfilePic ? 'Uploading…' : 'Choose photo' }}
+              </label>
+              <span class="pf-photo-hint">JPG, PNG, or WEBP. Shown on your public centre profile.</span>
+              <span class="pf-photo-error" *ngIf="profilePicError">{{ profilePicError }}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="pf-group">
           <label>Centre name</label>
           <input type="text" [(ngModel)]="profileForm.name" />
@@ -914,6 +933,13 @@ interface Need {
     .profile-form-card { background: var(--white); border: 1px solid var(--border); border-radius: 13px; padding: 28px; max-width: 680px; h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--text-dark); margin: 0 0 6px; } }
     .pfc-sub { font-size: .82rem; color: var(--text-muted); margin-bottom: 22px; }
     .pf-group { margin-bottom: 14px; label { display: block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text-dark); margin-bottom: 5px; } input, select, textarea { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: .86rem; outline: none; box-sizing: border-box; &:focus { border-color: var(--forest); } } textarea { resize: vertical; } }
+    .pf-photo-group { margin-bottom: 22px; }
+    .pf-photo-row { display: flex; align-items: center; gap: 18px; }
+    .pf-photo-preview { width: 76px; height: 76px; border-radius: 50%; background: var(--sage-light) center/cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; border: 1.5px solid var(--border); }
+    .pf-photo-actions { display: flex; flex-direction: column; gap: 4px; }
+    .pf-photo-actions .upload-btn { display: inline-block; width: fit-content; padding: 7px 16px; background: var(--sage-light); color: var(--forest); border-radius: 8px; font-size: .78rem; font-weight: 700; cursor: pointer; transition: all .2s; &:hover { background: var(--forest); color: white; } }
+    .pf-photo-hint { font-size: .72rem; color: var(--text-muted); }
+    .pf-photo-error { font-size: .74rem; color: var(--red, #DC2626); }
     .pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .pf-toggles { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
     .pf-toggle-row { display: flex; align-items: center; gap: 9px; font-size: .86rem; color: var(--text-mid); cursor: pointer; input { accent-color: var(--forest); width: 16px; height: 16px; } }
@@ -1012,6 +1038,9 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   showAddNeed = false;
   profileSaved = false;
   reportSubmitted = false;
+  profilePicUrl: string | null = null;
+  uploadingProfilePic = false;
+  profilePicError = '';
   impactStory = '';
   storyQuarter = 'Q2 2026 (Apr–Jun)';
   Math = Math;
@@ -1173,6 +1202,9 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
       this.verificationStatus = 'pending';
     }
 
+    const storedPic = localStorage.getItem('centreProfilePic');
+    if (storedPic) this.profilePicUrl = this.mediaUrl(storedPic);
+
     // ── SOS alerts: load now, then poll for new ones ──────────
     this.centreId = localStorage.getItem('centreId') || '';
     if (this.centreId) {
@@ -1222,6 +1254,39 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   }
   deleteNeed(n: Need): void { this.needs = this.needs.filter(x => x.id !== n.id); }
   saveProfile(): void { this.profileSaved = true; setTimeout(() => this.profileSaved = false, 3000); }
+
+  onProfilePicSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    input.value = '';
+
+    this.profilePicError = '';
+    this.uploadingProfilePic = true;
+
+    const centreId = localStorage.getItem('centreId') || this.centreId;
+    const token = localStorage.getItem('centreToken') || '';
+    const fd = new FormData();
+    fd.append('profile_picture', file, file.name);
+
+    this.http.post<any>(
+      `${environment.apiUrl}/api/centres/${centreId}/profile-picture`,
+      fd,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (res) => {
+        this.uploadingProfilePic = false;
+        if (res.profile_picture_url) {
+          localStorage.setItem('centreProfilePic', res.profile_picture_url);
+          this.profilePicUrl = this.mediaUrl(res.profile_picture_url);
+        }
+      },
+      error: (err) => {
+        this.uploadingProfilePic = false;
+        this.profilePicError = err.error?.error || 'Could not upload photo. Please try again.';
+      }
+    });
+  }
   submitImpactReport(): void { this.reportSubmitted = true; setTimeout(() => this.reportSubmitted = false, 4000); }
   exportDonations(): void { alert('CSV export would download here.'); }
   signOut(): void {
@@ -1239,6 +1304,8 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
     localStorage.removeItem('centreNpoNumber'); localStorage.removeItem('centreDescription');
     localStorage.removeItem('centreMission'); localStorage.removeItem('centreWebsite');
+    localStorage.removeItem('centreToken'); localStorage.removeItem('centreProfilePic');
+    localStorage.removeItem('centreStatus');
     this.router.navigate(['/marketplace']);
   }
 }

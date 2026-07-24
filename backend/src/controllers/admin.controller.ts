@@ -3,8 +3,6 @@
 // ============================================================
 import { Request, Response } from 'express';
 import { pool } from '../index';
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
 
 // ── Stats ──────────────────────────────────────────────────
 export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
@@ -12,9 +10,9 @@ export const getAdminStats = async (req: Request, res: Response): Promise<void> 
     const [sellers, centres, buyers, donations, orders] = await Promise.all([
       pool.query('SELECT verification_status, total_earned FROM sellers'),
       pool.query('SELECT status FROM centres'),
-      pool.query("SELECT id FROM users WHERE role = $1", ['buyer']),
+      pool.query("SELECT DISTINCT buyer_email FROM orders WHERE buyer_email IS NOT NULL"),
       pool.query('SELECT amount FROM donations'),
-      pool.query('SELECT id FROM orders'),
+      pool.query('SELECT id, total FROM orders'),
     ]);
 
     const totalDonationAmount = (donations.rows as { amount: string }[])
@@ -33,7 +31,7 @@ export const getAdminStats = async (req: Request, res: Response): Promise<void> 
       totalDonations:      donations.rows.length,
       totalDonationAmount,
       totalSalesAmount,
-      totalOrders:         0,
+      totalOrders:         orders.rows.length,
     });
   } catch (err: any) {
     console.error('[Admin] stats error:', err);
@@ -132,41 +130,27 @@ export const deleteCentre = async (req: Request, res: Response): Promise<void> =
 };
 
 // ── Buyers ────────────────────────────────────────────────
+// There's no buyer-accounts table in this schema — checkout is guest-only,
+// identified by buyer_email on the orders table. Build the buyer list by
+// grouping orders per email instead of querying a users table that doesn't exist.
 export const getBuyers = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
-      "SELECT users.*, COALESCE(SUM(orders.total), 0) AS total_spent, COUNT(orders.id) AS order_count FROM users LEFT JOIN orders ON orders.buyer_id = users.id WHERE users.role = $1 GROUP BY users.id ORDER BY users.created_at DESC",
-      ['buyer']
+      `SELECT
+         MIN(id)::text        AS id,
+         buyer_email           AS email,
+         MAX(buyer_name)       AS name,
+         COALESCE(SUM(total), 0) AS total_spent,
+         COUNT(*)::int         AS order_count,
+         MIN(created_at)       AS created_at
+       FROM orders
+       WHERE buyer_email IS NOT NULL AND buyer_email <> ''
+       GROUP BY buyer_email
+       ORDER BY MIN(created_at) DESC`
     );
     res.json(result.rows);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-export const createBuyer = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { name, email, password } = req.body as { name: string; email: string; password: string };
-    if (!name || !email || !password) {
-      res.status(400).json({ error: 'All fields required' });
-      return;
-    }
-    const hash = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      "INSERT INTO users (id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, created_at",
-      [uuidv4(), name, email, hash, 'buyer']
-    );
-    res.json({ ...result.rows[0], total_spent: 0, order_count: 0 });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-export const deleteBuyer = async (req: Request, res: Response): Promise<void> => {
-  try {
-    await pool.query("DELETE FROM users WHERE id = $1 AND role = $2", [req.params['id'], 'buyer']);
-    res.json({ ok: true });
-  } catch (err: any) {
+    console.error('[Admin] buyers error:', err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -2011,6 +2011,16 @@
   .locked-hint { font-weight: 400; font-size: 0.72rem; opacity: 0.8; }
 }
 
+.pending-approval-banner {
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.84rem;
+  margin-bottom: 18px;
+}
+
 .btn-secondary {
   background: var(--white);
   color: var(--forest);

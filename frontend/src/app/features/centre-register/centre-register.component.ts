@@ -5,8 +5,10 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, KeyValuePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 function passwordMatchValidator(control: AbstractControl): ValidationErrors | null {
   const password = control.get('password');
@@ -20,7 +22,7 @@ function passwordMatchValidator(control: AbstractControl): ValidationErrors | nu
 @Component({
   selector: 'app-centre-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, KeyValuePipe, TitleCasePipe],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, HttpClientModule, KeyValuePipe, TitleCasePipe],
   templateUrl: './centre-register.component.html',
   styleUrls: ['./centre-register.component.scss']
 })
@@ -96,10 +98,12 @@ export class CentreRegisterComponent implements OnInit, OnDestroy {
   get isOldAge():    boolean { return this.form.get('centre_type')?.value === 'old_age_home';  }
 
   form: FormGroup;
+  private readonly API = `${environment.apiUrl}/api/centres`;
 
   constructor(
     private fb:          FormBuilder,
     private router:      Router,
+    private http:        HttpClient,
     private authService: AuthService
   ) {
     this.form = this.fb.group({
@@ -310,49 +314,102 @@ export class CentreRegisterComponent implements OnInit, OnDestroy {
 
     this.isSubmitting   = true;
     this.submitError    = '';
-    this.uploadProgress = 0;
+    this.uploadProgress = 10;
 
-    try {
-      const v = this.form.value;
+    const v = this.form.value;
+    const fd = new FormData();
 
-      localStorage.setItem('centreName',        v.centre_name);
-      localStorage.setItem('centreType',        v.centre_type);
-      localStorage.setItem('centreCity',        v.city);
-      localStorage.setItem('centreProvince',    v.province);
-      localStorage.setItem('centreEmail',       v.contact_email);
-      localStorage.setItem('centreManagerName', v.contact_person_name);
-      localStorage.setItem('centrePhone',       v.contact_phone);
-      localStorage.setItem('centreNpoNumber',   v.npo_number);
-      localStorage.setItem('centrePassword',    v.password);
-      if (v.description)       localStorage.setItem('centreDescription',    v.description);
-      if (v.mission_statement) localStorage.setItem('centreMission',        v.mission_statement);
-      if (v.website_url)       localStorage.setItem('centreWebsite',        v.website_url);
-      if (v.whatsapp_number)   localStorage.setItem('centreWhatsapp',       v.whatsapp_number);
-
-      // Simulate upload progress
-      for (let i = 10; i <= 90; i += 10) {
-        this.uploadProgress = i;
-        await new Promise(r => setTimeout(r, 160));
+    // ── Scalar / text fields ─────────────────────────────────
+    const textFields: string[] = [
+      'centre_type', 'centre_name', 'registration_number', 'npo_number', 'dsd_number',
+      'tax_exemption_number', 'year_established',
+      'contact_person_name', 'contact_person_role', 'contact_email', 'contact_phone',
+      'whatsapp_number', 'website_url',
+      'physical_address', 'suburb', 'city', 'province', 'postal_code',
+      'gps_lat', 'gps_lng',
+      'description', 'mission_statement', 'vision_statement', 'core_values',
+      'capacity_total', 'referral_process', 'intake_process',
+      'law_enforcement_partnership', 'age_range_min', 'age_range_max', 'education_programs',
+      'care_level', 'medical_facilities', 'annual_beneficiaries',
+      'key_partnerships', 'awards_recognition',
+      'staff_training_description', 'security_description',
+      'emergency_protocol', 'confidentiality_policy',
+      'password',
+    ];
+    for (const key of textFields) {
+      const val = v[key];
+      if (val !== null && val !== undefined && val !== '') {
+        fd.append(key, String(val));
       }
-      await new Promise(r => setTimeout(r, 400));
-
-      this.centreId = 'AMN-' + Date.now().toString(36).toUpperCase().slice(-6);
-      localStorage.setItem('centreId', this.centreId);
-
-      this.authService.register(v.centre_name, v.contact_email, v.password, 'centre');
-      this.authService.login(v.contact_email, v.password, 'centre');
-
-      this.uploadProgress = 100;
-      this.submitSuccess  = true;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setTimeout(() => this.router.navigate(['/centre-dashboard']), 2500);
-
-    } catch (err) {
-      this.submitError = 'Something went wrong. Please try again.';
-      console.error('Centre registration error:', err);
-    } finally {
-      this.isSubmitting = false;
     }
+    // Backend expects gps_latitude / gps_longitude
+    if (v.gps_lat) fd.append('gps_latitude', String(v.gps_lat));
+    if (v.gps_lng) fd.append('gps_longitude', String(v.gps_lng));
+
+    // ── Boolean fields ────────────────────────────────────────
+    fd.append('is_address_public',       String(!!v.is_address_public));
+    fd.append('is_24_hour',              String(!!v.is_24_hour));
+    fd.append('has_shelter',             String(!!v.has_shelter));
+    fd.append('provides_legal_support',  String(!!v.provides_legal_support));
+    fd.append('provides_medical_support',String(!!v.provides_medical_support));
+    fd.append('provides_counselling',    String(!!v.provides_counselling));
+    fd.append('provides_court_support',  String(!!v.provides_court_support));
+    fd.append('has_trained_staff',       String(!!v.has_trained_staff));
+    fd.append('has_security_measures',   String(!!v.has_security_measures));
+
+    // ── Array fields (sent as JSON strings) ──────────────────
+    fd.append('services_offered',  JSON.stringify(v.services_offered || []));
+    fd.append('target_population', JSON.stringify(v.target_population || []));
+    fd.append('languages_spoken',  JSON.stringify(v.languages_spoken || []));
+
+    // ── Documents ─────────────────────────────────────────────
+    for (const [key, file] of Object.entries(this.uploadedFiles)) {
+      fd.append(key, file, file.name);
+    }
+    for (const photo of this.sitePhotos) {
+      fd.append('site_photos', photo, photo.name);
+    }
+
+    this.uploadProgress = 40;
+
+    this.http.post<any>(`${this.API}/register`, fd).subscribe({
+      next: (res) => {
+        this.uploadProgress = 100;
+        this.centreId = res.centre_id;
+
+        // Store the session so the dashboard can identify this centre.
+        localStorage.setItem('centreId',           res.centre_id || '');
+        localStorage.setItem('centreToken',        res.token || '');
+        localStorage.setItem('centreStatus',       res.status || 'pending');
+        localStorage.setItem('centreName',         v.centre_name || '');
+        localStorage.setItem('centreType',         v.centre_type || '');
+        localStorage.setItem('centreCity',         v.city || '');
+        localStorage.setItem('centreProvince',     v.province || '');
+        localStorage.setItem('centreEmail',        v.contact_email || '');
+        localStorage.setItem('centreManagerName',  v.contact_person_name || '');
+        localStorage.setItem('centrePhone',        v.contact_phone || '');
+        localStorage.setItem('centreNpoNumber',    v.npo_number || '');
+        if (v.description)       localStorage.setItem('centreDescription', v.description);
+        if (v.mission_statement) localStorage.setItem('centreMission',     v.mission_statement);
+        if (v.website_url)       localStorage.setItem('centreWebsite',     v.website_url);
+        if (v.whatsapp_number)   localStorage.setItem('centreWhatsapp',    v.whatsapp_number);
+
+        this.submitSuccess = true;
+        this.isSubmitting  = false;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => this.router.navigate(['/centre-dashboard']), 2500);
+      },
+      error: (err) => {
+        this.isSubmitting  = false;
+        this.uploadProgress = 0;
+        if (err.status === 409) {
+          this.submitError = 'A centre with this email is already registered. Please log in instead.';
+        } else {
+          this.submitError = err.error?.error || 'Something went wrong. Please try again.';
+        }
+        console.error('Centre registration error:', err);
+      }
+    });
   }
 
   // ── Auth modal helpers ────────────────────────────────────

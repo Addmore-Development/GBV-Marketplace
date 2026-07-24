@@ -779,33 +779,50 @@
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
+/* Admin keeps its sidebar on the left even on mobile (unlike the
+   seller dashboard, which moves its tabs to the top) — it just
+   narrows to an icon-first column so it doesn't eat the screen. */
 @media (max-width: 900px) {
-  .admin-wrap { flex-direction: column; }
   .sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
+    width: 76px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 
-    .sb-brand { padding: 14px 16px; border-bottom: none; }
+    .sb-brand {
+      flex-direction: column;
+      gap: 2px;
+      padding: 14px 6px;
+      text-align: center;
+      font-size: .62rem;
+      span:not(.sb-leaf) { display: none; }
+    }
     .sb-nav {
-      flex-direction: row;
+      flex-direction: column;
       flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      padding: 4px 8px 10px;
+      overflow-x: visible;
+      overflow-y: visible;
+      padding: 4px 4px 10px;
       gap: 2px;
 
       button {
-        width: auto;
-        white-space: nowrap;
-        padding: 8px 12px;
-        font-size: .8rem;
+        width: 100%;
+        flex-direction: column;
+        white-space: normal;
+        padding: 10px 2px;
+        font-size: .62rem;
+        gap: 3px;
+        text-align: center;
+
+        .badge-count { position: static; margin-top: 2px; }
       }
     }
-    .sb-footer { padding: 8px 16px 12px; margin-left: auto; }
+    .sb-footer { padding: 8px 4px 12px; margin-left: 0; }
   }
   .tab-content { padding: 24px 20px; }
   .tab-header.row { flex-direction: column; align-items: stretch; gap: 12px; }

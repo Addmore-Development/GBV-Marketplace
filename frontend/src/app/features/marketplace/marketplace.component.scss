@@ -1349,8 +1349,10 @@
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .nav-inner { padding: 0 16px; height: 60px; flex-wrap: wrap; }
-  .nav-search-wrap { order: 3; width: 100%; margin: 8px 0 0; }
+  .nav-inner { padding: 0 16px; height: auto; min-height: 60px; flex-wrap: wrap; row-gap: 8px; }
+  .brand { order: 1; }
+  .nav-search-wrap { order: 2; flex: 1 1 auto; min-width: 0; max-width: none; margin: 0; }
+  .nav-actions { order: 3; width: 100%; margin-left: 0; }
   .btn-contribute { padding: 8px 12px; font-size: .78rem; }
   .hero { padding: 0 0 28px; }
   .hero-inner { gap: 24px; padding: 28px 16px; }

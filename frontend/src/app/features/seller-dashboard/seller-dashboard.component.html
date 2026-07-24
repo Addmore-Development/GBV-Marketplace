@@ -253,10 +253,15 @@
           <span class="sb-dot">·</span>
           <span>{{ activeListings }} active</span>
         </div>
-        <button class="btn-primary" (click)="openAddProduct()" [class.locked]="!seller.profile_complete">
+        <button class="btn-primary" (click)="openAddProduct()" [class.locked]="!canListProducts">
           <span>+</span> Add listing
           <span class="locked-hint" *ngIf="!seller.profile_complete"> (complete profile first)</span>
+          <span class="locked-hint" *ngIf="seller.profile_complete && seller.verification_status !== 'approved'"> (pending admin approval)</span>
         </button>
+      </div>
+
+      <div class="pending-approval-banner" *ngIf="seller.profile_complete && seller.verification_status !== 'approved'">
+        Your profile is complete and awaiting admin review. You'll be able to add listings once your account is approved.
       </div>
 
       <div class="product-grid" *ngIf="products.length > 0">

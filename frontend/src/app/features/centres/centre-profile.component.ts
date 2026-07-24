@@ -5,10 +5,12 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService } from '../../services/seller-auth.service';
-import { Centre, NoticePost } from './centres.component';
+import { Centre, NoticePost, getCentreImage } from './centres.component';
+import { environment } from '../../../environments/environment';
 
 // Re-use the same static data from centres.component
 const ALL_CENTRES: Centre[] = [
@@ -117,7 +119,7 @@ const ALL_CENTRES: Centre[] = [
 @Component({
   selector: 'app-centre-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, HttpClientModule],
   template: `
 <nav class="pp-nav">
   <div class="pp-nav-inner">
@@ -145,7 +147,7 @@ const ALL_CENTRES: Centre[] = [
   </div>
 </nav>
 
-<div class="pp-not-found" *ngIf="!centre">
+<div class="pp-not-found" *ngIf="!centreLoading && !centre">
   <h2>Centre not found</h2>
   <p>This centre may have moved or been removed.</p>
   <a routerLink="/centres" class="pp-btn-solid">Back to Centres</a>
@@ -507,17 +509,74 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  centreLoading = true;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private authService: AuthService,
     private sellerAuth: SellerAuthService,
     private fb: FormBuilder,
+    private http: HttpClient,
   ) {}
+
+  // ── Resolve relative /uploads/... paths returned by the backend ──
+  mediaUrl(path: string): string {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `${environment.apiUrl}${path}`;
+  }
+
+  fetchCentre(id: string | null): void {
+    if (!id) { this.centre = null; this.centreLoading = false; return; }
+
+    // Fall back to the static demo data only if the live API has nothing for this id
+    const fallback = ALL_CENTRES.find(c => c.id === id) || null;
+
+    this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).subscribe({
+      next: (data) => {
+        const match = (data || []).find((c: any) => c.id === id);
+        if (match) {
+          this.centre = {
+            id: match.id,
+            name: match.name || '',
+            type: match.type || '',
+            city: match.city || '',
+            province: match.province || '',
+            suburb: match.suburb || match.city || '',
+            description: match.description || '',
+            mission: match.mission || '',
+            services: Array.isArray(match.services) ? match.services : [],
+            languages: Array.isArray(match.languages) ? match.languages : [],
+            is_24_hour: !!match.is_24_hour,
+            has_shelter: !!match.has_shelter,
+            provides_counselling: !!match.provides_counselling,
+            provides_legal_support: !!match.provides_legal_support,
+            capacity: match.capacity || 0,
+            img: match.profile_picture ? this.mediaUrl(match.profile_picture) : getCentreImage(match.type, match.id),
+            profilePicture: match.profile_picture || null,
+            contact_email: match.contact_email || '',
+            contact_phone: match.contact_phone || '',
+            whatsapp: match.whatsapp || '',
+            website: match.website || '',
+            verified: !!match.verified,
+            year_established: match.year_established || 0,
+            beneficiaries_per_year: match.beneficiaries_per_year || 0,
+          };
+        } else {
+          this.centre = fallback;
+        }
+        this.centreLoading = false;
+      },
+      error: () => {
+        this.centre = fallback;
+        this.centreLoading = false;
+      }
+    });
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
-    this.centre = ALL_CENTRES.find(c => c.id === id) || null;
+    this.fetchCentre(id);
 
     // Check seller/centre localStorage session first (survives page reload)
     const sellerId = localStorage.getItem('sellerId');

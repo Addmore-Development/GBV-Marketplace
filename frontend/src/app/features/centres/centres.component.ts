@@ -28,6 +28,7 @@ export interface Centre {
   provides_legal_support: boolean;
   capacity: number;
   img: string;
+  profilePicture?: string | null;
   contact_email?: string;
   contact_phone?: string;
   whatsapp?: string;
@@ -73,7 +74,7 @@ const DEFAULT_IMAGES = [
   'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=600&q=80',     // community gathering
 ];
 
-function getCentreImage(type: string, id: string): string {
+export function getCentreImage(type: string, id: string): string {
   // Use last char of id as deterministic index so same centre always gets same image
   const idx = id ? id.charCodeAt(id.length - 1) % 4 : 0;
   if (type === 'gbv_centre')   return GBV_IMAGES[idx % GBV_IMAGES.length];
@@ -356,6 +357,12 @@ export class CentresComponent implements OnInit, OnDestroy {
     clearInterval(this.slideInterval);
   }
 
+  // ── Resolve relative /uploads/... paths returned by the backend ──
+  mediaUrl(path: string): string {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `${environment.apiUrl}${path}`;
+  }
+
   fetchCentres(): void {
     this.centresLoading = true;
 
@@ -388,7 +395,8 @@ export class CentresComponent implements OnInit, OnDestroy {
             provides_counselling: !!c.provides_counselling,
             provides_legal_support: !!c.provides_legal_support,
             capacity: c.capacity || 0,
-            img: getCentreImage(c.type, c.id),
+            img: c.profile_picture ? this.mediaUrl(c.profile_picture) : getCentreImage(c.type, c.id),
+            profilePicture: c.profile_picture || null,
             contact_email: c.contact_email || '',
             contact_phone: c.contact_phone || '',
             whatsapp: c.whatsapp || '',

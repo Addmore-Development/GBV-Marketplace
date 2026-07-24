@@ -208,11 +208,6 @@ export class AdminComponent implements OnInit {
   replyText = '';
   replySending = false;
 
-  // ── Add buyer ─────────────────────────────────────────────
-  showAddBuyer = false;
-  newBuyer = { name: '', email: '', password: '' };
-  buyerSaveError = '';
-
   // ── Toast ─────────────────────────────────────────────────
   toastMsg = '';
   toastVisible = false;
@@ -456,36 +451,6 @@ export class AdminComponent implements OnInit {
       next: () => {
         this.centres = this.centres.filter(c => c.id !== id);
         this.showToast('Centre deleted');
-        this.cdr.detectChanges();
-      },
-      error: () => this.showToast('Error — check backend')
-    });
-  }
-
-  // ── Buyer actions ─────────────────────────────────────────
-  addBuyer(): void {
-    this.buyerSaveError = '';
-    if (!this.newBuyer.name || !this.newBuyer.email || !this.newBuyer.password) {
-      this.buyerSaveError = 'All fields required.'; return;
-    }
-    this.http.post<BuyerRow>(`${this.API}/buyers`, this.newBuyer, this.adminHeaders).subscribe({
-      next: (b) => {
-        this.buyers.unshift(b);
-        this.showAddBuyer = false;
-        this.newBuyer = { name: '', email: '', password: '' };
-        this.showToast('Buyer added');
-        this.cdr.detectChanges();
-      },
-      error: () => { this.buyerSaveError = 'Could not add buyer.'; }
-    });
-  }
-
-  deleteBuyer(id: string): void {
-    if (!confirm('Delete this buyer account?')) return;
-    this.http.delete(`${this.API}/buyers/${id}`, this.adminHeaders).subscribe({
-      next: () => {
-        this.buyers = this.buyers.filter(b => b.id !== id);
-        this.showToast('Buyer deleted');
         this.cdr.detectChanges();
       },
       error: () => this.showToast('Error — check backend')

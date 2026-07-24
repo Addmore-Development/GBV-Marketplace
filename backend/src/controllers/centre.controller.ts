@@ -3,8 +3,20 @@
 // ============================================================
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import fs from 'fs';
 import { pool } from '../index';
 import { logActivity, getClientIp } from '../utils/activityLog';
+
+const signCentreToken = (centreId: string) =>
+  jwt.sign({ id: centreId, role: 'centre' }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
+
+// Ensure the profile-picture upload directory exists
+const centreProfileDir = path.join(__dirname, '../../uploads/centre-profile');
+if (!fs.existsSync(centreProfileDir)) {
+  fs.mkdirSync(centreProfileDir, { recursive: true });
+}
 
 // ─── REGISTER A CENTRE ──────────────────────────────────────
 export const registerCentre = async (req: Request, res: Response) => {
@@ -13,10 +25,91 @@ export const registerCentre = async (req: Request, res: Response) => {
     const body = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
+    // ── Required text/selection fields (mirrors the frontend form's
+    //    Validators.required fields) ─────────────────────────────
+    const requiredTextFields: { key: string; label: string }[] = [
+      { key: 'centre_type',           label: 'Centre type' },
+      { key: 'centre_name',           label: 'Centre name' },
+      { key: 'npo_number',            label: 'NPO registration number' },
+      { key: 'contact_person_name',   label: 'Contact person name' },
+      { key: 'contact_person_role',   label: 'Contact person role' },
+      { key: 'contact_email',         label: 'Contact email' },
+      { key: 'contact_phone',         label: 'Contact phone' },
+      { key: 'physical_address',      label: 'Physical address' },
+      { key: 'suburb',                label: 'Suburb' },
+      { key: 'city',                  label: 'City' },
+      { key: 'province',              label: 'Province' },
+      { key: 'postal_code',           label: 'Postal code' },
+      { key: 'description',           label: 'Full description' },
+      { key: 'mission_statement',     label: 'Mission statement' },
+      { key: 'emergency_protocol',    label: 'Emergency protocol' },
+      { key: 'confidentiality_policy',label: 'Confidentiality policy' },
+      { key: 'password',              label: 'Password' },
+    ];
+
+    const missingFields: string[] = [];
+    for (const f of requiredTextFields) {
+      if (!body[f.key] || String(body[f.key]).trim() === '') {
+        missingFields.push(f.label);
+      }
+    }
+
+    // Array fields sent as JSON strings from FormData
+    const parseArrEarly = (val: string | string[]): any[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      try { const p = JSON.parse(val); return Array.isArray(p) ? p : [val]; } catch { return [val]; }
+    };
+    const servicesOffered  = parseArrEarly(body.services_offered);
+    const targetPopulation = parseArrEarly(body.target_population);
+    const languagesSpoken  = parseArrEarly(body.languages_spoken);
+
+    if (servicesOffered.length === 0)  missingFields.push('At least one service offered');
+    if (targetPopulation.length === 0) missingFields.push('At least one target population');
+    if (languagesSpoken.length === 0)  missingFields.push('At least one language spoken');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: `Missing required field(s): ${missingFields.join(', ')}`,
+        missing_fields: missingFields,
+      });
+    }
+
+    // ── Format validation ──────────────────────────────────────
+    const allowedCentreTypes = ['gbv_centre', 'orphanage', 'old_age_home'];
+    if (!allowedCentreTypes.includes(body.centre_type)) {
+      return res.status(400).json({ error: 'Centre type must be one of: gbv_centre, orphanage, old_age_home' });
+    }
+    if (String(body.centre_name).trim().length < 3) {
+      return res.status(400).json({ error: 'Centre name must be at least 3 characters' });
+    }
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(body.contact_email)) {
+      return res.status(400).json({ error: 'Please provide a valid contact email address' });
+    }
+    if (!/^0[0-9]{9}$/.test(body.contact_phone)) {
+      return res.status(400).json({ error: 'Contact phone must be a valid 10-digit South African number starting with 0' });
+    }
+    if (!/^\d{4}$/.test(body.postal_code)) {
+      return res.status(400).json({ error: 'Postal code must be exactly 4 digits' });
+    }
+    if (String(body.description).trim().length < 100) {
+      return res.status(400).json({ error: 'Full description must be at least 100 characters' });
+    }
+    if (String(body.mission_statement).trim().length < 50) {
+      return res.status(400).json({ error: 'Mission statement must be at least 50 characters' });
+    }
+    if (String(body.password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (body.agree_terms !== undefined && body.agree_terms !== 'true' && body.agree_terms !== true) {
+      return res.status(400).json({ error: 'You must agree to the declaration to submit your application' });
+    }
+
     // Required document check
     const requiredDocs = ['npo_certificate', 'id_document', 'proof_of_address'];
     for (const doc of requiredDocs) {
-      if (!files[doc]?.length) {
+      if (!files?.[doc]?.length) {
         return res.status(400).json({
           error: `Missing required document: ${doc.replace(/_/g, ' ')}`,
         });
@@ -135,6 +228,7 @@ export const registerCentre = async (req: Request, res: Response) => {
       centre_id: centre.id,
       centre_name: centre.centre_name,
       status: centre.status,
+      token: signCentreToken(centre.id),
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
@@ -233,7 +327,8 @@ export const loginCentre = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT id, centre_name, centre_type, contact_email, contact_person_name,
-              city, province, contact_phone, npo_number, password_hash, status
+              city, province, contact_phone, npo_number, password_hash, status,
+              profile_picture_url
        FROM centres WHERE contact_email = $1`,
       [email]
     );
@@ -255,6 +350,8 @@ export const loginCentre = async (req: Request, res: Response) => {
       contact_phone: centre.contact_phone,
       npo_number: centre.npo_number,
       status: centre.status,
+      profile_picture_url: centre.profile_picture_url,
+      token: signCentreToken(centre.id),
     });
   } catch (err) {
     console.error(err);
@@ -283,6 +380,7 @@ export const getAllCentres = async (req: Request, res: Response) => {
         COALESCE(suburb, city, '')      AS suburb,
         COALESCE(description, '')       AS description,
         COALESCE(mission_statement, '') AS mission,
+        profile_picture_url             AS profile_picture,
         COALESCE(services_offered, '{}') AS services,
         COALESCE(languages_spoken, '{}') AS languages,
         COALESCE(is_24_hour, false)          AS is_24_hour,
@@ -306,5 +404,38 @@ export const getAllCentres = async (req: Request, res: Response) => {
   } catch (err) {
     console.error('getAllCentres error:', err);
     res.status(500).json({ error: 'Failed to fetch centres' });
+  }
+};
+
+// ─── UPLOAD / UPDATE OWN PROFILE PICTURE ─────────────────────
+// Protected by verifyCentreToken — a centre can only set its own
+// picture. Approval status is NOT required here: a centre should
+// be able to finish setting up its profile while its application
+// is still under review.
+export const uploadCentreProfilePicture = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      return res.status(400).json({ error: 'No image file was uploaded' });
+    }
+
+    const profilePictureUrl = `/uploads/centre-profile/${file.filename}`;
+
+    const result = await pool.query(
+      `UPDATE centres SET profile_picture_url = $1, updated_at = NOW()
+       WHERE id = $2 RETURNING id, profile_picture_url`,
+      [profilePictureUrl, id]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Centre not found' });
+
+    return res.json({
+      message: 'Profile picture updated',
+      profile_picture_url: result.rows[0].profile_picture_url,
+    });
+  } catch (err) {
+    console.error('uploadCentreProfilePicture error:', err);
+    return res.status(500).json({ error: 'Failed to update profile picture' });
   }
 };

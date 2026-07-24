@@ -205,9 +205,15 @@ export const registerSeller = async (req: Request, res: Response) => {
             return res.status(409).json({ error: 'Email already registered', code: 'ALREADY_EXISTS' });
         }
 
-        const centreCheck = await pool.query(`SELECT id FROM centres WHERE id = $1`, [centre_id]);
+        const centreCheck = await pool.query(`SELECT id, status FROM centres WHERE id = $1`, [centre_id]);
         if (centreCheck.rows.length === 0) {
             return res.status(400).json({ error: 'Selected centre does not exist' });
+        }
+        if (centreCheck.rows[0].status !== 'approved') {
+            return res.status(400).json({
+                error: 'Selected centre is not yet approved and cannot accept new sellers.',
+                code: 'CENTRE_NOT_APPROVED',
+            });
         }
 
         const finalPhone = phone || '0000000000';
@@ -415,13 +421,22 @@ export const createProduct = async (req: Request, res: Response) => {
     }
     try {
         const check = await pool.query(
-            `SELECT profile_complete FROM sellers WHERE id = $1`,
+            `SELECT profile_complete, verification_status FROM sellers WHERE id = $1`,
             [seller_id]
         );
-        if (!check.rows[0]?.profile_complete) {
+        if (!check.rows.length) {
+            return res.status(404).json({ error: 'Seller not found' });
+        }
+        if (!check.rows[0].profile_complete) {
             return res.status(403).json({
                 error: 'Please complete your maker profile before listing products.',
                 code: 'PROFILE_INCOMPLETE'
+            });
+        }
+        if (check.rows[0].verification_status !== 'approved') {
+            return res.status(403).json({
+                error: 'Your account is still pending admin approval. You can list products once approved.',
+                code: 'NOT_APPROVED'
             });
         }
 

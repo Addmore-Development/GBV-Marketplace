@@ -249,30 +249,14 @@
       <div class="tab-header row">
         <div>
           <h1>Buyers</h1>
-          <p class="tab-sub">View and manage buyer accounts.</p>
-        </div>
-        <button class="btn-add" (click)="showAddBuyer = true">+ Add buyer</button>
-      </div>
-
-      <!-- Add buyer form -->
-      <div class="inline-form" *ngIf="showAddBuyer">
-        <h3>Add new buyer</h3>
-        <div class="form-row">
-          <div class="fg"><label>Full name</label><input [(ngModel)]="newBuyer.name" placeholder="Buyer name"></div>
-          <div class="fg"><label>Email</label><input type="email" [(ngModel)]="newBuyer.email" placeholder="email@example.com"></div>
-          <div class="fg"><label>Password</label><input type="password" [(ngModel)]="newBuyer.password" placeholder="Temp password"></div>
-        </div>
-        <div class="form-error" *ngIf="buyerSaveError">{{ buyerSaveError }}</div>
-        <div class="form-actions">
-          <button class="btn-primary" (click)="addBuyer()">Add buyer</button>
-          <button class="btn-ghost" (click)="showAddBuyer = false">Cancel</button>
+          <p class="tab-sub">Everyone who has placed an order — checkout is guest-only, so buyers are grouped by email.</p>
         </div>
       </div>
 
       <div class="data-table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Spent</th><th>Orders</th><th>Joined</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>Email</th><th>Spent</th><th>Orders</th><th>First order</th></tr>
           </thead>
           <tbody>
             <tr *ngFor="let b of buyers">
@@ -281,12 +265,9 @@
               <td>{{ formatCurrency(b.total_spent) }}</td>
               <td>{{ b.order_count }}</td>
               <td>{{ formatDate(b.created_at) }}</td>
-              <td class="td-actions">
-                <button class="btn-delete" (click)="deleteBuyer(b.id)">🗑 Delete</button>
-              </td>
             </tr>
             <tr *ngIf="buyers.length === 0">
-              <td colspan="6" class="td-empty">No buyers yet.</td>
+              <td colspan="5" class="td-empty">No buyers yet.</td>
             </tr>
           </tbody>
         </table>

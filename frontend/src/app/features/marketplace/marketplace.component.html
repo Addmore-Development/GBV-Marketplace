@@ -351,7 +351,7 @@
       </ng-container>
 
       <ng-container *ngIf="loginRole === 'admin'">
-        <div class="mf-group"><label>Admin PIN</label><input [(ngModel)]="adminPinInput" type="password" placeholder="Enter admin PIN" inputmode="numeric" /></div>
+        <div class="mf-group"><label>Admin PIN</label><input [(ngModel)]="adminPinInput" type="password" placeholder="Enter admin PIN" autocomplete="off" /></div>
         <div class="modal-error" *ngIf="authError">{{ authError }}</div>
         <button class="modal-cta" (click)="doAdminLogin()">Enter Admin Panel</button>
       </ng-container>

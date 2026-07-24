@@ -276,9 +276,9 @@
           <input [(ngModel)]="sellerEmail" type="email" placeholder="you@example.com" />
         </div>
         <div class="mf-group">
-          <label>Create a private PIN (4–6 digits)</label>
-          <input [(ngModel)]="sellerPin" type="password" inputmode="numeric"
-            placeholder="4–6 digits" maxlength="6" />
+          <label>Create a private PIN (min. 8 characters, letters allowed)</label>
+          <input [(ngModel)]="sellerPin" type="password"
+            placeholder="Min. 8 characters" autocomplete="new-password" />
           <div class="mf-hint">You'll use this PIN to log in. Write it down somewhere safe.</div>
         </div>
         <div class="mf-group">

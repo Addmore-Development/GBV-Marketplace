@@ -660,7 +660,29 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     else { this.authError = 'Registration failed.'; }
   }
 
-  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
+  logout(): void {
+    const role = this.currentUser?.role;
+    if (role === 'seller') {
+      this.sellerAuth.logout();
+    } else if (role === 'centre') {
+      const centreId = localStorage.getItem('centreId');
+      const centreName = localStorage.getItem('centreName');
+      const centreEmail = localStorage.getItem('centreEmail');
+      if (centreId) {
+        this.http.post(`${environment.apiUrl}/api/centres/logout`, {
+          centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
+        }).subscribe({ error: () => {} });
+      }
+      ['centreId', 'centreName', 'centreType', 'centreEmail', 'centreManagerName',
+       'centreCity', 'centreProvince', 'centrePhone', 'centreNpoNumber',
+       'centreDescription', 'centreMission', 'centreWebsite', 'centreToken',
+       'centreProfilePic', 'centreStatus'].forEach(k => localStorage.removeItem(k));
+    } else {
+      this.authService.logout();
+    }
+    this.currentUser = null;
+    this.showToast('Signed out successfully');
+  }
 
   submitDonate(): void {
     if (this.donateForm.invalid) { this.donateForm.markAllAsTouched(); return; }

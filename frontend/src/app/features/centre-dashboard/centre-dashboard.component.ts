@@ -991,29 +991,16 @@ interface Need {
 
     /* Math shortcut */
     @media (max-width: 900px) {
-      .cd-page { flex-direction: column; }
-      .sidebar {
-        width: 100%; min-height: unset; height: auto; position: relative;
-        flex-direction: row; flex-wrap: wrap; align-items: center;
-        &.collapsed { width: 100%; }
-      }
-      .sb-header { border-bottom: none; padding: 10px 12px; flex-shrink: 0; }
-      .sb-status { display: none !important; }
-      .sb-nav {
-        flex-direction: row; flex-wrap: nowrap; overflow-x: auto;
-        -webkit-overflow-scrolling: touch; padding: 6px 8px; gap: 4px;
-      }
-      .sb-link { white-space: nowrap; flex-shrink: 0; }
-      .sb-footer {
-        display: flex !important;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        border-top: none;
-        padding: 8px 12px;
-        margin-left: auto;
-        gap: 6px;
-      }
-      .sb-footer-link, .sb-signout { white-space: nowrap; padding: 6px 8px; font-size: .7rem; }
+      /* The sidebar keeps its normal left-docked, sticky, collapsible
+         layout on mobile too (same as the admin dashboard) — it just
+         starts narrower so it doesn't eat the whole screen. The
+         existing sb-toggle button still expands it out (wider, labels
+         visible) or collapses it back down (narrower, icons only),
+         same mechanic as desktop. */
+      .sidebar { width: 72px; &.collapsed { width: 72px; } }
+      .sidebar:not(.collapsed) { width: 220px; }
+      .sb-header { padding: 14px 8px 10px; }
+      .sb-nav { padding: 8px 6px; }
       .overview-grid { grid-template-columns: 1fr; }
       .ov-card.wide { grid-column: span 1; }
       .donations-summary, .orders-summary { grid-template-columns: repeat(2, 1fr); }
@@ -1030,7 +1017,7 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
 
   constructor(private http: HttpClient, private router: Router) {}
 
-  sidebarCollapsed = false;
+  sidebarCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900;
   activeTab = 'overview';
   hasAlert = true;
   unreadNotifications = 3;

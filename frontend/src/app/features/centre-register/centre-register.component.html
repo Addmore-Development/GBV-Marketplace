@@ -71,12 +71,9 @@
         </a>
       </div>
 
-      <!-- Auth actions (top-right) -->
+      <!-- Auth actions (top-right) — only shown once signed in; no Sign In / Register
+           buttons here since this page is itself a registration flow. -->
       <div class="reg-nav-right">
-        <ng-container *ngIf="!currentUser">
-          <button class="nav-btn-ghost" (click)="showAuthModal('login')">Sign In</button>
-          <button class="nav-btn-solid" (click)="showAuthModal('register')">Register</button>
-        </ng-container>
         <ng-container *ngIf="currentUser">
           <div class="user-chip">
             <div class="user-avatar">{{ currentUser.initials }}</div>

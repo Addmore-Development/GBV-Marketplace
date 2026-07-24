@@ -70,13 +70,17 @@
       <!-- Centre Selection — proper dropdown -->
       <div class="form-group">
         <label>Nearest Amani workshop *</label>
-        <select [(ngModel)]="selectedCentreId">
+        <select [(ngModel)]="selectedCentreId" [disabled]="centresLoading || !!centresError">
           <option value="">{{ centresLoading ? 'Loading centres…' : 'Select a centre…' }}</option>
           <option *ngFor="let c of centres" [value]="c.id">
             {{ c.name }} — {{ c.city }}, {{ c.province }}
           </option>
         </select>
-        <small>Choose the centre closest to you. Your products will be shipped from here.</small>
+        <small *ngIf="!centresError">Choose the centre closest to you. Your products will be shipped from here.</small>
+        <small style="color:#b3261e;" *ngIf="centresError">
+          {{ centresError }}
+          <a href="javascript:void(0)" (click)="fetchCentres()">Retry</a>
+        </small>
       </div>
 
       <div class="error-msg" *ngIf="error">

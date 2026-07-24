@@ -4,10 +4,22 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture } from '../controllers/centre.controller';
 import { verifyAdminToken, verifyCentreToken } from '../middleware/auth.middleware';
 
 const router = Router();
+
+// Ensure upload directories exist (Railway's filesystem is ephemeral,
+// so these can't be assumed to be present after a redeploy).
+const centreDocumentsDir = path.join(__dirname, '../../uploads/centre-documents');
+if (!fs.existsSync(centreDocumentsDir)) {
+  fs.mkdirSync(centreDocumentsDir, { recursive: true });
+}
+const centreProfilePicDir = path.join(__dirname, '../../uploads/centre-profile');
+if (!fs.existsSync(centreProfilePicDir)) {
+  fs.mkdirSync(centreProfilePicDir, { recursive: true });
+}
 
 // File upload config
 const storage = multer.diskStorage({

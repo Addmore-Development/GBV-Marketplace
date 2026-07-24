@@ -129,6 +129,7 @@ export class CentresComponent implements OnInit, OnDestroy {
   sellerError = '';
   sellerCentres: { id: string; name: string; city: string; province: string }[] = [];
   sellerCentresLoading = false;
+  sellerCentresError = '';
   donateForm!: FormGroup;
   donateType: 'money' | 'goods' | 'time' = 'money';
 
@@ -489,15 +490,24 @@ export class CentresComponent implements OnInit, OnDestroy {
   // ── Auth ──────────────────────────────────────────────────
   loadSellerCentres(): void {
     this.sellerCentresLoading = true;
+    this.sellerCentresError = '';
     this.http.get<any[]>(`${environment.apiUrl}/api/sellers/centres/verified`).subscribe({
       next: (data) => {
         if (data && data.length > 0) {
           this.sellerCentres = data.map((c: any) => ({ id: c.id, name: c.name || c.centre_name, city: c.city, province: c.province }));
+        } else {
+          this.sellerCentres = [];
+          this.sellerCentresError = 'No centres have been approved yet. Please check back soon.';
         }
         this.sellerCentresLoading = false;
         this.cdr.detectChanges();
       },
-      error: () => { this.sellerCentresLoading = false; this.cdr.detectChanges(); }
+      error: () => {
+        this.sellerCentres = [];
+        this.sellerCentresError = "Couldn't load the list of centres — check your connection and try again.";
+        this.sellerCentresLoading = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 

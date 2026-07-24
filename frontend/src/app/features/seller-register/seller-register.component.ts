@@ -12,17 +12,6 @@ interface Centre {
   province: string;
 }
 
-const STATIC_CENTRES: Centre[] = [
-  { id: 'c1', name: 'Thistle House GBV Centre',   city: 'Cape Town',      province: 'Western Cape' },
-  { id: 'c2', name: 'New Beginnings NPO',          city: 'Johannesburg',   province: 'Gauteng' },
-  { id: 'c3', name: 'Ubuntu Youth Programme',      city: 'Johannesburg',   province: 'Gauteng' },
-  { id: 'c4', name: 'Khanya Elderly Home',         city: 'Pretoria',       province: 'Gauteng' },
-  { id: 'c5', name: "Khayelitsha Women's Hub",     city: 'Cape Town',      province: 'Western Cape' },
-  { id: 'c6', name: 'Empilweni Care Centre',       city: 'Durban',         province: 'KwaZulu-Natal' },
-  { id: 'c7', name: "Sunshine Children's Village", city: 'Bloemfontein',   province: 'Free State' },
-  { id: 'c8', name: "Ubuntu Women's Centre",       city: 'Port Elizabeth', province: 'Eastern Cape' },
-];
-
 @Component({
   selector: 'app-seller-register',
   standalone: true,
@@ -41,6 +30,7 @@ export class SellerRegisterComponent implements OnInit {
 
   centres: Centre[] = [];
   centresLoading = false;
+  centresError = '';
 
   isLoading = false;
   error = '';
@@ -62,7 +52,12 @@ export class SellerRegisterComponent implements OnInit {
   constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
+    this.fetchCentres();
+  }
+
+  fetchCentres(): void {
     this.centresLoading = true;
+    this.centresError = '';
     this.http.get<any[]>(`${this.API}/centres/verified`).subscribe({
       next: (data) => {
         if (data && data.length > 0) {
@@ -73,14 +68,14 @@ export class SellerRegisterComponent implements OnInit {
             province: c.province,
           }));
         } else {
-          // Backend returned empty — use static fallback
-          this.centres = STATIC_CENTRES;
+          this.centres = [];
+          this.centresError = 'No centres have been approved yet. Please check back soon.';
         }
         this.centresLoading = false;
       },
       error: () => {
-        // Network error — use static fallback
-        this.centres = STATIC_CENTRES;
+        this.centres = [];
+        this.centresError = "Couldn't load the list of centres — check your connection and try again.";
         this.centresLoading = false;
       }
     });

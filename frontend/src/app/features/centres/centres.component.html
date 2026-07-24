@@ -283,13 +283,17 @@
         </div>
         <div class="mf-group">
           <label>Nearest Amani workshop *</label>
-          <select [(ngModel)]="sellerCentreId" [disabled]="sellerCentresLoading">
+          <select [(ngModel)]="sellerCentreId" [disabled]="sellerCentresLoading || !!sellerCentresError">
             <option value="" disabled selected>{{ sellerCentresLoading ? 'Loading centres…' : 'Select a centre…' }}</option>
             <option *ngFor="let c of sellerCentres" [value]="c.id">
               {{ c.name }} — {{ c.city }}, {{ c.province }}
             </option>
           </select>
-          <div class="mf-hint">Choose the centre closest to you. Your products will be shipped from here.</div>
+          <div class="mf-hint" *ngIf="!sellerCentresError">Choose the centre closest to you. Your products will be shipped from here.</div>
+          <div class="mf-hint" style="color:#b3261e;" *ngIf="sellerCentresError">
+            {{ sellerCentresError }}
+            <a href="javascript:void(0)" (click)="loadSellerCentres()">Retry</a>
+          </div>
         </div>
         <div class="modal-error" *ngIf="sellerError">{{ sellerError }}</div>
         <button class="modal-cta" [disabled]="!sellerCanSubmit || sellerIsLoading" (click)="doSellerRegister()">

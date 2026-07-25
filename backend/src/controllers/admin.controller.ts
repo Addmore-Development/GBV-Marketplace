@@ -137,7 +137,7 @@ export const getBuyers = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
       `SELECT
-         MIN(id)::text        AS id,
+         MIN(id::text)         AS id,
          buyer_email           AS email,
          MAX(buyer_name)       AS name,
          COALESCE(SUM(total), 0) AS total_spent,

@@ -23,7 +23,10 @@ app.use('/api/centres', centreRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', (req, res, next) => {
+  res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static('uploads'));
 
 
 // PostgreSQL connection

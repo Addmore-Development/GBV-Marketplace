@@ -276,7 +276,10 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     }
 
     this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => { if (u) this.currentUser = u; });
+      .subscribe(u => {
+        if (u) this.currentUser = u;
+        else if (!this.sellerAuth.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+      });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
         if (u) {
@@ -631,6 +634,11 @@ formatPrice(p: number | string): string {
     localStorage.removeItem('centreManagerName'); localStorage.removeItem('centreCity');
     localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
     localStorage.removeItem('centreNpoNumber');
+    // Clear immediately rather than relying on the auth-service subscriptions —
+    // those only assign currentUser when a user is present, and centre sessions
+    // aren't reactive at all (no dedicated auth service), so without this the
+    // name stayed visible until the next full page load.
+    this.currentUser = null;
     this.showToast('Signed out successfully');
   }
 

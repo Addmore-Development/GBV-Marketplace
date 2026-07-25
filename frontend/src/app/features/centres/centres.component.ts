@@ -603,9 +603,18 @@ export class CentresComponent implements OnInit, OnDestroy {
         email: this.loginEmail, password: this.loginPassword
       }).subscribe({
         next: (res) => {
-          localStorage.setItem('centreId', res.centre_id);
-          localStorage.setItem('centreName', res.centre_name);
-          localStorage.setItem('centreEmail', res.contact_email);
+          localStorage.setItem('centreId', res.centre_id || '');
+          localStorage.setItem('centreToken', res.token || '');
+          localStorage.setItem('centreName', res.centre_name || '');
+          localStorage.setItem('centreType', res.centre_type || '');
+          localStorage.setItem('centreEmail', res.contact_email || '');
+          localStorage.setItem('centreManagerName', res.contact_person_name || '');
+          localStorage.setItem('centreCity', res.city || '');
+          localStorage.setItem('centreProvince', res.province || '');
+          localStorage.setItem('centrePhone', res.contact_phone || '');
+          localStorage.setItem('centreNpoNumber', res.npo_number || '');
+          localStorage.setItem('centreStatus', res.status || '');
+          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
           this.closeModalDirect();
           this.router.navigate(['/centre-dashboard']);
         },

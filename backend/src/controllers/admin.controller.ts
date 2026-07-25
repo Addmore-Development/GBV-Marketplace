@@ -155,6 +155,20 @@ export const getBuyers = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// There's no buyer-accounts table to delete a row from (see getBuyers above),
+// so "deleting a buyer" removes their order history — order_items cascade
+// via the FK, so a single DELETE on orders is enough.
+export const deleteBuyer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const email = decodeURIComponent(req.params['email'] as string);
+    const result = await pool.query(`DELETE FROM orders WHERE buyer_email = $1`, [email]);
+    res.json({ ok: true, ordersDeleted: result.rowCount });
+  } catch (err: any) {
+    console.error('[Admin] deleteBuyer error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ── Messages ──────────────────────────────────────────────
 export const getMessages = async (req: Request, res: Response): Promise<void> => {
   try {

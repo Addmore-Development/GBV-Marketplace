@@ -15,7 +15,7 @@
   <!-- ── SIDEBAR ─────────────────────────────────────────── -->
   <aside class="sd-sidebar">
     <div class="sb-brand" (dblclick)="handleLogoDblTap()" title="Double-tap to leave safely">
-      <span class="sb-leaf">🌿</span>
+      <span class="sb-leaf"></span>
       <span class="sb-name">Amani</span>
     </div>
 
@@ -24,7 +24,7 @@
       <div class="sb-maker-info">
         <div class="sb-alias">{{ seller.alias }}</div>
         <div class="sb-status" [class.verified]="seller.verification_status === 'approved'">
-          {{ seller.verification_status === 'approved' ? '✓ Verified maker' : '⏳ Pending review' }}
+          {{ seller.verification_status === 'approved' ? '✓ Verified maker' : 'Pending review' }}
         </div>
       </div>
     </div>
@@ -40,40 +40,40 @@
 
     <nav class="sb-nav">
       <button class="sb-link" [class.active]="activeTab === 'home'" (click)="activeTab = 'home'">
-        <span class="sb-icon">🏡</span><span class="sb-label">My Studio</span>
+        <span class="sb-icon"></span><span class="sb-label">My Studio</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'listings'" (click)="activeTab = 'listings'">
-        <span class="sb-icon">🛍️</span><span class="sb-label">My Listings</span>
+        <span class="sb-icon"></span><span class="sb-label">My Listings</span>
         <span class="sb-badge" *ngIf="activeListings > 0">{{ activeListings }}</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'earnings'" (click)="activeTab = 'earnings'">
-        <span class="sb-icon">💛</span><span class="sb-label">My Earnings</span>
+        <span class="sb-icon"></span><span class="sb-label">My Earnings</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'centre'" (click)="activeTab = 'centre'">
-        <span class="sb-icon">🏢</span><span class="sb-label">My Centre</span>
+        <span class="sb-icon"></span><span class="sb-label">My Centre</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'volunteer'" (click)="activeTab = 'volunteer'">
-        <span class="sb-icon">🤝</span><span class="sb-label">Volunteer</span>
+        <span class="sb-icon"></span><span class="sb-label">Volunteer</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'learn'" (click)="activeTab = 'learn'">
-        <span class="sb-icon">🌱</span><span class="sb-label">Grow & Learn</span>
+        <span class="sb-icon"></span><span class="sb-label">Grow & Learn</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'contacts'" (click)="activeTab = 'contacts'">
-        <span class="sb-icon">🤝</span><span class="sb-label">My Circle</span>
+        <span class="sb-icon"></span><span class="sb-label">My Circle</span>
         <span class="sb-badge warn" *ngIf="contacts.length === 0">!</span>
       </button>
       <button class="sb-link" [class.active]="activeTab === 'profile'" (click)="activeTab = 'profile'">
-        <span class="sb-icon">✍️</span><span class="sb-label">My Story</span>
+        <span class="sb-icon"></span><span class="sb-label">My Story</span>
       </button>
       <div class="sb-divider"></div>
       <button class="sb-link sanctuary-link" (click)="requestSanctuary()">
-        <span class="sb-icon">🔐</span><span class="sb-label">My Stats</span>
+        <span class="sb-icon"></span><span class="sb-label">My Stats</span>
       </button>
     </nav>
 
     <div class="sb-bottom">
       <button class="sb-suppliers-btn" (click)="openSuppliersPanel()">
-        📦 Checkout Suppliers
+        Checkout Suppliers
       </button>
       <button class="sb-signout" (click)="logout()">Sign out</button>
       <div class="sb-exit-hint">Double-tap logo to leave safely</div>
@@ -97,7 +97,7 @@
       </div>
       <div class="tb-right">
         <button class="tb-exit" (click)="quickExit()" title="Quick exit — leave this site instantly">
-          <span class="tb-exit-icon">🚪</span><span class="tb-exit-label">Quick Exit</span>
+          <span class="tb-exit-icon"></span><span class="tb-exit-label">Quick Exit</span>
         </button>
         <div class="tb-avatar">{{ seller.alias.charAt(0).toUpperCase() }}</div>
       </div>
@@ -120,7 +120,7 @@
 
     <!-- Profile incomplete banner -->
     <div class="incomplete-banner" *ngIf="!seller.profile_complete && activeTab !== 'profile'">
-      <span>✍️</span>
+      <span></span>
       <span>Your story isn't complete yet — <strong>complete your profile</strong> to start listing your work.</span>
       <button (click)="activeTab = 'profile'">Complete now →</button>
     </div>
@@ -130,7 +130,7 @@
     <div class="tab-content" *ngIf="activeTab === 'home'">
       <div class="home-welcome">
         <div class="hw-copy">
-          <h2>Good to see you, <span class="hw-name">{{ seller.alias }}</span> 🌿</h2>
+          <h2>Good to see you, <span class="hw-name">{{ seller.alias }}</span> </h2>
           <p>Your craft is your power. Every piece you make tells a story — and this is where that story grows.</p>
         </div>
       </div>
@@ -159,17 +159,17 @@
           <h3>Quick actions</h3>
           <div class="quick-actions">
             <button class="qa-btn" (click)="openAddProduct()">
-              <span>➕</span>
+              <span></span>
               <strong>Add a listing</strong>
               <small>Share your latest creation</small>
             </button>
             <button class="qa-btn" (click)="activeTab = 'learn'">
-              <span>🌱</span>
+              <span></span>
               <strong>Continue learning</strong>
               <small>{{ trainingModules.filter(m => m.progress === 'in_progress').length }} modules in progress</small>
             </button>
             <button class="qa-btn" (click)="activeTab = 'earnings'">
-              <span>💛</span>
+              <span></span>
               <strong>View earnings</strong>
               <small>{{ earningsSummary.paid_count }} payouts received</small>
             </button>
@@ -184,7 +184,7 @@
           <div class="recent-products">
             <div class="rp-item" *ngFor="let p of products.slice(0, 4)">
               <div class="rp-thumb" [style.background-image]="p.image_url ? 'url(' + p.image_url + ')' : ''">
-                <span *ngIf="!p.image_url">{{ p.category?.charAt(0) || '🎨' }}</span>
+                <span *ngIf="!p.image_url">{{ p.category?.charAt(0) || '' }}</span>
               </div>
               <div class="rp-info">
                 <div class="rp-name">{{ p.name }}</div>
@@ -219,7 +219,7 @@
         </div>
 
         <div class="hg-card circle-nudge" *ngIf="contacts.length === 0">
-          <div class="cn-icon">🤝</div>
+          <div class="cn-icon"></div>
           <h3>Build your circle</h3>
           <p>Add people you trust — people who will know if you need them. It takes two minutes and can mean everything.</p>
           <button class="btn-sm-gold" (click)="activeTab = 'contacts'">Add someone now →</button>
@@ -236,7 +236,7 @@
                 <div class="cm-name">{{ c.name }}</div>
                 <div class="cm-rel">{{ c.relationship || 'Trusted person' }}</div>
               </div>
-              <span class="cm-wa" *ngIf="c.whatsapp">📱</span>
+              <span class="cm-wa" *ngIf="c.whatsapp"></span>
             </div>
           </div>
         </div>
@@ -267,7 +267,7 @@
       <div class="product-grid" *ngIf="products.length > 0">
         <div class="product-card" *ngFor="let p of products">
           <div class="pc-image" [style.background-image]="p.image_url ? 'url(' + p.image_url + ')' : ''">
-            <span class="pc-placeholder" *ngIf="!p.image_url">🎨</span>
+            <span class="pc-placeholder" *ngIf="!p.image_url"></span>
             <span class="pc-status-badge" [ngClass]="p.status">{{ p.status }}</span>
           </div>
           <div class="pc-body">
@@ -277,14 +277,14 @@
             <div class="pc-stock">{{ p.stock || 0 }} in stock · {{ p.total_sold || 0 }} sold</div>
           </div>
           <div class="pc-actions">
-            <button class="pc-btn edit" (click)="editProduct(p)">✏️ Edit</button>
+            <button class="pc-btn edit" (click)="editProduct(p)">Edit</button>
             <button class="pc-btn del" (click)="deleteProduct(p.id)">Remove</button>
           </div>
         </div>
       </div>
 
       <div class="empty-state" *ngIf="products.length === 0">
-        <div class="es-icon">🧵</div>
+        <div class="es-icon"></div>
         <h3>Your shop is empty</h3>
         <p>Add your first listing and let the world find your craft.</p>
         <button class="btn-primary" (click)="openAddProduct()">Add your first listing</button>
@@ -311,7 +311,7 @@
       </div>
 
       <div class="earnings-info">
-        <span>💡</span>
+        <span></span>
         <p>You keep <strong>70% of every sale</strong>. Amani takes only 2%. Your centre receives 28% to keep the workshop running for everyone.</p>
       </div>
 
@@ -332,7 +332,7 @@
       </div>
 
       <div class="empty-state" *ngIf="transactions.length === 0">
-        <div class="es-icon">💛</div>
+        <div class="es-icon"></div>
         <h3>No transactions yet</h3>
         <p>Once your first listing sells, your earnings will appear here.</p>
       </div>
@@ -359,7 +359,7 @@
       <div class="ci-row">
         <strong>Your verification status:</strong>
         <span class="centre-status" [class.approved]="seller.verification_status === 'approved'">
-          {{ seller.verification_status === 'approved' ? '✓ Verified' : '⏳ Pending review' }}
+          {{ seller.verification_status === 'approved' ? '✓ Verified' : 'Pending review' }}
         </span>
       </div>
     </div>
@@ -372,7 +372,7 @@
 
   <ng-template #noCentre>
     <div class="empty-state">
-      <div class="es-icon">🏢</div>
+      <div class="es-icon"></div>
       <h3>No centre assigned yet</h3>
       <p>You haven't been assigned to a centre. Please complete your registration or contact Amani support.</p>
     </div>
@@ -399,13 +399,13 @@
             <strong>Skills needed:</strong> {{ opp.skills_required.join(', ') }}
           </div>
           <div class="vc-location" *ngIf="opp.location">
-            📍 {{ opp.location }}
+            {{ opp.location }}
           </div>
           <button class="btn-primary" (click)="openApplyModal(opp)">Apply →</button>
         </div>
       </div>
       <div class="empty-state" *ngIf="volunteerOpportunities.length === 0">
-        <div class="es-icon">🤝</div>
+        <div class="es-icon"></div>
         <h3>No opportunities right now</h3>
         <p>Check back later or contact your centre directly.</p>
       </div>
@@ -436,11 +436,11 @@
 
       <div class="learn-filters">
         <button [class.active]="trainingFilter === 'all'" (click)="trainingFilter = 'all'">All</button>
-        <button [class.active]="trainingFilter === 'craft'" (click)="trainingFilter = 'craft'">🧵 Craft</button>
-        <button [class.active]="trainingFilter === 'business'" (click)="trainingFilter = 'business'">📊 Business</button>
-        <button [class.active]="trainingFilter === 'legal'" (click)="trainingFilter = 'legal'">⚖️ Legal rights</button>
-        <button [class.active]="trainingFilter === 'financial'" (click)="trainingFilter = 'financial'">💰 Money</button>
-        <button [class.active]="trainingFilter === 'wellness'" (click)="trainingFilter = 'wellness'">🌿 Wellness</button>
+        <button [class.active]="trainingFilter === 'craft'" (click)="trainingFilter = 'craft'">Craft</button>
+        <button [class.active]="trainingFilter === 'business'" (click)="trainingFilter = 'business'">Business</button>
+        <button [class.active]="trainingFilter === 'legal'" (click)="trainingFilter = 'legal'">Legal rights</button>
+        <button [class.active]="trainingFilter === 'financial'" (click)="trainingFilter = 'financial'">Money</button>
+        <button [class.active]="trainingFilter === 'wellness'" (click)="trainingFilter = 'wellness'">Wellness</button>
         <button [class.active]="trainingFilter === 'progress'" (click)="trainingFilter = 'progress'">▶ In progress</button>
       </div>
 
@@ -512,14 +512,14 @@
             <div class="cc-rel">{{ c.relationship || 'Trusted person' }}</div>
           </div>
           <div class="cc-tags">
-            <span class="cc-wa" *ngIf="c.whatsapp">📱 WhatsApp</span>
+            <span class="cc-wa" *ngIf="c.whatsapp">WhatsApp</span>
           </div>
           <button class="cc-remove" (click)="removeContact(c.id)">Remove</button>
         </div>
       </div>
 
       <div class="empty-state" *ngIf="contacts.length === 0 && !showAddContact">
-        <div class="es-icon">🤝</div>
+        <div class="es-icon"></div>
         <h3>No one added yet</h3>
         <p>Your circle is your safety net. Add at least one person you trust.</p>
       </div>
@@ -533,7 +533,7 @@
         <h2>My story</h2>
         <p>This is how buyers will find and understand you. The more you share, the more people will connect with your work.</p>
         <div class="profile-status" [class.complete]="seller.profile_complete">
-          {{ seller.profile_complete ? '✓ Profile complete — you can list products' : '⚠️ Complete your profile to start selling' }}
+          {{ seller.profile_complete ? '✓ Profile complete — you can list products' : 'Complete your profile to start selling' }}
         </div>
       </div>
 
@@ -610,19 +610,19 @@
 <div class="sanctuary-page" *ngIf="sanctuaryOpen && !isLoading">
   <header class="sanc-header">
     <div class="sanc-brand" (dblclick)="quickExit()">
-      <span>🌿</span>
+      <span></span>
       <span class="sanc-name">Amani</span>
       <span class="sanc-hint">(double-tap to leave)</span>
     </div>
     <div class="sanc-tabs">
-  <button [class.active]="sanctuaryTab === 'journey'"   (click)="sanctuaryTab = 'journey'">📋 My Journey</button>
-  <button [class.active]="sanctuaryTab === 'share'"     (click)="sanctuaryTab = 'share'">🔗 Share My Case</button>
-  <button [class.active]="sanctuaryTab === 'vault'"     (click)="sanctuaryTab = 'vault'">🔒 Safe Space</button>
-  <button [class.active]="sanctuaryTab === 'support'"   (click)="sanctuaryTab = 'support'">🤝 Find Help</button>
-  <button [class.active]="sanctuaryTab === 'affidavit'" (click)="sanctuaryTab = 'affidavit'">🎙️ Voice Affidavit</button>
+  <button [class.active]="sanctuaryTab === 'journey'"   (click)="sanctuaryTab = 'journey'">My Journey</button>
+  <button [class.active]="sanctuaryTab === 'share'"     (click)="sanctuaryTab = 'share'">Share My Case</button>
+  <button [class.active]="sanctuaryTab === 'vault'"     (click)="sanctuaryTab = 'vault'">Safe Space</button>
+  <button [class.active]="sanctuaryTab === 'support'"   (click)="sanctuaryTab = 'support'">Find Help</button>
+  <button [class.active]="sanctuaryTab === 'affidavit'" (click)="sanctuaryTab = 'affidavit'">Voice Affidavit</button>
 </div>
     <div class="sanc-actions">
-      <button class="sanc-exit-btn" (click)="quickExit()">🚪 Leave quickly</button>
+      <button class="sanc-exit-btn" (click)="quickExit()">Leave quickly</button>
       <button class="sanc-close-btn" (click)="exitSanctuary()">Close sanctuary</button>
     </div>
   </header>
@@ -719,32 +719,32 @@
     <p class="sanc-sub">All of the following are free and confidential. You don't have to face anything alone.</p>
     <div class="support-cards">
       <button class="support-card" (click)="requestSupport('companion')">
-        <span class="spc-icon">👥</span>
+        <span class="spc-icon"></span>
         <strong>Someone to walk with you</strong>
         <small>A trained companion who will go with you to the police station or court — so you're never alone.</small>
         <span class="spc-cta">Request →</span>
       </button>
       <button class="support-card" (click)="requestSupport('legal')">
-        <span class="spc-icon">⚖️</span>
+        <span class="spc-icon"></span>
         <strong>Free legal advice</strong>
         <small>A qualified advocate will contact you to explain your rights and help with your protection order.</small>
         <span class="spc-cta">Request →</span>
       </button>
       <button class="support-card" (click)="requestSupport('counselling')">
-        <span class="spc-icon">💬</span>
+        <span class="spc-icon"></span>
         <strong>Speak to someone</strong>
         <small>Free, private counselling sessions — in person or over the phone. No judgment. Just support.</small>
         <span class="spc-cta">Request →</span>
       </button>
       <button class="support-card" (click)="requestSupport('medical')">
-        <span class="spc-icon">🏥</span>
+        <span class="spc-icon"></span>
         <strong>Medical referral</strong>
         <small>We'll help you access a Thuthuzela Care Centre or doctor near you — free of charge.</small>
         <span class="spc-cta">Request →</span>
       </button>
     </div>
     <div class="sanc-emergency-note">
-      🛡️ <strong>If you are in immediate danger, call 10111 first.</strong> Then come back here.
+      <strong>If you are in immediate danger, call 10111 first.</strong> Then come back here.
     </div>
   </div>
 
@@ -759,12 +759,12 @@
   <!-- Microphone button and status -->
   <div class="affidavit-controls">
     <button class="sanc-btn" (click)="startRecording()" [disabled]="isRecording" *ngIf="!isRecording">
-      🎤 Start speaking
+      Start speaking
     </button>
     <button class="sanc-btn" (click)="stopRecording()" *ngIf="isRecording" style="background:#c0392b;">
-      ⏹️ Stop recording
+      Stop recording
     </button>
-    <span *ngIf="isRecording" class="recording-indicator">🔴 Recording...</span>
+    <span *ngIf="isRecording" class="recording-indicator">Recording...</span>
     <span *ngIf="!isRecording && affidavitTranscript" class="status-ok">✓ Ready</span>
   </div>
 
@@ -778,7 +778,7 @@
   <!-- Generate PDF button -->
   <div class="affidavit-actions">
     <button class="sanc-btn secondary" (click)="generateAffidavitPDF()" [disabled]="!affidavitTranscript || generatingAffidavit">
-      {{ generatingAffidavit ? 'Generating PDF...' : '📄 Generate Affidavit PDF' }}
+      {{ generatingAffidavit ? 'Generating PDF...' : 'Generate Affidavit PDF' }}
     </button>
     <button class="sanc-btn cancel" (click)="clearAffidavit()">Clear</button>
   </div>
@@ -786,7 +786,7 @@
   <!-- Success / error messages -->
   <div class="affidavit-result" *ngIf="lastAffidavitUrl">
     <p>✓ Affidavit PDF generated.</p>
-    <a [href]="lastAffidavitUrl" target="_blank" class="sanc-btn">📥 Download / View PDF</a>
+    <a [href]="lastAffidavitUrl" target="_blank" class="sanc-btn">Download / View PDF</a>
     <small>Saved to your Safe Space (evidence vault).</small>
   </div>
 </div>
@@ -813,12 +813,12 @@
                 </span>
             </div>
             <div class="share-details">
-                <span>👤 {{ share.professional_name || 'Professional' }}</span>
-                <span>🔐 {{ share.permission === 'journey_and_evidence' ? 'Journey + Evidence' : 'Journey only' }}</span>
-                <span>⏱️ Expires: {{ share.expires_at | date:'d MMM y' }}</span>
+                <span>{{ share.professional_name || 'Professional' }}</span>
+                <span>{{ share.permission === 'journey_and_evidence' ? 'Journey + Evidence' : 'Journey only' }}</span>
+                <span>Expires: {{ share.expires_at | date:'d MMM y' }}</span>
             </div>
             <div class="share-actions" *ngIf="share.is_active">
-                <button class="small-btn" (click)="copyShareLink(share.share_url)">📋 Copy link</button>
+                <button class="small-btn" (click)="copyShareLink(share.share_url)">Copy link</button>
                 <button class="small-btn revoke" (click)="revokeShare(share.id)">Revoke access</button>
             </div>
             <div class="share-url" *ngIf="share.share_url">
@@ -832,7 +832,7 @@
 </div>
 
   <footer class="sanc-footer">
-    <span>🛡️ In danger now? Call 10111 first.</span>
+    <span>In danger now? Call 10111 first.</span>
     <span>Double-tap the Amani leaf to leave immediately.</span>
   </footer>
 </div>
@@ -844,7 +844,7 @@
 <!-- PIN Modal -->
 <div class="modal-overlay" *ngIf="showPinModal">
   <div class="modal-card">
-    <div class="mc-icon">🔐</div>
+    <div class="mc-icon"></div>
     <h3>Enter your private PIN</h3>
     <p>This section is for you only. Enter the PIN you set when you joined.</p>
     <input type="password" [(ngModel)]="hiddenPin" placeholder="4–6 digits" autocomplete="off" (keyup.enter)="verifyPin()">
@@ -914,8 +914,8 @@
 <div class="modal-overlay" *ngIf="showSuppliersPanel">
   <div class="modal-card wide suppliers-modal">
     <div class="sm-header">
-      <h3>📦 Supplier directory</h3>
-      <button class="sm-close" (click)="showSuppliersPanel = false">✕</button>
+      <h3>Supplier directory</h3>
+      <button class="sm-close" (click)="showSuppliersPanel = false">Close</button>
     </div>
     <p class="sm-sub">Craft material suppliers across South Africa. Updated monthly.</p>
 
@@ -923,7 +923,7 @@
       <div class="supplier-row" *ngFor="let s of fakeSuppliers">
         <div class="sr-info">
           <div class="sr-name">{{ s.name }}</div>
-          <div class="sr-city">📍 {{ s.city }}</div>
+          <div class="sr-city">{{ s.city }}</div>
           <div class="sr-stock">{{ s.stock }}</div>
         </div>
         <div class="sr-price">{{ s.price }}</div>
@@ -932,7 +932,7 @@
 
     <div class="sm-footer" *ngIf="!alertSent">
       <button class="sm-contact-btn" (click)="sendEmergencyAlert()" [disabled]="alertLoading">
-        {{ alertLoading ? 'Contacting…' : '📞 Contact all suppliers' }}
+        {{ alertLoading ? 'Contacting…' : 'Contact all suppliers' }}
       </button>
       <span class="sm-note">Sends your details to your preferred contact list</span>
     </div>
@@ -941,7 +941,7 @@
       <div class="as-icon">✓</div>
       <h3>Your people have been contacted</h3>
       <p>Everyone in your circle has been notified.</p>
-      <!-- <p class="as-emergency">🛡️ If you are in immediate danger — <strong>call 10111 now</strong>.</p> -->
+      <!-- <p class="as-emergency">If you are in immediate danger — <strong>call 10111 now</strong>.</p> -->
       <button class="btn-primary" (click)="showSuppliersPanel = false; alertSent = false">Close</button>
     </div>
   </div>
@@ -950,7 +950,7 @@
 <!-- Share Case Modal -->
 <div class="modal-overlay" *ngIf="showShareModal">
     <div class="modal-card">
-        <div class="mc-icon">🔗</div>
+        <div class="mc-icon"></div>
         <h3>Share your case file</h3>
         <p>The professional will be able to view your case journey and (optionally) evidence.</p>
 
@@ -998,7 +998,7 @@
 <!-- Volunteer Application Modal (NEW) -->
 <div class="modal-overlay" *ngIf="showApplyModal">
   <div class="modal-card">
-    <div class="mc-icon">🤝</div>
+    <div class="mc-icon"></div>
     <h3>Apply for {{ selectedOpportunity?.title }}</h3>
     <p>{{ selectedOpportunity?.centre_name }} – {{ selectedOpportunity?.city }}</p>
     <label>Why are you interested? (optional)</label>

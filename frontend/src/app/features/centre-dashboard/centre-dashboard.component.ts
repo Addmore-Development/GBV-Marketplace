@@ -28,6 +28,8 @@ interface DashboardStats {
   pendingOrders: number;
   survivorEarnings: number;
   profileViews: number;
+  totalMakers: number;
+  pendingMakers: number;
 }
 
 interface Donation {
@@ -88,7 +90,7 @@ interface Need {
         <div class="sb-centre-type">{{ centreType }}</div>
       </div>
       <button class="sb-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
-        {{ sidebarCollapsed ? '→' : '←' }}
+        {{ sidebarCollapsed ? 'Expand' : 'Collapse' }}
       </button>
     </div>
 
@@ -110,9 +112,9 @@ interface Need {
     </nav>
 
     <div class="sb-footer" *ngIf="!sidebarCollapsed">
-      <a routerLink="/marketplace" class="sb-footer-link">🛒 View Marketplace</a>
-      <a routerLink="/for-centres" class="sb-footer-link">📖 Amani Guide</a>
-      <div class="sb-signout" (click)="signOut()">🚪 Sign Out</div>
+      <a routerLink="/marketplace" class="sb-footer-link">View Marketplace</a>
+      <a routerLink="/for-centres" class="sb-footer-link">Amani Guide</a>
+      <div class="sb-signout" (click)="signOut()">Sign Out</div>
     </div>
   </aside>
 
@@ -127,7 +129,7 @@ interface Need {
       </div>
       <div class="tb-right">
         <div class="tb-notification">
-          🔔
+          
           <span class="notif-badge" *ngIf="unreadNotifications > 0">{{ unreadNotifications }}</span>
         </div>
         <div class="tb-user">
@@ -141,7 +143,7 @@ interface Need {
 
     <!-- SOS BANNER — visible on every tab while an alert is unresolved -->
     <div class="sos-banner" *ngIf="sosAlerts.length > 0" (click)="activeTab = 'sos'">
-      🚨 <strong>{{ sosAlerts.length }} active SOS alert{{ sosAlerts.length > 1 ? 's' : '' }}</strong> from sellers at your centre — tap to view
+      <strong>{{ sosAlerts.length }} active SOS alert{{ sosAlerts.length > 1 ? 's' : '' }}</strong> from sellers at your centre — tap to view
     </div>
 
     <!-- ════════════════════════════════════
@@ -151,37 +153,43 @@ interface Need {
 
       <!-- Pending verification banner -->
       <div class="alert-banner info" *ngIf="verificationStatus === 'pending'">
-        🌿 <strong>Welcome, {{ (centreManagerName || '').split(' ')[0] }}!</strong> Your application for <strong>{{ centreName }}</strong> has been received and is under review (1–14 days). We'll email you at the address you registered with once approved.
+        <strong>Welcome, {{ (centreManagerName || '').split(' ')[0] }}!</strong> Your application for <strong>{{ centreName }}</strong> has been received and is under review (1–14 days). We'll email you at the address you registered with once approved.
       </div>
 
       <!-- Alert banner -->
       <div class="alert-banner warning" *ngIf="hasAlert && verificationStatus === 'verified'">
-        ⚠️ 3 new orders require packing confirmation.
+        3 new orders require packing confirmation.
         <button class="alert-action" (click)="activeTab = 'orders'">View orders →</button>
       </div>
 
       <!-- Stats grid -->
       <div class="stats-grid">
         <div class="stat-card primary">
-          <div class="sc-icon">💰</div>
+          <div class="sc-icon"></div>
           <div class="sc-value">R{{ formatK(stats.totalDonations) }}</div>
           <div class="sc-label">Total donations received</div>
           <div class="sc-delta positive">+R{{ formatK(stats.thisMonthDonations) }} this month</div>
         </div>
         <div class="stat-card">
-          <div class="sc-icon">🤝</div>
+          <div class="sc-icon"></div>
           <div class="sc-value">{{ stats.activeVolunteers }}</div>
           <div class="sc-label">Active volunteers</div>
           <div class="sc-delta warning" *ngIf="stats.pendingVolunteers > 0">{{ stats.pendingVolunteers }} awaiting review</div>
         </div>
         <div class="stat-card">
-          <div class="sc-icon">🛒</div>
+          <div class="sc-icon"></div>
+          <div class="sc-value">{{ stats.totalMakers }}</div>
+          <div class="sc-label">Registered makers</div>
+          <div class="sc-delta warning" *ngIf="stats.pendingMakers > 0">{{ stats.pendingMakers }} pending approval</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-icon"></div>
           <div class="sc-value">R{{ formatK(stats.totalSales) }}</div>
           <div class="sc-label">Marketplace sales</div>
           <div class="sc-delta">{{ stats.pendingOrders }} orders to pack</div>
         </div>
         <div class="stat-card">
-          <div class="sc-icon">💛</div>
+          <div class="sc-icon"></div>
           <div class="sc-value">R{{ formatK(stats.survivorEarnings) }}</div>
           <div class="sc-label">Paid to survivors / makers</div>
           <div class="sc-delta positive">70% of all sales</div>
@@ -202,15 +210,15 @@ interface Need {
               <div class="dr-left">
                 <div class="dr-avatar">{{ d.donor.charAt(0) }}</div>
                 <div class="dr-info">
-                  <div class="dr-name">{{ d.type === 'goods' ? '📦 ' : '' }}{{ d.donor }}</div>
+                  <div class="dr-name">{{ d.donor }}</div>
                   <div class="dr-date">{{ d.date }}</div>
                 </div>
               </div>
               <div class="dr-right">
                 <div class="dr-amount" *ngIf="d.type === 'money'">R{{ d.amount }}</div>
                 <div class="dr-goods-label" *ngIf="d.type === 'goods'">Goods</div>
-                <div class="dr-s18a" *ngIf="d.s18aIssued">🧾 Cert sent</div>
-                <div class="dr-recurring" *ngIf="d.recurring">🔄 Monthly</div>
+                <div class="dr-s18a" *ngIf="d.s18aIssued">Cert sent</div>
+                <div class="dr-recurring" *ngIf="d.recurring">Monthly</div>
               </div>
             </div>
           </div>
@@ -278,7 +286,7 @@ interface Need {
       </div>
 
       <div class="sos-empty" *ngIf="!loadingAlerts && sosAlerts.length === 0">
-        <div class="sos-empty-icon">🕊️</div>
+        <div class="sos-empty-icon"></div>
         <p>No SOS alerts. This page updates automatically when a seller triggers one.</p>
       </div>
 
@@ -287,7 +295,7 @@ interface Need {
       <div class="sos-list" *ngIf="!loadingAlerts && sosAlerts.length > 0">
         <div class="sos-card" *ngFor="let a of sosAlerts">
           <div class="sos-card-header">
-            <span class="sos-pulse">🚨</span>
+            <span class="sos-pulse"></span>
             <div class="sos-card-title">
               <div class="sos-seller">{{ a.seller_alias || 'Seller' }}</div>
               <div class="sos-time">{{ a.created_at | date:'medium' }}</div>
@@ -295,7 +303,7 @@ interface Need {
           </div>
 
           <div class="sos-detail-row" *ngIf="a.location_hint">
-            <span class="sos-detail-label">📍 Location:</span>
+            <span class="sos-detail-label">Location:</span>
             <a *ngIf="isCoords(a.location_hint)" [href]="'https://www.google.com/maps?q=' + a.location_hint" target="_blank" rel="noopener">
               {{ a.location_hint }} — open in Maps →
             </a>
@@ -303,14 +311,14 @@ interface Need {
           </div>
 
           <div class="sos-detail-row">
-            <span class="sos-detail-label">🎙️ Recording:</span>
+            <span class="sos-detail-label">Recording:</span>
             <span *ngIf="!a.recording_path" class="sos-recording-pending">Not yet received — still uploading or unavailable on the seller's device.</span>
             <audio *ngIf="a.recording_path" controls [src]="mediaUrl(a.recording_path)"></audio>
           </div>
 
           <div class="sos-actions">
-            <a class="sos-action-btn" href="tel:10111">📞 Call SAPS (10111)</a>
-            <a class="sos-action-btn" href="tel:0800428428">☎️ GBV Command Centre</a>
+            <a class="sos-action-btn" href="tel:10111">Call SAPS (10111)</a>
+            <a class="sos-action-btn" href="tel:0800428428">GBV Command Centre</a>
           </div>
         </div>
       </div>
@@ -341,7 +349,7 @@ interface Need {
       <div class="table-card">
         <div class="tc-header">
           <h3>All donations</h3>
-          <button class="btn-export" (click)="exportDonations()">⬇ Export CSV</button>
+          <button class="btn-export" (click)="exportDonations()">Export CSV</button>
         </div>
         <div class="table-wrap">
           <table class="data-table">
@@ -359,7 +367,7 @@ interface Need {
                 <td><strong>{{ d.donor }}</strong></td>
                 <td>
                   <span *ngIf="d.type === 'money'" class="td-money">R{{ d.amount }}</span>
-                  <span *ngIf="d.type === 'goods'" class="td-goods">📦 {{ d.goods?.join(', ') }}</span>
+                  <span *ngIf="d.type === 'goods'" class="td-goods">{{ d.goods?.join(', ') }}</span>
                 </td>
                 <td class="td-muted">{{ d.date }}</td>
                 <td><span class="pill green" *ngIf="d.recurring">Monthly</span><span class="td-muted" *ngIf="!d.recurring">Once-off</span></td>
@@ -401,8 +409,8 @@ interface Need {
             <button class="btn-decline" (click)="declineVolunteer(v)">✗ Decline</button>
           </div>
           <div class="vc-actions" *ngIf="v.status === 'active'">
-            <button class="btn-message">💬 Message</button>
-            <button class="btn-log-hours" (click)="logHours(v)">⏱ Log hours</button>
+            <button class="btn-message">Message</button>
+            <button class="btn-log-hours" (click)="logHours(v)">Log hours</button>
           </div>
         </div>
       </div>
@@ -541,7 +549,7 @@ interface Need {
           <label>Profile picture</label>
           <div class="pf-photo-row">
             <div class="pf-photo-preview" [style.background-image]="profilePicUrl ? 'url(' + profilePicUrl + ')' : ''">
-              <span *ngIf="!profilePicUrl">🏠</span>
+              <span *ngIf="!profilePicUrl"></span>
             </div>
             <div class="pf-photo-actions">
               <label class="upload-btn">
@@ -606,8 +614,9 @@ interface Need {
             List products on marketplace
           </label>
         </div>
-        <button class="btn-save" (click)="saveProfile()">Save profile</button>
+        <button class="btn-save" (click)="saveProfile()" [disabled]="savingProfile">{{ savingProfile ? 'Saving…' : 'Save profile' }}</button>
         <div class="save-success" *ngIf="profileSaved">✓ Profile saved successfully!</div>
+        <div class="pf-photo-error" *ngIf="profileSaveError">{{ profileSaveError }}</div>
       </div>
     </div>
 
@@ -1024,6 +1033,8 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   orderFilter = '';
   showAddNeed = false;
   profileSaved = false;
+  savingProfile = false;
+  profileSaveError = '';
   reportSubmitted = false;
   profilePicUrl: string | null = null;
   uploadingProfilePic = false;
@@ -1055,15 +1066,17 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   sosAlerts: SosAlert[] = [];
   loadingAlerts = false;
 
+  makers: any[] = [];
+
   readonly navItems = [
-    { key: 'overview',   icon: '🏠', label: 'Overview',        badge: null },
-    { key: 'sos',        icon: '🚨', label: 'SOS Alerts',      badge: null },
-    { key: 'donations',  icon: '💰', label: 'Donations',       badge: null },
-    { key: 'volunteers', icon: '🤝', label: 'Volunteers',      badge: 3 },
-    { key: 'orders',     icon: '🛒', label: 'Marketplace',     badge: null },
-    { key: 'needs',      icon: '📋', label: 'Needs Board',     badge: null },
-    { key: 'profile',    icon: '🏥', label: 'Centre Profile',  badge: null },
-    { key: 'impact',     icon: '📊', label: 'Impact Report',   badge: null },
+    { key: 'overview',   icon: '', label: 'Overview',        badge: null },
+    { key: 'sos',        icon: '', label: 'SOS Alerts',      badge: null },
+    { key: 'donations',  icon: '', label: 'Donations',       badge: null },
+    { key: 'volunteers', icon: '', label: 'Volunteers',      badge: 3 },
+    { key: 'orders',     icon: '', label: 'Marketplace',     badge: null },
+    { key: 'needs',      icon: '', label: 'Needs Board',     badge: null },
+    { key: 'profile',    icon: '', label: 'Centre Profile',  badge: null },
+    { key: 'impact',     icon: '', label: 'Impact Report',   badge: null },
   ];
 
   get currentTab() { return this.navItems.find(n => n.key === this.activeTab); }
@@ -1072,6 +1085,7 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     totalDonations: 142000, thisMonthDonations: 18400, activeVolunteers: 12,
     pendingVolunteers: 3, totalSales: 28600, pendingOrders: 3,
     survivorEarnings: 20020, profileViews: 1840,
+    totalMakers: 0, pendingMakers: 0,
   };
 
   readonly monthlyData = [
@@ -1091,12 +1105,12 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   ];
 
   volunteers: Volunteer[] = [
-    { id: 'v1', name: 'Dr. Fatima Essop',   skill: 'Trauma counsellor', status: 'active',    hours: 28, joinDate: 'Mar 2026', avatar: '👩‍⚕️' },
-    { id: 'v2', name: 'Adv. James Mogale',  skill: 'Legal advocacy',    status: 'active',    hours: 16, joinDate: 'Feb 2026', avatar: '⚖️' },
-    { id: 'v3', name: 'Zanele Sithole',     skill: 'Social work',       status: 'pending',   hours: 0,  joinDate: 'May 2026', avatar: '🤝' },
-    { id: 'v4', name: 'David Kim',          skill: 'IT support',        status: 'pending',   hours: 0,  joinDate: 'May 2026', avatar: '💻' },
-    { id: 'v5', name: 'Greta Fourie',       skill: 'Admin',             status: 'pending',   hours: 0,  joinDate: 'May 2026', avatar: '📋' },
-    { id: 'v6', name: 'Thabo Nkosi',        skill: 'Transport',         status: 'completed', hours: 40, joinDate: 'Jan 2026', avatar: '🚗' },
+    { id: 'v1', name: 'Dr. Fatima Essop',   skill: 'Trauma counsellor', status: 'active',    hours: 28, joinDate: 'Mar 2026', avatar: '' },
+    { id: 'v2', name: 'Adv. James Mogale',  skill: 'Legal advocacy',    status: 'active',    hours: 16, joinDate: 'Feb 2026', avatar: '' },
+    { id: 'v3', name: 'Zanele Sithole',     skill: 'Social work',       status: 'pending',   hours: 0,  joinDate: 'May 2026', avatar: '' },
+    { id: 'v4', name: 'David Kim',          skill: 'IT support',        status: 'pending',   hours: 0,  joinDate: 'May 2026', avatar: '' },
+    { id: 'v5', name: 'Greta Fourie',       skill: 'Admin',             status: 'pending',   hours: 0,  joinDate: 'May 2026', avatar: '' },
+    { id: 'v6', name: 'Thabo Nkosi',        skill: 'Transport',         status: 'completed', hours: 40, joinDate: 'Jan 2026', avatar: '' },
   ];
 
   orders: Order[] = [
@@ -1130,12 +1144,12 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   }
 
   readonly impactMetrics = [
-    { icon: '🏠', value: '84', label: 'Residents sheltered' },
-    { icon: '⚖️', value: '23', label: 'Court cases supported' },
-    { icon: '💛', value: '18', label: 'Survivors earning income' },
-    { icon: '🤝', value: '340', label: 'Volunteer hours' },
-    { icon: '💰', value: 'R142K', label: 'Donations received' },
-    { icon: '📦', value: '61', label: 'Products sold' },
+    { icon: '', value: '84', label: 'Residents sheltered' },
+    { icon: '', value: '23', label: 'Court cases supported' },
+    { icon: '', value: '18', label: 'Survivors earning income' },
+    { icon: '', value: '340', label: 'Volunteer hours' },
+    { icon: '', value: 'R142K', label: 'Donations received' },
+    { icon: '', value: '61', label: 'Products sold' },
   ];
 
   ngOnInit(): void {
@@ -1197,6 +1211,11 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     if (this.centreId) {
       this.loadSosAlerts();
       this.pollHandle = setInterval(() => this.loadSosAlerts(), 15000);
+      // Pull the real, persisted record from the backend — this is what
+      // actually populates the "Centre Profile" tab correctly for a
+      // centre that just logged in (rather than one that just registered).
+      this.loadCentreProfile();
+      this.loadCentreSellers();
     }
   }
 
@@ -1240,7 +1259,118 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     this.showAddNeed = false;
   }
   deleteNeed(n: Need): void { this.needs = this.needs.filter(x => x.id !== n.id); }
-  saveProfile(): void { this.profileSaved = true; setTimeout(() => this.profileSaved = false, 3000); }
+  saveProfile(): void {
+    const centreId = localStorage.getItem('centreId') || this.centreId;
+    const token = localStorage.getItem('centreToken') || '';
+    if (!centreId) { this.profileSaveError = 'You need to be signed in as a centre to save changes.'; return; }
+
+    this.savingProfile = true;
+    this.profileSaveError = '';
+
+    const payload = {
+      name: this.profileForm.name,
+      city: this.profileForm.city,
+      province: this.profileForm.province,
+      tagline: this.profileForm.tagline,
+      description: this.profileForm.description,
+      npo_number: this.profileForm.npo_number,
+      phone: this.profileForm.phone,
+      website: this.profileForm.website,
+      accepts_goods: this.profileForm.accepts_goods,
+      section18a: this.profileForm.section18a,
+      marketplace_active: this.profileForm.marketplace_active,
+    };
+
+    this.http.patch<any>(
+      `${environment.apiUrl}/api/centres/${centreId}/profile`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: () => {
+        this.savingProfile = false;
+        this.profileSaved = true;
+        // Keep localStorage in sync so other pages (marketplace nav, etc.)
+        // reflect the change immediately without a re-login.
+        localStorage.setItem('centreName', this.profileForm.name);
+        localStorage.setItem('centreCity', this.profileForm.city);
+        localStorage.setItem('centreProvince', this.profileForm.province);
+        localStorage.setItem('centrePhone', this.profileForm.phone);
+        localStorage.setItem('centreNpoNumber', this.profileForm.npo_number);
+        localStorage.setItem('centreDescription', this.profileForm.description);
+        localStorage.setItem('centreMission', this.profileForm.tagline);
+        localStorage.setItem('centreWebsite', this.profileForm.website);
+        this.centreName = this.profileForm.name;
+        setTimeout(() => this.profileSaved = false, 3000);
+      },
+      error: (err) => {
+        this.savingProfile = false;
+        this.profileSaveError = err.error?.error || 'Could not save your profile. Please try again.';
+      }
+    });
+  }
+
+  // Loads the centre's real record from the backend so the dashboard
+  // reflects what's actually saved, rather than relying only on
+  // localStorage values set at registration time (which don't exist
+  // for a centre that simply logs back in on a new device/session).
+  loadCentreProfile(): void {
+    const centreId = localStorage.getItem('centreId') || this.centreId;
+    const token = localStorage.getItem('centreToken') || '';
+    if (!centreId || !token) return;
+
+    this.http.get<any>(
+      `${environment.apiUrl}/api/centres/${centreId}/profile`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (c) => {
+        this.profileForm = {
+          name: c.centre_name || this.profileForm.name,
+          city: c.city || this.profileForm.city,
+          province: c.province || this.profileForm.province,
+          tagline: c.mission_statement || this.profileForm.tagline,
+          description: c.description || this.profileForm.description,
+          npo_number: c.npo_number || this.profileForm.npo_number,
+          phone: c.contact_phone || this.profileForm.phone,
+          website: c.website_url || this.profileForm.website,
+          accepts_goods: c.accepts_goods !== null && c.accepts_goods !== undefined ? c.accepts_goods : this.profileForm.accepts_goods,
+          section18a: c.section18a !== null && c.section18a !== undefined ? c.section18a : this.profileForm.section18a,
+          marketplace_active: c.marketplace_active !== null && c.marketplace_active !== undefined ? c.marketplace_active : this.profileForm.marketplace_active,
+        };
+        this.centreName = c.centre_name || this.centreName;
+        const typeMap: Record<string, string> = {
+          gbv_centre: 'GBV Centre', orphanage: 'Orphanage / Child Care', old_age_home: 'Old Age Home',
+        };
+        this.centreType = (typeMap[c.centre_type] || 'Care Centre') + (c.city ? ` · ${c.city}` : '');
+        if (c.contact_person_name) {
+          this.centreManagerName = c.contact_person_name;
+          this.centreInitials = c.contact_person_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+        }
+        this.verificationStatus = c.status === 'approved' ? 'verified' : 'pending';
+        if (c.profile_picture_url) this.profilePicUrl = this.mediaUrl(c.profile_picture_url);
+      },
+      error: () => { /* fall back silently to whatever localStorage/defaults already populated */ }
+    });
+  }
+
+  // Loads the makers (sellers) actually registered to this centre so the
+  // Overview stat card reflects real registrations instead of mock data.
+  loadCentreSellers(): void {
+    const centreId = localStorage.getItem('centreId') || this.centreId;
+    const token = localStorage.getItem('centreToken') || '';
+    if (!centreId || !token) return;
+
+    this.http.get<any[]>(
+      `${environment.apiUrl}/api/centres/${centreId}/sellers`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (makers) => {
+        this.makers = makers;
+        this.stats.totalMakers = makers.length;
+        this.stats.pendingMakers = makers.filter(m => m.verification_status === 'pending').length;
+      },
+      error: () => { /* leave stats at their defaults on failure */ }
+    });
+  }
 
   onProfilePicSelect(event: Event): void {
     const input = event.target as HTMLInputElement;

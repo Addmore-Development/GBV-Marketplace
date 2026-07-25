@@ -457,6 +457,19 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  // ── Buyer actions ──────────────────────────────────────────
+  deleteBuyer(email: string): void {
+    if (!confirm('Permanently delete this buyer\'s order history? This cannot be undone.')) return;
+    this.http.delete(`${this.API}/buyers/${encodeURIComponent(email)}`, this.adminHeaders).subscribe({
+      next: () => {
+        this.buyers = this.buyers.filter(b => b.email !== email);
+        this.showToast('Buyer deleted');
+        this.cdr.detectChanges();
+      },
+      error: () => this.showToast('Error — check backend')
+    });
+  }
+
   // ── Messaging ─────────────────────────────────────────────
   openMessage(msg: MessageRow): void {
     this.selectedMsg = msg;

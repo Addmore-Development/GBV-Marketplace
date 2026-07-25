@@ -422,6 +422,118 @@ export const getAllCentres = async (req: Request, res: Response) => {
   }
 };
 
+// ─── GET OWN FULL PROFILE (for the centre dashboard) ─────────
+// Protected by verifyCentreToken — a centre can only fetch its own
+// record. Returns every field the "Centre Profile" tab needs to
+// edit, not just the trimmed public-listing shape from getAllCentres.
+export const getOwnCentreProfile = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, centre_name, centre_type, contact_person_name, contact_person_role,
+              contact_email, contact_phone, whatsapp_number, website_url,
+              physical_address, suburb, city, province, postal_code,
+              description, mission_statement, npo_number, status,
+              profile_picture_url, accepts_goods, section18a, marketplace_active
+       FROM centres WHERE id = $1`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Centre not found' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('getOwnCentreProfile error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── GET SELLERS REGISTERED TO THIS CENTRE (for the centre dashboard) ──
+// Protected by verifyCentreToken — a centre can only see its own makers.
+export const getCentreSellers = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, alias, real_name, real_surname, email, phone,
+              verification_status, profile_complete, total_sales, total_earned,
+              created_at
+       FROM sellers
+       WHERE centre_id = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreSellers error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── UPDATE OWN PROFILE (editable fields only) ───────────────
+// Protected by verifyCentreToken. Only the fields shown on the
+// dashboard's "Centre Profile" tab are editable here — anything
+// that affects verification/approval status is deliberately left
+// out and can only be changed by an admin.
+const editableCentreFields: { body: string; column: string }[] = [
+  { body: 'name',        column: 'centre_name' },
+  { body: 'city',        column: 'city' },
+  { body: 'province',    column: 'province' },
+  { body: 'tagline',     column: 'mission_statement' },
+  { body: 'description', column: 'description' },
+  { body: 'npo_number',  column: 'npo_number' },
+  { body: 'phone',       column: 'contact_phone' },
+  { body: 'website',     column: 'website_url' },
+  { body: 'accepts_goods',       column: 'accepts_goods' },
+  { body: 'section18a',          column: 'section18a' },
+  { body: 'marketplace_active',  column: 'marketplace_active' },
+];
+
+export const updateCentreProfile = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+
+    for (const field of editableCentreFields) {
+      if (body[field.body] === undefined) continue;
+      setClauses.push(`${field.column} = $${i}`);
+      values.push(body[field.body]);
+      i++;
+    }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json({ error: 'No editable fields were provided' });
+    }
+
+    // Basic validation to mirror the registration form's constraints
+    if (body.name !== undefined && String(body.name).trim().length < 3) {
+      return res.status(400).json({ error: 'Centre name must be at least 3 characters' });
+    }
+    if (body.description !== undefined && String(body.description).trim().length < 100) {
+      return res.status(400).json({ error: 'Full description must be at least 100 characters' });
+    }
+
+    setClauses.push('updated_at = NOW()');
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE centres SET ${setClauses.join(', ')} WHERE id = $${i}
+       RETURNING id, centre_name, city, province, mission_statement, description,
+                 npo_number, contact_phone, website_url,
+                 accepts_goods, section18a, marketplace_active`,
+      values
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Centre not found' });
+
+    return res.json({ message: 'Profile updated', centre: result.rows[0] });
+  } catch (err) {
+    console.error('updateCentreProfile error:', err);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+};
+
 // ─── UPLOAD / UPDATE OWN PROFILE PICTURE ─────────────────────
 // Protected by verifyCentreToken — a centre can only set its own
 // picture. Approval status is NOT required here: a centre should

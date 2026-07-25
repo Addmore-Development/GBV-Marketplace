@@ -14,6 +14,7 @@ import {
   rejectCentre,
   deleteCentre,
   getBuyers,
+  deleteBuyer,
   getMessages,
   markMessageRead,
   replyToMessage,
@@ -55,6 +56,7 @@ router.delete('/centres/:id',      requireAdmin, deleteCentre);
 
 // ── Buyers ────────────────────────────────────────────────
 router.get('/buyers', requireAdmin, getBuyers);
+router.delete('/buyers/:email', requireAdmin, deleteBuyer);
 
 // ── Messages ──────────────────────────────────────────────
 router.get('/messages',              requireAdmin, getMessages);

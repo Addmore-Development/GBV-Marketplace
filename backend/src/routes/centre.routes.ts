@@ -5,7 +5,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture } from '../controllers/centre.controller';
+import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture, getOwnCentreProfile, updateCentreProfile, getCentreSellers } from '../controllers/centre.controller';
 import { verifyAdminToken, verifyCentreToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -100,6 +100,9 @@ router.post('/logout', logoutCentre);
 router.get('/status/:id', getCentreStatus);
 
 // Centre self-service routes (requires the centre to be logged in)
+router.get('/:id/profile', verifyCentreToken, getOwnCentreProfile);
+router.patch('/:id/profile', verifyCentreToken, updateCentreProfile);
+router.get('/:id/sellers', verifyCentreToken, getCentreSellers);
 router.post(
   '/:id/profile-picture',
   verifyCentreToken,

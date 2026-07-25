@@ -240,7 +240,7 @@ export const registerSeller = async (req: Request, res: Response) => {
                 finalPhone,
                 centre_id,
                 [],
-                null,
+                '',
                 'cash',
                 null,
                 null,

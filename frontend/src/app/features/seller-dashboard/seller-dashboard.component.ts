@@ -446,17 +446,17 @@ export class SellerDashboardComponent implements OnInit {
     get centreStatusText(): string {
         if (!this.seller?.centre_id) return 'Not assigned';
         if (this.centreInfo?.status === 'approved') return '✓ Approved centre';
-        if (this.centreInfo?.status === 'pending') return '⏳ Pending verification';
+        if (this.centreInfo?.status === 'pending') return 'Pending verification';
         return 'Awaiting approval';
     }
 
     get journeySteps() {
         return [
-            { key: 'medical',    label: 'Medical check-up',      icon: '🏥', done: this.caseJourney.medical_done,    date: this.caseJourney.medical_date },
-            { key: 'police',     label: 'Statement recorded',     icon: '📋', done: this.caseJourney.police_done,     date: this.caseJourney.police_date },
-            { key: 'protection', label: 'Protection order',       icon: '🛡️', done: this.caseJourney.protection_done, date: this.caseJourney.protection_date },
-            { key: 'court',      label: 'Court proceedings',      icon: '⚖️', done: this.caseJourney.court_done,      date: this.caseJourney.court_date },
-            { key: 'counselling','label': 'Counselling sessions', icon: '💬', done: this.caseJourney.counselling_done, date: this.caseJourney.counselling_date },
+            { key: 'medical',    label: 'Medical check-up',      icon: '', done: this.caseJourney.medical_done,    date: this.caseJourney.medical_date },
+            { key: 'police',     label: 'Statement recorded',     icon: '', done: this.caseJourney.police_done,     date: this.caseJourney.police_date },
+            { key: 'protection', label: 'Protection order',       icon: '', done: this.caseJourney.protection_done, date: this.caseJourney.protection_date },
+            { key: 'court',      label: 'Court proceedings',      icon: '', done: this.caseJourney.court_done,      date: this.caseJourney.court_date },
+            { key: 'counselling','label': 'Counselling sessions', icon: '', done: this.caseJourney.counselling_done, date: this.caseJourney.counselling_date },
         ];
     }
 
@@ -855,18 +855,18 @@ export class SellerDashboardComponent implements OnInit {
 
     evidenceIcon(type: string): string {
         const map: Record<string, string> = {
-            photo: '📷', voice_note: '🎤', whatsapp: '💬',
-            medical: '🏥', document: '📄', other: '📎',
+            photo: '', voice_note: '', whatsapp: '',
+            medical: '', document: '', other: '',
         };
-        return map[type] || '📎';
+        return map[type] || '';
     }
 
     categoryIcon(cat: string): string {
         const map: Record<string, string> = {
-            craft: '🧵', business: '📊', legal: '⚖️',
-            financial: '💰', wellness: '🌿',
+            craft: '', business: '', legal: '',
+            financial: '', wellness: '',
         };
-        return map[cat] || '📚';
+        return map[cat] || '';
     }
 
     // ============================================================

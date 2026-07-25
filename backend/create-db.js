@@ -182,6 +182,7 @@ async function initDatabase() {
       'accepts_goods BOOLEAN DEFAULT true',
       'section18a BOOLEAN DEFAULT false',
       'marketplace_active BOOLEAN DEFAULT false',
+      'profile_picture_url TEXT',
     ];
     for (const col of centreExtras) {
       const name = col.split(' ')[0];

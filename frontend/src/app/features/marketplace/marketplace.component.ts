@@ -262,8 +262,21 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     this.loadRealProducts();
     this.cartService.cart$.pipe(takeUntil(this.destroy$))
       .subscribe(c => this.cartCount = c.items.reduce((s, i) => s + i.quantity, 0));
+
+    // Restore a centre session (survives page reload / navigation).
+    // Sellers and buyers are handled by their reactive auth services below,
+    // but centres don't have a dedicated auth service — their session
+    // lives in localStorage, so it has to be checked explicitly here too.
+    const sellerId = localStorage.getItem('sellerId');
+    const centreId = localStorage.getItem('centreId');
+    if (!sellerId && centreId) {
+      const name = localStorage.getItem('centreName') || 'Centre';
+      const email = localStorage.getItem('centreEmail') || '';
+      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
+    }
+
     this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => this.currentUser = u);
+      .subscribe(u => { if (u) this.currentUser = u; });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
         if (u) {
@@ -274,8 +287,8 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
             initials: u.alias.slice(0,2).toUpperCase()
           };
         } else {
-          // seller logged out � only clear if no buyer session active
-          if (!this.authService.currentUser) this.currentUser = null;
+          // seller logged out — only clear if no buyer or centre session active
+          if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
         }
       });
   }
@@ -547,9 +560,18 @@ formatPrice(p: number | string): string {
         email: this.loginEmail, password: this.loginPassword
       }).subscribe({
         next: (res) => {
-          localStorage.setItem('centreId', res.centre_id);
-          localStorage.setItem('centreName', res.centre_name);
-          localStorage.setItem('centreEmail', res.contact_email);
+          localStorage.setItem('centreId', res.centre_id || '');
+          localStorage.setItem('centreToken', res.token || '');
+          localStorage.setItem('centreName', res.centre_name || '');
+          localStorage.setItem('centreType', res.centre_type || '');
+          localStorage.setItem('centreEmail', res.contact_email || '');
+          localStorage.setItem('centreManagerName', res.contact_person_name || '');
+          localStorage.setItem('centreCity', res.city || '');
+          localStorage.setItem('centreProvince', res.province || '');
+          localStorage.setItem('centrePhone', res.contact_phone || '');
+          localStorage.setItem('centreNpoNumber', res.npo_number || '');
+          localStorage.setItem('centreStatus', res.status || '');
+          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
           this.authModal = '';
           this.router.navigate(['/centre-dashboard']);
         },

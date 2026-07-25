@@ -1,519 +1,657 @@
-// ============================================================
-// backend/src/controllers/marketplace.controller.ts
-// ============================================================
-import { Request, Response } from 'express';
-import { pool } from '../index';
-import { v4 as uuidv4 } from 'uuid';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { CartService } from '../../services/cart.service';
+import { AuthService, User } from '../../services/auth.service';
+import { SellerAuthService, SellerUser } from '../../services/seller-auth.service';
+import { environment } from '../../../environments/environment';
 
-// ─── HELPER: Calculate Impact Split ─────────────────────────
-const calculateImpact = (price: number, survivorPct: number, centrePct: number, platformPct: number) => ({
-  survivor: parseFloat((price * survivorPct / 100).toFixed(2)),
-  centre:   parseFloat((price * centrePct   / 100).toFixed(2)),
-  platform: parseFloat((price * platformPct / 100).toFixed(2)),
-});
+interface Product {
+  id: string;
+  title: string;
+  seller_alias: string;
+  centre_name: string;
+  category: string;
+  price: number;
+  survivor_income: number;
+  centre_funding: number;
+  platform_fee: number;
+  stock: number;
+  rating: number;
+  reviews: number;
+  sold: number;
+  img: string;
+  description: string;
+  story: string;
+  badge?: 'bestseller' | 'low-stock' | 'out-of-stock';
+  seller_type: 'survivor' | 'youth' | 'elderly';
+}
 
-// ─── GET ALL PRODUCTS (public listing) ──────────────────────
-export const getProducts = async (req: Request, res: Response) => {
-  try {
-    const {
-      category, search, centre_id,
-      min_price, max_price,
-      sort = 'created_at',
-      order = 'DESC',
-      page = '1', limit = '12'
-    } = req.query;
+@Component({
+  selector: 'app-marketplace',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule, HttpClientModule],
+  templateUrl: './marketplace.component.html',
+  styleUrls: ['./marketplace.component.scss']
+})
+export class MarketplaceComponent implements OnInit, OnDestroy {
+  searchQuery = '';
+  activeCategory = 'all';
+  sortBy = 'popular';
+  maxPrice = 1000;
+  cartCount = 0;
+  scrolled = false;
+  currentUser: User | null = null;
+  toastMsg = '';
+  toastVisible = false;
+  addingIds = new Set<string>();
+  addedIds = new Set<string>();
+  authModal = '';
+  authError = '';
+  loginEmail = '';
+  loginPassword = '';
+  loginRole: 'buyer' | 'seller' | 'centre' | 'admin' = 'buyer';
+  adminPinInput = '';
+  registerName = '';
+  registerEmail = '';
+  registerPassword = '';
+  registerRole: 'buyer' | 'seller' | 'centre' = 'buyer';
 
-    const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const params: any[] = ['active'];
-    let where = `WHERE p.status = $1`;
-    let idx = 2;
+  // ── Inline seller registration ────────────────────────────
+  sellerIdNumber = '';
+  sellerFullName = '';
+  sellerEmail = '';
+  sellerPin = '';
+  sellerCentreId = '';
+  sellerIdVerified = false;
+  sellerIdError = '';
+  sellerIsLoading = false;
+  sellerError = '';
+  sellerCentres: { id: string; name: string; city: string; province: string }[] = [];
+  sellerCentresLoading = false;
+  selectedProduct: Product | null = null;
+  selectedQty = 1;
 
-    if (category) {
-      where += ` AND p.category = $${idx++}`;
-      params.push(category);
-    }
-    if (search) {
-      where += ` AND (p.name ILIKE $${idx} OR p.description ILIKE $${idx})`;
-      params.push(`%${search}%`);
-      idx++;
-    }
-    if (centre_id) {
-      where += ` AND p.centre_id = $${idx++}`;
-      params.push(centre_id);
-    }
-    if (min_price) {
-      where += ` AND p.price >= $${idx++}`;
-      params.push(parseFloat(min_price as string));
-    }
-    if (max_price) {
-      where += ` AND p.price <= $${idx++}`;
-      params.push(parseFloat(max_price as string));
-    }
+  // Real products from backend (falls back to static list on error)
+  products: Product[] = [];
+  isLoadingProducts = true;
+  impactInfoOpen = false;
 
-    const allowedSort  = ['created_at', 'price', 'total_sold'];
-    const allowedOrder = ['ASC', 'DESC'];
-    const safeSort  = allowedSort.includes(sort as string)  ? sort  : 'created_at';
-    const safeOrder = allowedOrder.includes((order as string).toUpperCase()) ? order : 'DESC';
+  private destroy$ = new Subject<void>();
 
-    // Count query
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM products p ${where}`,
-      params
-    );
+  readonly categories = [
+    { key: 'all',       label: 'All Products' },
+    { key: 'jewellery', label: 'Jewellery & Accessories' },
+    { key: 'textiles',  label: 'Clothing & Textiles' },
+    { key: 'food',      label: 'Food & Jams' },
+    { key: 'crafts',    label: 'Art & Crafts' },
+  ];
 
-    // Main query – removed rating_avg and rating_count, using static defaults
-    const result = await pool.query(
-      `SELECT
-        p.id,
-        p.name AS title,
-        p.description,
-        p.category,
-        COALESCE(p.story, p.description) AS story,
-        p.price,
-        COALESCE(p.stock, 0) AS stock,
-        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS img,
-        p.seller_alias,
-        COALESCE(p.seller_type::text, 'survivor') AS seller_type,
-        COALESCE(p.rating_avg, 5.0) AS rating,
-        COALESCE(p.rating_count, 0) AS reviews,
-        COALESCE(p.total_sold, 0) AS sold,
-        c.centre_name,
-        c.city,
-        ROUND(p.price * COALESCE(p.survivor_pct, 70) / 100, 2) AS survivor_income,
-        ROUND(p.price * COALESCE(p.centre_pct, 28) / 100, 2) AS centre_funding,
-        ROUND(p.price * COALESCE(p.platform_pct, 2) / 100, 2) AS platform_fee,
-        CASE WHEN COALESCE(p.stock, 0) = 0 THEN 'out-of-stock'
-             WHEN COALESCE(p.stock, 0) <= 5 THEN 'low-stock'
-             ELSE NULL END AS badge
-       FROM products p
-       JOIN centres c ON c.id = p.centre_id
-       ${where}
-       ORDER BY p.${safeSort} ${safeOrder}
-       LIMIT $${idx} OFFSET $${idx + 1}`,
-      [...params, parseInt(limit as string), offset]
-    );
+  readonly featuredCats = [
+    { key: 'jewellery', label: 'Jewellery & Accessories', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80' },
+    { key: 'textiles',  label: 'Clothing & Textiles',     img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80' },
+    { key: 'food',      label: 'Food & Jams',             img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&q=80' },
+    { key: 'crafts',    label: 'Art & Crafts',            img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
+    { key: 'all',       label: 'Shop All' },
+  ];
 
-    return res.json({
-      products: result.rows,
-      total: parseInt(countResult.rows[0].count),
-      page: parseInt(page as string),
-      pages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit as string)),
+  readonly staticProducts: Product[] = [
+    {
+      id: 'p001', title: 'Beaded Sunrise Necklace', seller_alias: 'Nomsa B.',
+      centre_name: 'Thistle House', category: 'jewellery', price: 180,
+      survivor_income: 126, centre_funding: 54, platform_fee: 9,
+      stock: 12, rating: 4.9, reviews: 34, sold: 89,
+      img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=600&q=80',
+      description: 'Hand-beaded necklace using traditional Zulu patterns. Each bead is placed by hand — no two are identical.',
+      story: '"I learned to bead from my grandmother. Now I teach the other women here. Every necklace I sell means my children eat." — Nomsa',
+      badge: 'bestseller', seller_type: 'survivor'
+    },
+    {
+      id: 'p002', title: 'Wire-Wrapped Earring Set', seller_alias: 'Thandi M.',
+      centre_name: 'Khayelitsha Hub', category: 'jewellery', price: 95,
+      survivor_income: 66.5, centre_funding: 28.5, platform_fee: 4.75,
+      stock: 20, rating: 4.7, reviews: 18, sold: 52,
+      img: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&q=80',
+      description: 'Delicate copper wire earrings with seed bead accents. Lightweight and hypoallergenic.',
+      story: '"Wire work keeps my hands busy and my mind calm. I have sold 52 pairs this year." — Thandi',
+      seller_type: 'survivor'
+    },
+    {
+      id: 'p003', title: 'Maasai-Style Bead Bracelet', seller_alias: 'Lindiwe K.',
+      centre_name: 'Ubuntu Women\'s Centre', category: 'jewellery', price: 65,
+      survivor_income: 45.5, centre_funding: 19.5, platform_fee: 3.25,
+      stock: 3, rating: 4.8, reviews: 22, sold: 67,
+      img: 'https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=600&q=80',
+      description: 'Bold, colourful bracelet inspired by East African beadwork traditions.',
+      story: '"I arrived with nothing. Now I have skills, income, and dignity." — Lindiwe',
+      badge: 'low-stock', seller_type: 'survivor'
+    },
+    {
+      id: 'p004', title: 'Recycled Glass Bead Anklet', seller_alias: 'Palesa D.',
+      centre_name: 'Empilweni Centre', category: 'jewellery', price: 55,
+      survivor_income: 38.5, centre_funding: 16.5, platform_fee: 2.75,
+      stock: 15, rating: 4.6, reviews: 11, sold: 29,
+      img: 'https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?w=600&q=80',
+      description: 'Made from recycled glass beads sourced locally. Adjustable fit.',
+      story: '"Recycling glass into jewellery — turning broken things into beautiful ones." — Palesa',
+      seller_type: 'survivor'
+    },
+    {
+      id: 'p005', title: 'Shweshwe Print Tote Bag', seller_alias: 'Zanele P.',
+      centre_name: 'Thistle House', category: 'textiles', price: 220,
+      survivor_income: 154, centre_funding: 66, platform_fee: 11,
+      stock: 8, rating: 4.8, reviews: 27, sold: 71,
+      img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&q=80',
+      description: 'Handmade tote bag using traditional South African Shweshwe fabric. Fully lined with cotton.',
+      story: '"I sew each bag myself. My hands have healed through this work." — Zanele',
+      badge: 'bestseller', seller_type: 'survivor'
+    },
+    {
+      id: 'p006', title: 'Hand-Dyed Ankara Scarf', seller_alias: 'Fatima O.',
+      centre_name: 'New Beginnings NPO', category: 'textiles', price: 150,
+      survivor_income: 105, centre_funding: 45, platform_fee: 7.5,
+      stock: 11, rating: 4.5, reviews: 9, sold: 23,
+      img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+      description: 'Vibrant hand-dyed scarf using natural plant dyes. 100% cotton, 180cm long.',
+      story: '"I brought these dyeing techniques from Nigeria. Now I share them here." — Fatima',
+      seller_type: 'survivor'
+    },
+    {
+      id: 'p007', title: 'Fig & Ginger Preserve (3-pack)', seller_alias: 'Gogo Dlamini',
+      centre_name: 'Khanya Elderly Home', category: 'food', price: 120,
+      survivor_income: 84, centre_funding: 36, platform_fee: 6,
+      stock: 18, rating: 5.0, reviews: 41, sold: 112,
+      img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=600&q=80',
+      description: 'Three jars of homemade fig and ginger preserve. No artificial preservatives.',
+      story: '"I have been making jam since 1975. At 74, I am still the best cook here." — Gogo Dlamini',
+      badge: 'bestseller', seller_type: 'elderly'
+    },
+    {
+      id: 'p008', title: 'Rooibos & Honey Body Scrub', seller_alias: 'Amahle N.',
+      centre_name: 'Khayelitsha Hub', category: 'food', price: 89,
+      survivor_income: 62.3, centre_funding: 26.7, platform_fee: 4.45,
+      stock: 22, rating: 4.7, reviews: 19, sold: 48,
+      img: 'https://images.unsplash.com/photo-1683944433023-027a3f443ae4?w=600&q=80',
+      description: 'All-natural exfoliating scrub made with South African rooibos, raw honey, and brown sugar.',
+      story: '"I started mixing scrubs during lockdown. Now it pays school fees." — Amahle',
+      seller_type: 'survivor'
+    },
+    {
+      id: 'p009', title: 'Hand-Thrown Earth Bowl', seller_alias: 'Sipho K.',
+      centre_name: 'Ubuntu Youth Programme', category: 'crafts', price: 340,
+      survivor_income: 238, centre_funding: 102, platform_fee: 17,
+      stock: 4, rating: 4.9, reviews: 16, sold: 38,
+      img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80',
+      description: 'Wheel-thrown stoneware bowl, fired at 1280°C. Food safe. Each piece unique.',
+      story: '"Pottery taught me patience. I threw 200 bowls before I made one I liked." — Sipho, 19',
+      badge: 'low-stock', seller_type: 'youth'
+    },
+    {
+      id: 'p010', title: 'Wire Art — Township Cycle', seller_alias: 'Lebo M.',
+      centre_name: 'Ubuntu Youth Programme', category: 'crafts', price: 280,
+      survivor_income: 196, centre_funding: 84, platform_fee: 14,
+      stock: 6, rating: 4.8, reviews: 12, sold: 29,
+      img: 'https://images.unsplash.com/photo-1695742968499-4555230b1d3f?w=600&q=80',
+      description: 'Intricate wire bicycle sculpture, approx. 25cm.',
+      story: '"I started making wire toys at 8 to sell at robots. Now I sell internationally." — Lebo, 22',
+      seller_type: 'youth'
+    },
+    {
+      id: 'p011', title: 'Beeswax Pillar Candle Set', seller_alias: 'Gogo Mokoena',
+      centre_name: 'Khanya Elderly Home', category: 'crafts', price: 95,
+      survivor_income: 66.5, centre_funding: 28.5, platform_fee: 4.75,
+      stock: 30, rating: 4.6, reviews: 8, sold: 21,
+      img: 'https://images.unsplash.com/photo-1602523961358-f9f03dd557db?w=600&q=80',
+      description: 'Set of 3 hand-dipped beeswax candles in natural honey tones. Burns 18–22 hours each.',
+      story: '"At 68, I finally started my own little business. Better late than never." — Gogo Mokoena',
+      seller_type: 'elderly'
+    },
+    {
+      id: 'p012', title: 'Woven Sisal Market Basket', seller_alias: 'Nomvula Z.',
+      centre_name: 'Empilweni Centre', category: 'crafts', price: 295,
+      survivor_income: 206.5, centre_funding: 88.5, platform_fee: 14.75,
+      stock: 9, rating: 4.9, reviews: 24, sold: 58,
+      img: 'https://images.unsplash.com/photo-1455669175216-9017c9b02fc6?w=600&q=80',
+      description: 'Large hand-woven sisal basket with leather handles.',
+      story: '"My mother taught me this weave. I am teaching my daughter. Three generations." — Nomvula',
+      badge: 'bestseller', seller_type: 'survivor'
+    },
+  ];
+
+  get allProducts(): Product[] {
+    return this.products.length ? this.products : this.staticProducts;
+  }
+
+  get filteredProducts(): Product[] {
+    return this.allProducts.filter(p => {
+      const catMatch = this.activeCategory === 'all' || p.category === this.activeCategory;
+      const priceMatch = p.price <= this.maxPrice;
+      const searchMatch = !this.searchQuery ||
+        p.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        p.centre_name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        p.seller_alias.toLowerCase().includes(this.searchQuery.toLowerCase());
+      return catMatch && priceMatch && searchMatch;
+    }).sort((a, b) => {
+      if (this.sortBy === 'popular')    return b.sold - a.sold;
+      if (this.sortBy === 'price-asc')  return a.price - b.price;
+      if (this.sortBy === 'price-desc') return b.price - a.price;
+      if (this.sortBy === 'rating')     return b.rating - a.rating;
+      return 0;
     });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
   }
-};
 
-// ─── GET SINGLE PRODUCT ──────────────────────────────────────
-export const getProduct = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      `SELECT
-        p.*,
-        p.name AS title,
-        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS thumbnail,
-        COALESCE(p.stock, 0) AS stock_quantity,
-        'ZAR' AS currency,
-        c.centre_name, c.city, c.province, c.contact_phone,
-        c.services_offered, c.languages_spoken,
-        c.provides_counselling, c.provides_legal_support,
-        c.has_shelter, c.is_24_hour,
-        ROUND(p.price * p.survivor_pct / 100, 2) as survivor_income,
-        ROUND(p.price * p.centre_pct   / 100, 2) as centre_funding,
-        ROUND(p.price * p.platform_pct / 100, 2) as platform_fee
-       FROM products p
-       JOIN centres c ON c.id = p.centre_id
-       WHERE p.id = $1 AND p.status = 'active'`,
-      [id]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Product not found' });
+  constructor(
+    private cartService: CartService,
+    private authService: AuthService,
+    private sellerAuth: SellerAuthService,
+    private router: Router,
+    private http: HttpClient,
+    private route: ActivatedRoute,
+  ) {}
 
-    // Get reviews – if table exists, otherwise return empty array
-    let reviews = [];
-    try {
-      const reviewsResult = await pool.query(
-        `SELECT buyer_name, rating, comment, created_at
-         FROM product_reviews WHERE product_id = $1
-         ORDER BY created_at DESC LIMIT 10`,
-        [id]
-      );
-      reviews = reviewsResult.rows;
-    } catch (err) {
-      // Ignore – table may not exist yet
-      console.warn('product_reviews table not found, returning empty reviews');
-    }
-
-    return res.json({ ...result.rows[0], reviews });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// ─── GET CATEGORIES WITH COUNTS ─────────────────────────────
-export const getCategories = async (req: Request, res: Response) => {
-  try {
-    const result = await pool.query(
-      `SELECT category, COUNT(*) as count, MIN(price) as min_price, MAX(price) as max_price
-       FROM products WHERE status = 'active'
-       GROUP BY category ORDER BY count DESC`
-    );
-    return res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// ─── CART: GET ───────────────────────────────────────────────
-export const getCart = async (req: Request, res: Response) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    if (!sessionId) return res.json({ items: [], subtotal: 0 });
-
-    const result = await pool.query(
-      `SELECT items FROM carts WHERE session_id = $1`, [sessionId]
-    );
-
-    if (!result.rows.length) return res.json({ items: [], subtotal: 0 });
-
-    const items = result.rows[0].items || [];
-    const subtotal = items.reduce((sum: number, item: any) =>
-      sum + (item.price * item.quantity), 0);
-
-    return res.json({ items, subtotal: parseFloat(subtotal.toFixed(2)) });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// ─── CART: ADD / UPDATE ──────────────────────────────────────
-export const updateCart = async (req: Request, res: Response) => {
-  try {
-    const sessionId = req.headers['x-session-id'] as string || uuidv4();
-    const { product_id, quantity } = req.body;
-
-    if (!product_id || quantity < 0) {
-      return res.status(400).json({ error: 'Invalid product or quantity' });
-    }
-
-    // Fetch product
-    const prod = await pool.query(
-      `SELECT p.id, p.name AS title, p.price, COALESCE(p.image_url, '') AS thumbnail,
-              p.seller_alias, 'ZAR' AS currency, p.survivor_pct, p.centre_pct, p.platform_pct,
-              COALESCE(p.stock, 0) AS stock_quantity,
-              c.centre_name
-       FROM products p
-       JOIN centres c ON c.id = p.centre_id
-       WHERE p.id = $1 AND p.status = 'active'`,
-      [product_id]
-    );
-    if (!prod.rows.length) return res.status(404).json({ error: 'Product not found' });
-
-    const p = prod.rows[0];
-    if (quantity > p.stock_quantity) {
-      return res.status(400).json({ error: `Only ${p.stock_quantity} in stock` });
-    }
-
-    // Get or create cart
-    let cart = await pool.query(
-      `SELECT items FROM carts WHERE session_id = $1`, [sessionId]
-    );
-
-    let items: any[] = cart.rows.length ? (cart.rows[0].items || []) : [];
-
-    if (quantity === 0) {
-      items = items.filter((i: any) => i.product_id !== product_id);
-    } else {
-      const idx = items.findIndex((i: any) => i.product_id === product_id);
-      const impact = calculateImpact(p.price, p.survivor_pct, p.centre_pct, p.platform_pct);
-      const cartItem = {
-        product_id, quantity,
-        title: p.title, price: p.price,
-        thumbnail: p.thumbnail,
-        seller_alias: p.seller_alias,
-        centre_name: p.centre_name,
-        currency: p.currency,
-        survivor_income: impact.survivor,
-        centre_funding: impact.centre,
-        platform_fee: impact.platform,
-      };
-      if (idx > -1) items[idx] = cartItem;
-      else items.push(cartItem);
-    }
-
-    // Upsert cart
-    await pool.query(
-      `INSERT INTO carts (session_id, items) VALUES ($1, $2)
-       ON CONFLICT (session_id) DO UPDATE SET items = $2, updated_at = NOW()`,
-      [sessionId, JSON.stringify(items)]
-    );
-
-    const subtotal = items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
-    return res.json({ session_id: sessionId, items, subtotal: parseFloat(subtotal.toFixed(2)) });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// ─── PLACE ORDER ─────────────────────────────────────────────
-export const placeOrder = async (req: Request, res: Response) => {
-  const client = await pool.connect();
-  try {
-    const sessionId = req.headers['x-session-id'] as string;
-    const {
-      buyer_name, buyer_email, buyer_phone,
-      delivery_address, delivery_suburb, delivery_city,
-      delivery_province, delivery_postal,
-      payment_method, notes,
-    } = req.body;
-
-    // Get cart
-    const cartResult = await client.query(
-      `SELECT items FROM carts WHERE session_id = $1`, [sessionId]
-    );
-    if (!cartResult.rows.length || !cartResult.rows[0].items?.length) {
-      return res.status(400).json({ error: 'Cart is empty' });
-    }
-
-    const items = cartResult.rows[0].items;
-
-    // Find nearest hub centre (simplified: use seller's centre of first item)
-    const hubCentreId = items[0] ? await client.query(
-      `SELECT p.centre_id
-       FROM products p
-       WHERE p.id = $1`,
-      [items[0].product_id]
-    ).then(r => r.rows[0]?.centre_id) : null;
-
-    await client.query('BEGIN');
-
-    // Calculate totals
-    let subtotal = 0;
-    let platformFeeTotal = 0;
-    const orderItems: any[] = [];
-
-    for (const item of items) {
-      const prod = await client.query(
-        `SELECT p.id, p.name AS title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
-                COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias,
-                COALESCE(p.image_url, '') AS thumbnail,
-                c.centre_name, p.centre_id
-         FROM products p
-         JOIN centres c ON c.id = p.centre_id
-         WHERE p.id = $1 AND p.status = 'active' FOR UPDATE`,
-        [item.product_id]
-      );
-
-      if (!prod.rows.length) throw new Error(`Product ${item.product_id} unavailable`);
-      const p = prod.rows[0];
-
-      if (p.stock_quantity < item.quantity) {
-        throw new Error(`Insufficient stock for: ${p.title}`);
+  ngOnInit(): void {
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(p => {
+      if (p['authRequired']) {
+        setTimeout(() => this.showToast('Please log in or register to view centre profiles.'), 300);
+        this.router.navigate([], { queryParams: {}, replaceUrl: true });
       }
+    });
+    this.loadRealProducts();
+    this.cartService.cart$.pipe(takeUntil(this.destroy$))
+      .subscribe(c => this.cartCount = c.items.reduce((s, i) => s + i.quantity, 0));
 
-      const lineTotal = p.price * item.quantity;
-      const impact = calculateImpact(p.price, p.survivor_pct, p.centre_pct, p.platform_pct);
+    // Restore a centre session (survives page reload / navigation).
+    // Sellers and buyers are handled by their reactive auth services below,
+    // but centres don't have a dedicated auth service — their session
+    // lives in localStorage, so it has to be checked explicitly here too.
+    const sellerId = localStorage.getItem('sellerId');
+    const centreId = localStorage.getItem('centreId');
+    if (!sellerId && centreId) {
+      const name = localStorage.getItem('centreName') || 'Centre';
+      const email = localStorage.getItem('centreEmail') || '';
+      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
+    }
 
-      subtotal += lineTotal;
-      platformFeeTotal += impact.platform * item.quantity;
-
-      orderItems.push({
-        product_id: p.id,
-        centre_id: p.centre_id,
-        quantity: item.quantity,
-        unit_price: p.price,
-        total_price: lineTotal,
-        survivor_amount: impact.survivor * item.quantity,
-        centre_amount: impact.centre * item.quantity,
-        platform_amount: impact.platform * item.quantity,
-        product_title: p.title,
-        product_thumbnail: p.thumbnail,
-        seller_alias: p.seller_alias,
-        centre_name: p.centre_name,
+    this.authService.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => { if (u) this.currentUser = u; });
+    this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) {
+          this.currentUser = {
+            name: u.alias,
+            email: u.email,
+            role: 'seller',
+            initials: u.alias.slice(0,2).toUpperCase()
+          };
+        } else {
+          // seller logged out — only clear if no buyer or centre session active
+          if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+        }
       });
+  }
 
-      // Decrement stock
-      await client.query(
-        `UPDATE products SET stock = stock - $1, total_sold = total_sold + $1 WHERE id = $2`,
-        [item.quantity, p.id]
-      );
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  loadRealProducts(): void {
+    this.isLoadingProducts = true;
+    this.http.get<any>(`${environment.apiUrl}/api/marketplace/products`)
+      .subscribe({
+        next: (res) => {
+          this.products = res.products ?? [];
+          this.isLoadingProducts = false;
+        },
+        error: () => {
+          this.isLoadingProducts = false;
+          this.products = [];
+        }
+      });
+  }
+
+  @HostListener('window:scroll')
+  onScroll(): void {
+    this.scrolled = window.scrollY > 40;
+  }
+
+  getCategoryLabel(): string {
+    return this.categories.find(c => c.key === this.activeCategory)?.label || '';
+  }
+
+formatPrice(p: number | string): string {
+  const num = typeof p === 'number' ? p : Number(p);
+  if (isNaN(num)) return 'R0.00';
+  return `R${num.toFixed(2)}`;
+}
+
+  formatSurvivorPct(p: Product): string {
+    return `${Math.round((p.survivor_income / p.price) * 100)}%`;
+  }
+
+  openProduct(p: Product): void {
+    if (!this.currentUser) {
+      this.showAuthModal('login');
+      return;
     }
+    this.selectedProduct = p;
+    this.selectedQty = 1;
+  }
 
-    const total = subtotal; // delivery fee calculated separately
+  closeProduct(): void {
+    this.selectedProduct = null;
+  }
 
-    // Insert order
-    const orderResult = await client.query(
-      `INSERT INTO orders (
-        buyer_email, buyer_name, buyer_phone,
-        delivery_address, delivery_suburb, delivery_city,
-        delivery_province, delivery_postal,
-        hub_centre_id, subtotal, platform_fee_total, total,
-        payment_method, notes
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       RETURNING id`,
-      [
-        buyer_email, buyer_name, buyer_phone || null,
-        delivery_address, delivery_suburb, delivery_city,
-        delivery_province, delivery_postal,
-        hubCentreId, subtotal, platformFeeTotal, total,
-        payment_method || null, notes || null,
-      ]
-    );
-    const orderId = orderResult.rows[0].id;
+  scrollToProducts(): void {
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+  }
 
-    // Insert order items
-    for (const oi of orderItems) {
-      await client.query(
-        `INSERT INTO order_items (
-          order_id, product_id, centre_id, quantity, unit_price, total_price,
-          survivor_amount, centre_amount, platform_amount,
-          product_title, product_thumbnail, seller_alias, centre_name
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [
-          orderId, oi.product_id, oi.centre_id, oi.quantity,
-          oi.unit_price, oi.total_price,
-          oi.survivor_amount, oi.centre_amount, oi.platform_amount,
-          oi.product_title, oi.product_thumbnail, oi.seller_alias, oi.centre_name,
-        ]
-      );
-    }
-
-    // Generate Impact Receipt
-    const totalSurvivor = orderItems.reduce((s, i) => s + i.survivor_amount, 0);
-    const totalCentre   = orderItems.reduce((s, i) => s + i.centre_amount, 0);
-    const counsellingMins = Math.round((totalCentre / 30) * 20);
-    const workHours = Math.round(totalSurvivor / 80 * 3);
-    const shareCode = `AMN-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
-
-    await client.query(
-      `INSERT INTO impact_receipts (
-        order_id, total_paid, total_survivor_income,
-        total_centre_funding, total_platform,
-        counselling_minutes, work_hours_created, shareable_code
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [
-        orderId, total, parseFloat(totalSurvivor.toFixed(2)),
-        parseFloat(totalCentre.toFixed(2)), parseFloat(platformFeeTotal.toFixed(2)),
-        counsellingMins, workHours, shareCode,
-      ]
-    );
-
-    // Clear cart
-    await client.query(`DELETE FROM carts WHERE session_id = $1`, [sessionId]);
-
-    await client.query('COMMIT');
-
-    return res.status(201).json({
-      order_id: orderId,
-      share_code: shareCode,
-      total,
-      message: 'Order placed. Your Impact Receipt has been generated.',
+  addToCart(p: Product, qty = 1): void {
+    if (!this.currentUser) { this.showAuthModal('login'); return; }
+    if (this.addingIds.has(p.id)) return;
+    this.addingIds.add(p.id);
+    this.cartService.addToCart(p.id, qty, {
+      title: p.title,
+      price: p.price,
+      thumbnail: p.img,
+      seller_alias: p.seller_alias,
+      centre_name: p.centre_name,
+      survivor_income: p.survivor_income,
+      centre_funding: p.centre_funding,
+      platform_fee: p.platform_fee,
+    }).subscribe({
+      next: () => {
+        this.addingIds.delete(p.id);
+        this.addedIds.add(p.id);
+        this.showToast(`${p.title} added to cart`);
+        setTimeout(() => this.addedIds.delete(p.id), 2000);
+      },
+      error: () => {
+        this.addingIds.delete(p.id);
+      }
     });
-  } catch (err: any) {
-    await client.query('ROLLBACK');
-    console.error(err);
-    return res.status(400).json({ error: err.message || 'Order failed' });
-  } finally {
-    client.release();
   }
-};
 
-// ─── GET IMPACT RECEIPT ──────────────────────────────────────
-export const getImpactReceipt = async (req: Request, res: Response) => {
-  try {
-    const { orderId } = req.params;
-    const result = await pool.query(
-      `SELECT ir.*, o.buyer_name, o.total, o.created_at as order_date,
-              json_agg(json_build_object(
-                'title', oi.product_title,
-                'quantity', oi.quantity,
-                'total', oi.total_price,
-                'survivor_amount', oi.survivor_amount,
-                'centre_amount', oi.centre_amount,
-                'centre_name', oi.centre_name,
-                'seller_alias', oi.seller_alias
-              )) as items
-       FROM impact_receipts ir
-       JOIN orders o ON o.id = ir.order_id
-       JOIN order_items oi ON oi.order_id = o.id
-       WHERE ir.order_id = $1
-       GROUP BY ir.id, o.buyer_name, o.total, o.created_at`,
-      [orderId]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Receipt not found' });
-    return res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+  addFromModal(): void {
+    if (this.selectedProduct) {
+      this.addToCart(this.selectedProduct, this.selectedQty);
+      this.closeProduct();
+    }
   }
-};
 
-// ─── CENTRE: ADD PRODUCT ─────────────────────────────────────
-export const addProduct = async (req: Request, res: Response) => {
-  try {
-    const centreId = (req as any).centre?.id;
-    const body = req.body;
-    const files = req.files as { [f: string]: Express.Multer.File[] };
+  showToast(msg: string): void {
+    this.toastMsg = msg;
+    this.toastVisible = true;
+    setTimeout(() => this.toastVisible = false, 2800);
+  }
 
-    const images = files?.images?.map(f => f.path) || [];
-    const thumbnail = images[0] || null;
+  showAuthModal(m: string): void {
+    this.authModal = m;
+    if (m === 'register' && this.sellerCentres.length === 0) {
+      this.loadSellerCentres();
+    }
+  }
 
-    // Ensure required fields exist
-    if (!body.title || !body.price || !body.stock_quantity) {
-      return res.status(400).json({ error: 'Missing required fields: title, price, stock_quantity' });
+  loadSellerCentres(): void {
+    this.sellerCentresLoading = true;
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/centres/verified`).subscribe({
+      next: (data) => {
+        this.sellerCentres = (data || []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          city: c.city,
+          province: c.province,
+        }));
+        this.sellerCentresLoading = false;
+      },
+      error: () => { this.sellerCentresLoading = false; }
+    });
+  }
+
+  closeAuthModal(e: MouseEvent): void {
+    this.authModal = '';
+  }
+
+  redirectTo(role: string, action: string): void {
+    this.authModal = '';
+    if (role === 'seller') {
+      if (action === 'login') {
+        this.router.navigate(['/login']);
+      } else {
+        this.router.navigate(['/register/seller']);
+      }
+    } else if (role === 'centre') {
+      if (action === 'login') {
+        this.router.navigate(['/centre-dashboard']);
+      } else {
+        this.router.navigate(['/register/centre']);
+      }
+    } else if (role === 'buyer') {
+      if (action === 'login') {
+        this.showToast('Shop as guest – no account needed');
+      } else {
+        this.showToast('Buyers can shop without registration');
+      }
+    }
+  }
+
+  // ── Inline seller registration ────────────────────────────
+  onSellerIdInput(): void {
+    const cleaned = this.sellerIdNumber.replace(/\D/g, '');
+    this.sellerIdNumber = cleaned;
+    this.sellerIdVerified = false;
+    this.sellerIdError = '';
+    if (cleaned.length === 13) {
+      this.sellerIdVerified = true;
+    } else if (cleaned.length > 0) {
+      this.sellerIdError = `${cleaned.length}/13 digits entered.`;
+    }
+  }
+
+  get sellerCanSubmit(): boolean {
+    return this.sellerIdVerified &&
+      this.sellerFullName.trim().length > 0 &&
+      this.sellerEmail.trim().length > 0 &&
+      /^.{8,}$/.test(this.sellerPin) &&
+      this.sellerCentreId.length > 0 &&
+      !this.sellerIsLoading;
+  }
+
+  doSellerRegister(): void {
+    this.sellerError = '';
+    if (!this.sellerCanSubmit) { this.sellerError = 'Please complete all fields.'; return; }
+
+    const nameParts = this.sellerFullName.trim().split(/\s+/);
+    const real_name = nameParts[0];
+    const real_surname = nameParts.slice(1).join(' ') || nameParts[0];
+    let alias = this.sellerEmail.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    if (!alias) alias = `maker_${Date.now()}`;
+
+    this.sellerIsLoading = true;
+
+    const payload = {
+      id_number: this.sellerIdNumber,
+      real_name, real_surname,
+      email: this.sellerEmail,
+      pin: this.sellerPin,
+      alias,
+      phone: '0000000000',
+      centre_id: this.sellerCentreId,
+      accepted_terms: true, accepted_popia: true, safety_acknowledged: true,
+    };
+
+    this.http.post<any>(`${environment.apiUrl}/api/sellers/register`, payload).subscribe({
+      next: (res) => {
+        localStorage.setItem('sellerId', res.seller_id);
+        localStorage.setItem('sellerAlias', res.alias);
+        localStorage.setItem('sellerEmail', res.email);
+        localStorage.setItem('hiddenPin', this.sellerPin);
+        localStorage.setItem('hiddenLayerAccess', 'false');
+        // Update auth state so nav reflects logged-in seller
+        const sellerUser = {
+          id: res.seller_id,
+          alias: res.alias,
+          email: res.email,
+          verification_status: res.verification_status || 'pending',
+          hidden_layer_granted: false,
+        };
+        localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
+        this.sellerAuth['userSubject'].next(sellerUser);
+        this.sellerIsLoading = false;
+        this.authModal = '';
+        this.router.navigate(['/seller/dashboard']);
+      },
+      error: (err) => {
+        this.sellerIsLoading = false;
+        if (err.error?.code === 'ALREADY_EXISTS' || err.status === 409) {
+          this.sellerError = 'This email is already registered. Please sign in instead.';
+        } else {
+          this.sellerError = err.error?.error || err.message || 'Something went wrong. Please try again.';
+        }
+      }
+    });
+  }
+
+  sellerQuickExit(): void { window.location.href = 'https://www.news24.com'; }
+
+  goToSellerLogin(): void {
+    this.authModal = '';
+    this.router.navigate(['/login']);
+  }
+
+  doAdminLogin(): void {
+    this.authError = '';
+    if (!this.adminPinInput) { this.authError = 'Please enter the admin PIN.'; return; }
+    if (this.adminPinInput !== 'amani2024') { this.authError = 'Incorrect PIN.'; return; }
+    localStorage.setItem('adminAuth', 'true');
+    this.authModal = '';
+    this.adminPinInput = '';
+    this.router.navigate(['/admin']);
+  }
+
+  doLogin(): void {
+    this.authError = '';
+    if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
+
+    if (this.loginRole === 'seller') {
+      // Seller uses email + PIN via real API
+      this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
+        email: this.loginEmail, pin: this.loginPassword
+      }).subscribe({
+        next: (res) => {
+          localStorage.setItem('sellerId', res.id);
+          localStorage.setItem('sellerAlias', res.alias);
+          localStorage.setItem('sellerEmail', res.email);
+          localStorage.setItem('hiddenPin', this.loginPassword);
+          localStorage.setItem('hiddenLayerAccess', 'false');
+          this.authModal = '';
+          this.router.navigate(['/seller/dashboard']);
+        },
+        error: (err) => { this.authError = err.error?.error || 'Invalid email or PIN.'; }
+      });
+      return;
     }
 
-    const result = await pool.query(
-      `INSERT INTO products (
-        centre_id, seller_alias, seller_type, name, description,
-        category, tags, story, price, survivor_pct, centre_pct, platform_pct,
-        stock, images, image_url, weight_grams, processing_days, status
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-       RETURNING id, name, status`,
-      [
-        centreId, body.seller_alias, body.seller_type,
-        body.title, body.description, body.category,
-        body.tags ? JSON.parse(body.tags) : [],
-        body.story || null, parseFloat(body.price),
-        parseFloat(body.survivor_pct || '70'),
-        parseFloat(body.centre_pct  || '28'),
-        parseFloat(body.platform_pct || '2'),
-        parseInt(body.stock_quantity),
-        images, thumbnail || null,
-        body.weight_grams ? parseInt(body.weight_grams) : null,
-        parseInt(body.processing_days || '3'),
-        'pending' // needs admin approval
-      ]
-    );
+    if (this.loginRole === 'centre') {
+      this.http.post<any>(`${environment.apiUrl}/api/centres/login`, {
+        email: this.loginEmail, password: this.loginPassword
+      }).subscribe({
+        next: (res) => {
+          localStorage.setItem('centreId', res.centre_id || '');
+          localStorage.setItem('centreToken', res.token || '');
+          localStorage.setItem('centreName', res.centre_name || '');
+          localStorage.setItem('centreType', res.centre_type || '');
+          localStorage.setItem('centreEmail', res.contact_email || '');
+          localStorage.setItem('centreManagerName', res.contact_person_name || '');
+          localStorage.setItem('centreCity', res.city || '');
+          localStorage.setItem('centreProvince', res.province || '');
+          localStorage.setItem('centrePhone', res.contact_phone || '');
+          localStorage.setItem('centreNpoNumber', res.npo_number || '');
+          localStorage.setItem('centreStatus', res.status || '');
+          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
+          this.authModal = '';
+          this.router.navigate(['/centre-dashboard']);
+        },
+        error: (err) => { this.authError = err.error?.error || 'Invalid email or password.'; }
+      });
+      return;
+    }
 
-    return res.status(201).json({
-      message: 'Product submitted for approval',
-      product: result.rows[0],
-    });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Failed to add product' });
-  }
-};
+    if (this.loginRole === 'admin') {
+      this.authModal = '';
+      this.router.navigate(['/admin']);
+      return;
+    }
 
-// ─── ADMIN: APPROVE PRODUCT ──────────────────────────────────
-export const approveProduct = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { action } = req.body; // 'active' | 'rejected'
-    await pool.query(
-      `UPDATE products SET status = $1, approved_at = CASE WHEN $1 = 'active' THEN NOW() ELSE NULL END
-       WHERE id = $2`,
-      [action, id]
-    );
-    return res.json({ message: `Product ${action}` });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    // Buyer — local auth service
+    const ok = this.authService.login(this.loginEmail, this.loginPassword, 'buyer');
+    if (!ok) this.authError = 'Invalid credentials.';
+    else this.authModal = '';
   }
-};
+
+  doRegister(): void {
+    this.authError = '';
+    if (this.registerRole === 'centre') { this.authModal = ''; this.router.navigate(['/register/centre']); return; }
+    if (this.registerRole === 'seller') { this.authModal = ''; this.router.navigate(['/register/seller']); return; }
+    if (!this.registerName || !this.registerEmail || !this.registerPassword) { this.authError = 'Please fill in all fields.'; return; }
+    if (this.registerPassword.length < 8) { this.authError = 'Password must be at least 8 characters.'; return; }
+    const ok = this.authService.register(this.registerName, this.registerEmail, this.registerPassword, this.registerRole);
+    if (ok) this.authModal = '';
+    else this.authError = 'Registration failed. Please try again.';
+  }
+
+  logout(): void {
+    const sellerId = localStorage.getItem('sellerId');
+    const sellerAlias = localStorage.getItem('sellerAlias');
+    const sellerEmail = localStorage.getItem('sellerEmail');
+    const centreId = localStorage.getItem('centreId');
+    const centreName = localStorage.getItem('centreName');
+    const centreEmail = localStorage.getItem('centreEmail');
+
+    if (sellerId) {
+      this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
+        seller_id: sellerId, alias: sellerAlias, email: sellerEmail,
+      }).subscribe({ error: () => {} });
+    }
+    if (centreId) {
+      this.http.post(`${environment.apiUrl}/api/centres/logout`, {
+        centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
+      }).subscribe({ error: () => {} });
+    }
+
+    this.authService.logout();
+    localStorage.removeItem('sellerId'); localStorage.removeItem('sellerUser');
+    localStorage.removeItem('sellerAlias'); localStorage.removeItem('sellerEmail');
+    localStorage.removeItem('hiddenPin'); localStorage.removeItem('hiddenLayerAccess');
+    localStorage.removeItem('centreId'); localStorage.removeItem('centreName');
+    localStorage.removeItem('centreType'); localStorage.removeItem('centreEmail');
+    localStorage.removeItem('centreManagerName'); localStorage.removeItem('centreCity');
+    localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
+    localStorage.removeItem('centreNpoNumber');
+    this.showToast('Signed out successfully');
+  }
+
+  stars(rating: number): boolean[] {
+    return Array.from({ length: 5 }, (_, i) => i < Math.round(rating));
+  }
+
+  getButtonLabel(p: Product): string {
+    if (p.stock === 0) return 'Out of stock';
+    if (this.addingIds.has(p.id)) return 'Adding…';
+    if (this.addedIds.has(p.id)) return 'Added';
+    return '+ Add to cart';
+  }
+
+  getButtonClass(p: Product): string {
+    if (this.addedIds.has(p.id)) return 'card-add-btn added';
+    if (this.addingIds.has(p.id)) return 'card-add-btn adding';
+    return 'card-add-btn';
+  }
+
+  goToDonate(): void { this.router.navigate(['/donate']); }
+  goToCentres(): void { this.router.navigate(['/for-centres']); }
+  goToContribute(): void { this.router.navigate(['/centres']); }
+}

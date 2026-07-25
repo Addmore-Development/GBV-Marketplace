@@ -33,7 +33,7 @@ export const getProducts = async (req: Request, res: Response) => {
       params.push(category);
     }
     if (search) {
-      where += ` AND (p.title ILIKE $${idx} OR p.description ILIKE $${idx})`;
+      where += ` AND (p.name ILIKE $${idx} OR p.description ILIKE $${idx})`;
       params.push(`%${search}%`);
       idx++;
     }
@@ -65,13 +65,13 @@ export const getProducts = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT
         p.id,
-        p.title,
+        p.name AS title,
         p.description,
         p.category,
         COALESCE(p.story, p.description) AS story,
         p.price,
-        COALESCE(p.stock_quantity, 0) AS stock,
-        COALESCE(p.thumbnail, 'https://placehold.co/600x400?text=No+Image') AS img,
+        COALESCE(p.stock, 0) AS stock,
+        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS img,
         p.seller_alias,
         COALESCE(p.seller_type::text, 'survivor') AS seller_type,
         COALESCE(p.rating_avg, 5.0) AS rating,
@@ -82,8 +82,8 @@ export const getProducts = async (req: Request, res: Response) => {
         ROUND(p.price * COALESCE(p.survivor_pct, 70) / 100, 2) AS survivor_income,
         ROUND(p.price * COALESCE(p.centre_pct, 28) / 100, 2) AS centre_funding,
         ROUND(p.price * COALESCE(p.platform_pct, 2) / 100, 2) AS platform_fee,
-        CASE WHEN COALESCE(p.stock_quantity, 0) = 0 THEN 'out-of-stock'
-             WHEN COALESCE(p.stock_quantity, 0) <= 5 THEN 'low-stock'
+        CASE WHEN COALESCE(p.stock, 0) = 0 THEN 'out-of-stock'
+             WHEN COALESCE(p.stock, 0) <= 5 THEN 'low-stock'
              ELSE NULL END AS badge
        FROM products p
        JOIN centres c ON c.id = p.centre_id
@@ -112,6 +112,10 @@ export const getProduct = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT
         p.*,
+        p.name AS title,
+        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS thumbnail,
+        COALESCE(p.stock, 0) AS stock_quantity,
+        'ZAR' AS currency,
         c.centre_name, c.city, c.province, c.contact_phone,
         c.services_offered, c.languages_spoken,
         c.provides_counselling, c.provides_legal_support,
@@ -198,9 +202,9 @@ export const updateCart = async (req: Request, res: Response) => {
 
     // Fetch product
     const prod = await pool.query(
-      `SELECT p.id, p.title, p.price, COALESCE(p.thumbnail, '') AS thumbnail,
-              p.seller_alias, p.currency, p.survivor_pct, p.centre_pct, p.platform_pct,
-              COALESCE(p.stock_quantity, 0) AS stock_quantity,
+      `SELECT p.id, p.name AS title, p.price, COALESCE(p.image_url, '') AS thumbnail,
+              p.seller_alias, 'ZAR' AS currency, p.survivor_pct, p.centre_pct, p.platform_pct,
+              COALESCE(p.stock, 0) AS stock_quantity,
               c.centre_name
        FROM products p
        JOIN centres c ON c.id = p.centre_id
@@ -295,8 +299,9 @@ export const placeOrder = async (req: Request, res: Response) => {
 
     for (const item of items) {
       const prod = await client.query(
-        `SELECT p.id, p.title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
-                COALESCE(p.stock_quantity, 0) AS stock_quantity, p.seller_alias,
+        `SELECT p.id, p.name AS title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
+                COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias,
+                COALESCE(p.image_url, '') AS thumbnail,
                 c.centre_name, p.centre_id
          FROM products p
          JOIN centres c ON c.id = p.centre_id
@@ -334,7 +339,7 @@ export const placeOrder = async (req: Request, res: Response) => {
 
       // Decrement stock
       await client.query(
-        `UPDATE products SET stock_quantity = stock_quantity - $1, total_sold = total_sold + $1 WHERE id = $2`,
+        `UPDATE products SET stock = stock - $1, total_sold = total_sold + $1 WHERE id = $2`,
         [item.quantity, p.id]
       );
     }

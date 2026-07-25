@@ -9,6 +9,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService } from '../../services/seller-auth.service';
+import { CentreAuthService } from '../../services/centre-auth.service';
 import { environment } from '../../../environments/environment';
 
 export interface Centre {
@@ -303,6 +304,7 @@ export class CentresComponent implements OnInit, OnDestroy {
   constructor(
     private authService: AuthService,
     private sellerAuth: SellerAuthService,
+    private centreAuth: CentreAuthService,
     private router: Router,
     private fb: FormBuilder,
     private http: HttpClient,
@@ -311,19 +313,21 @@ export class CentresComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const sellerId = localStorage.getItem('sellerId');
-    const centreId = localStorage.getItem('centreId');
     if (sellerId) {
       const stored = localStorage.getItem('sellerUser');
       if (stored) { const s = JSON.parse(stored); this.currentUser = { name: s.alias, email: s.email, role: 'seller', initials: s.alias.slice(0,2).toUpperCase() }; }
-    } else if (centreId) {
-      const name = localStorage.getItem('centreName') || 'Centre';
-      const email = localStorage.getItem('centreEmail') || '';
-      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
     }
     this.authService.user$.pipe(takeUntil(this.destroy$)).subscribe(u => { if (u) { this.currentUser = u; this.cdr.detectChanges(); } });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$)).subscribe(u => {
       if (u) this.currentUser = { name: u.alias, email: u.email, role: 'seller', initials: u.alias.slice(0,2).toUpperCase() };
-      else if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+      else if (!this.authService.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+      this.cdr.detectChanges();
+    });
+    // Reactive centre session — updates immediately if the centre signs out
+    // from this page, from the centre profile page, or from another tab.
+    this.centreAuth.user$.pipe(takeUntil(this.destroy$)).subscribe(u => {
+      if (u) this.currentUser = { name: u.name, email: u.email, role: 'centre', initials: u.name.slice(0,2).toUpperCase() };
+      else if (!this.authService.currentUser && !this.sellerAuth.currentUser) this.currentUser = null;
       this.cdr.detectChanges();
     });
 
@@ -603,18 +607,7 @@ export class CentresComponent implements OnInit, OnDestroy {
         email: this.loginEmail, password: this.loginPassword
       }).subscribe({
         next: (res) => {
-          localStorage.setItem('centreId', res.centre_id || '');
-          localStorage.setItem('centreToken', res.token || '');
-          localStorage.setItem('centreName', res.centre_name || '');
-          localStorage.setItem('centreType', res.centre_type || '');
-          localStorage.setItem('centreEmail', res.contact_email || '');
-          localStorage.setItem('centreManagerName', res.contact_person_name || '');
-          localStorage.setItem('centreCity', res.city || '');
-          localStorage.setItem('centreProvince', res.province || '');
-          localStorage.setItem('centrePhone', res.contact_phone || '');
-          localStorage.setItem('centreNpoNumber', res.npo_number || '');
-          localStorage.setItem('centreStatus', res.status || '');
-          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
+          this.centreAuth.setSession(res);
           this.closeModalDirect();
           this.router.navigate(['/centre-dashboard']);
         },
@@ -644,7 +637,14 @@ export class CentresComponent implements OnInit, OnDestroy {
     else { this.authError = 'Registration failed.'; }
   }
 
-  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
+  logout(): void {
+    const role = this.currentUser?.role;
+    if (role === 'seller') this.sellerAuth.logout();
+    else if (role === 'centre') this.centreAuth.logout();
+    else this.authService.logout();
+    this.currentUser = null;
+    this.showToast('Signed out successfully');
+  }
 
   // ── Donate submit ─────────────────────────────────────────
   submitDonate(): void {

@@ -9,6 +9,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService } from '../../services/seller-auth.service';
+import { CentreAuthService } from '../../services/centre-auth.service';
 import { Centre, NoticePost, getCentreImage } from './centres.component';
 import { environment } from '../../../environments/environment';
 
@@ -146,6 +147,11 @@ const ALL_CENTRES: Centre[] = [
     </div>
   </div>
 </nav>
+
+<div class="pp-loading" *ngIf="centreLoading">
+  <div class="pp-spinner"></div>
+  <p>Loading centre profile…</p>
+</div>
 
 <div class="pp-not-found" *ngIf="!centreLoading && !centre">
   <h2>Centre not found</h2>
@@ -410,6 +416,11 @@ const ALL_CENTRES: Centre[] = [
 .pp-chip { display: flex; align-items: center; gap: 7px; }
 .pp-avatar { width: 30px; height: 30px; background: #8B2635; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; }
 
+/* Loading */
+.pp-loading { text-align: center; padding: 120px 24px; color: #7A6A5A; font-family: 'DM Sans', sans-serif; }
+.pp-spinner { width: 32px; height: 32px; margin: 0 auto 14px; border: 3px solid #EDE8E3; border-top-color: #8B2635; border-radius: 50%; animation: pp-spin .8s linear infinite; }
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+
 /* Not found */
 .pp-not-found { text-align: center; padding: 100px 24px; }
 
@@ -516,6 +527,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     private router: Router,
     private authService: AuthService,
     private sellerAuth: SellerAuthService,
+    private centreAuth: CentreAuthService,
     private fb: FormBuilder,
     private http: HttpClient,
   ) {}
@@ -534,40 +546,47 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
 
     this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).subscribe({
       next: (data) => {
-        const match = (data || []).find((c: any) => c.id === id);
-        if (match) {
-          this.centre = {
-            id: match.id,
-            name: match.name || '',
-            type: match.type || '',
-            city: match.city || '',
-            province: match.province || '',
-            suburb: match.suburb || match.city || '',
-            description: match.description || '',
-            mission: match.mission || '',
-            services: Array.isArray(match.services) ? match.services : [],
-            languages: Array.isArray(match.languages) ? match.languages : [],
-            is_24_hour: !!match.is_24_hour,
-            has_shelter: !!match.has_shelter,
-            provides_counselling: !!match.provides_counselling,
-            provides_legal_support: !!match.provides_legal_support,
-            capacity: match.capacity || 0,
-            img: match.profile_picture ? this.mediaUrl(match.profile_picture) : getCentreImage(match.type, match.id),
-            profilePicture: match.profile_picture || null,
-            contact_email: match.contact_email || '',
-            contact_phone: match.contact_phone || '',
-            whatsapp: match.whatsapp || '',
-            website: match.website || '',
-            verified: !!match.verified,
-            year_established: match.year_established || 0,
-            beneficiaries_per_year: match.beneficiaries_per_year || 0,
-          };
-        } else {
+        try {
+          const match = (data || []).find((c: any) => c.id === id);
+          if (match) {
+            this.centre = {
+              id: match.id,
+              name: match.name || '',
+              type: match.type || '',
+              city: match.city || '',
+              province: match.province || '',
+              suburb: match.suburb || match.city || '',
+              description: match.description || '',
+              mission: match.mission || '',
+              services: Array.isArray(match.services) ? match.services : [],
+              languages: Array.isArray(match.languages) ? match.languages : [],
+              is_24_hour: !!match.is_24_hour,
+              has_shelter: !!match.has_shelter,
+              provides_counselling: !!match.provides_counselling,
+              provides_legal_support: !!match.provides_legal_support,
+              capacity: match.capacity || 0,
+              img: match.profile_picture ? this.mediaUrl(match.profile_picture) : getCentreImage(match.type, match.id),
+              profilePicture: match.profile_picture || null,
+              contact_email: match.contact_email || '',
+              contact_phone: match.contact_phone || '',
+              whatsapp: match.whatsapp || '',
+              website: match.website || '',
+              verified: !!match.verified,
+              year_established: match.year_established || 0,
+              beneficiaries_per_year: match.beneficiaries_per_year || 0,
+            };
+          } else {
+            this.centre = fallback;
+          }
+        } catch (e) {
+          console.error('Failed to map centre data, falling back:', e);
           this.centre = fallback;
+        } finally {
+          this.centreLoading = false;
         }
-        this.centreLoading = false;
       },
-      error: () => {
+      error: (err) => {
+        console.error('Failed to load /api/centres/all:', err);
         this.centre = fallback;
         this.centreLoading = false;
       }
@@ -578,26 +597,28 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     const id = this.route.snapshot.paramMap.get('id');
     this.fetchCentre(id);
 
-    // Check seller/centre localStorage session first (survives page reload)
+    // Check seller localStorage session first (survives page reload)
     const sellerId = localStorage.getItem('sellerId');
-    const centreId = localStorage.getItem('centreId');
     if (sellerId) {
       const stored = localStorage.getItem('sellerUser');
       if (stored) {
         const s = JSON.parse(stored);
         this.currentUser = { name: s.alias, email: s.email, role: 'seller', initials: s.alias.slice(0,2).toUpperCase() };
       }
-    } else if (centreId) {
-      const name = localStorage.getItem('centreName') || 'Centre';
-      const email = localStorage.getItem('centreEmail') || '';
-      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
     }
     this.authService.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => { if (u) this.currentUser = u; });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
         if (u) this.currentUser = { name: u.alias, email: u.email, role: 'seller', initials: u.alias.slice(0,2).toUpperCase() };
-        else if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+        else if (!this.authService.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+      });
+    // Reactive centre session -- fires immediately on load, on login/logout
+    // from this page, and on login/logout from any other open tab.
+    this.centreAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) this.currentUser = { name: u.name, email: u.email, role: 'centre', initials: u.name.slice(0,2).toUpperCase() };
+        else if (!this.authService.currentUser && !this.sellerAuth.currentUser) this.currentUser = null;
       });
 
     this.donateForm = this.fb.group({
@@ -665,18 +686,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     if (role === 'seller') {
       this.sellerAuth.logout();
     } else if (role === 'centre') {
-      const centreId = localStorage.getItem('centreId');
-      const centreName = localStorage.getItem('centreName');
-      const centreEmail = localStorage.getItem('centreEmail');
-      if (centreId) {
-        this.http.post(`${environment.apiUrl}/api/centres/logout`, {
-          centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
-        }).subscribe({ error: () => {} });
-      }
-      ['centreId', 'centreName', 'centreType', 'centreEmail', 'centreManagerName',
-       'centreCity', 'centreProvince', 'centrePhone', 'centreNpoNumber',
-       'centreDescription', 'centreMission', 'centreWebsite', 'centreToken',
-       'centreProfilePic', 'centreStatus'].forEach(k => localStorage.removeItem(k));
+      this.centreAuth.logout();
     } else {
       this.authService.logout();
     }

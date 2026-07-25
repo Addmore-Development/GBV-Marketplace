@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { CentreAuthService } from '../../services/centre-auth.service';
 
 @Component({
   selector: 'app-centre-login',
@@ -71,7 +72,7 @@ export class CentreLoginComponent {
   error = '';
   isLoading = false;
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private centreAuth: CentreAuthService) {}
 
   login(): void {
     if (!this.email || !this.password) { this.error = 'Email and password are required'; return; }
@@ -80,19 +81,7 @@ export class CentreLoginComponent {
     this.http.post<any>(`${environment.apiUrl}/api/centres/login`, { email: this.email, password: this.password })
       .subscribe({
         next: (res) => {
-          localStorage.setItem('centreId', res.centre_id || '');
-          localStorage.setItem('centreToken', res.token || '');
-          localStorage.setItem('centreName', res.centre_name || '');
-          localStorage.setItem('centreType', res.centre_type || '');
-          localStorage.setItem('centreEmail', res.contact_email || '');
-          localStorage.setItem('centreManagerName', res.contact_person_name || '');
-          localStorage.setItem('centreCity', res.city || '');
-          localStorage.setItem('centreProvince', res.province || '');
-          localStorage.setItem('centrePhone', res.contact_phone || '');
-          localStorage.setItem('centreNpoNumber', res.npo_number || '');
-          localStorage.setItem('centreStatus', res.status || '');
-          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
-          else localStorage.removeItem('centreProfilePic');
+          this.centreAuth.setSession(res);
           this.isLoading = false;
           this.router.navigate(['/centre-dashboard']);
         },

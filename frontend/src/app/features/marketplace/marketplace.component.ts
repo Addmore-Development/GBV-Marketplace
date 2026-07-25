@@ -7,6 +7,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CartService } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService, SellerUser } from '../../services/seller-auth.service';
+import { CentreAuthService } from '../../services/centre-auth.service';
 import { environment } from '../../../environments/environment';
 
 interface Product {
@@ -247,6 +248,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     private cartService: CartService,
     private authService: AuthService,
     private sellerAuth: SellerAuthService,
+    private centreAuth: CentreAuthService,
     private router: Router,
     private http: HttpClient,
     private route: ActivatedRoute,
@@ -263,22 +265,10 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     this.cartService.cart$.pipe(takeUntil(this.destroy$))
       .subscribe(c => this.cartCount = c.items.reduce((s, i) => s + i.quantity, 0));
 
-    // Restore a centre session (survives page reload / navigation).
-    // Sellers and buyers are handled by their reactive auth services below,
-    // but centres don't have a dedicated auth service — their session
-    // lives in localStorage, so it has to be checked explicitly here too.
-    const sellerId = localStorage.getItem('sellerId');
-    const centreId = localStorage.getItem('centreId');
-    if (!sellerId && centreId) {
-      const name = localStorage.getItem('centreName') || 'Centre';
-      const email = localStorage.getItem('centreEmail') || '';
-      this.currentUser = { name, email, role: 'centre', initials: name.slice(0,2).toUpperCase() };
-    }
-
     this.authService.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
         if (u) this.currentUser = u;
-        else if (!this.sellerAuth.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+        else if (!this.sellerAuth.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
       });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
@@ -291,7 +281,18 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
           };
         } else {
           // seller logged out — only clear if no buyer or centre session active
-          if (!this.authService.currentUser && !localStorage.getItem('centreId')) this.currentUser = null;
+          if (!this.authService.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+        }
+      });
+    // Reactive centre session — fires immediately on load, on login/logout
+    // from this page, and on login/logout from any other open tab, so
+    // signing out on the centre profile page is reflected here too.
+    this.centreAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) {
+          this.currentUser = { name: u.name, email: u.email, role: 'centre', initials: u.name.slice(0,2).toUpperCase() };
+        } else if (!this.authService.currentUser && !this.sellerAuth.currentUser) {
+          this.currentUser = null;
         }
       });
   }
@@ -563,18 +564,7 @@ formatPrice(p: number | string): string {
         email: this.loginEmail, password: this.loginPassword
       }).subscribe({
         next: (res) => {
-          localStorage.setItem('centreId', res.centre_id || '');
-          localStorage.setItem('centreToken', res.token || '');
-          localStorage.setItem('centreName', res.centre_name || '');
-          localStorage.setItem('centreType', res.centre_type || '');
-          localStorage.setItem('centreEmail', res.contact_email || '');
-          localStorage.setItem('centreManagerName', res.contact_person_name || '');
-          localStorage.setItem('centreCity', res.city || '');
-          localStorage.setItem('centreProvince', res.province || '');
-          localStorage.setItem('centrePhone', res.contact_phone || '');
-          localStorage.setItem('centreNpoNumber', res.npo_number || '');
-          localStorage.setItem('centreStatus', res.status || '');
-          if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
+          this.centreAuth.setSession(res);
           this.authModal = '';
           this.router.navigate(['/centre-dashboard']);
         },
@@ -610,34 +600,23 @@ formatPrice(p: number | string): string {
     const sellerId = localStorage.getItem('sellerId');
     const sellerAlias = localStorage.getItem('sellerAlias');
     const sellerEmail = localStorage.getItem('sellerEmail');
-    const centreId = localStorage.getItem('centreId');
-    const centreName = localStorage.getItem('centreName');
-    const centreEmail = localStorage.getItem('centreEmail');
 
     if (sellerId) {
       this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
         seller_id: sellerId, alias: sellerAlias, email: sellerEmail,
       }).subscribe({ error: () => {} });
     }
-    if (centreId) {
-      this.http.post(`${environment.apiUrl}/api/centres/logout`, {
-        centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
-      }).subscribe({ error: () => {} });
+    if (this.centreAuth.currentUser) {
+      this.centreAuth.logout();
     }
 
     this.authService.logout();
     localStorage.removeItem('sellerId'); localStorage.removeItem('sellerUser');
     localStorage.removeItem('sellerAlias'); localStorage.removeItem('sellerEmail');
     localStorage.removeItem('hiddenPin'); localStorage.removeItem('hiddenLayerAccess');
-    localStorage.removeItem('centreId'); localStorage.removeItem('centreName');
-    localStorage.removeItem('centreType'); localStorage.removeItem('centreEmail');
-    localStorage.removeItem('centreManagerName'); localStorage.removeItem('centreCity');
-    localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
-    localStorage.removeItem('centreNpoNumber');
-    // Clear immediately rather than relying on the auth-service subscriptions —
-    // those only assign currentUser when a user is present, and centre sessions
-    // aren't reactive at all (no dedicated auth service), so without this the
-    // name stayed visible until the next full page load.
+    // centreAuth.logout() above already clears every centre-related key and
+    // pushes null through user$, which every page (this one included, and
+    // any other open tab) is subscribed to -- so no manual clearing needed here.
     this.currentUser = null;
     this.showToast('Signed out successfully');
   }

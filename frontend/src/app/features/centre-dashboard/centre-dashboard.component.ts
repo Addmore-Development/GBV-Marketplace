@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { CentreAuthService } from '../../services/centre-auth.service';
 
 interface SosAlert {
   id: string;
@@ -1024,7 +1025,7 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   private centreId = '';
   private pollHandle: any;
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private centreAuth: CentreAuthService) {}
 
   sidebarCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900;
   activeTab = 'overview';
@@ -1407,22 +1408,7 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   submitImpactReport(): void { this.reportSubmitted = true; setTimeout(() => this.reportSubmitted = false, 4000); }
   exportDonations(): void { alert('CSV export would download here.'); }
   signOut(): void {
-    const centreId = localStorage.getItem('centreId') || this.centreId;
-    const centreName = localStorage.getItem('centreName');
-    const centreEmail = localStorage.getItem('centreEmail');
-    if (centreId) {
-      this.http.post(`${environment.apiUrl}/api/centres/logout`, {
-        centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
-      }).subscribe({ error: () => {} });
-    }
-    localStorage.removeItem('centreId'); localStorage.removeItem('centreName');
-    localStorage.removeItem('centreType'); localStorage.removeItem('centreEmail');
-    localStorage.removeItem('centreManagerName'); localStorage.removeItem('centreCity');
-    localStorage.removeItem('centreProvince'); localStorage.removeItem('centrePhone');
-    localStorage.removeItem('centreNpoNumber'); localStorage.removeItem('centreDescription');
-    localStorage.removeItem('centreMission'); localStorage.removeItem('centreWebsite');
-    localStorage.removeItem('centreToken'); localStorage.removeItem('centreProfilePic');
-    localStorage.removeItem('centreStatus');
+    this.centreAuth.logout();
     this.router.navigate(['/marketplace']);
   }
 }

@@ -348,7 +348,7 @@ export const getSellerProfile = async (req: Request, res: Response) => {
                     s.hidden_layer_granted, s.profile_complete,
                     s.craft_story, s.photo_url, s.languages, s.availability,
                     s.skills_experience, s.total_sales, s.total_earned,
-                    s.public_bio, s.social_handle,
+                    s.public_bio, s.social_handle, s.centre_id,
                     c.centre_name, c.city AS centre_city
              FROM sellers s
              LEFT JOIN centres c ON c.id = s.centre_id

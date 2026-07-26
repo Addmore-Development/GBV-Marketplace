@@ -217,6 +217,7 @@ export class SellerDashboardComponent implements OnInit {
     notifications: any[] = [];
     unreadCount = 0;
     showNotifications = false;
+    mobileNavOpen = false;
 
     constructor(
         private http: HttpClient,
@@ -250,6 +251,14 @@ export class SellerDashboardComponent implements OnInit {
     quickExit(): void {
         localStorage.removeItem('hiddenLayerAccess');
         window.location.href = '/news';
+    }
+
+    // Plain in-app nav back to the marketplace — stays signed in.
+    // Kept separate from quickExit() above, which is the safety
+    // "leave this site instantly" feature (double-tap logo) and
+    // must keep its current behaviour.
+    goToMarketplace(): void {
+        this.router.navigate(['/marketplace']);
     }
 
     loadProfile(id: string): void {

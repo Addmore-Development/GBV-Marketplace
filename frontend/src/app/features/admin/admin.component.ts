@@ -157,6 +157,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   // ── Auth ──────────────────────────────────────────────────
   isAuthenticated = false;
+  mobileNavOpen = false;
   adminPin = '';
   authError = '';
   readonly ADMIN_PIN = 'amani2024'; // In production: server-side session

@@ -22,8 +22,11 @@
 <!-- ── ADMIN DASHBOARD ────────────────────────────────────── -->
 <div class="admin-wrap" *ngIf="isAuthenticated">
 
+  <!-- Mobile-only backdrop, closes the drawer on tap-outside -->
+  <div class="sidebar-backdrop" *ngIf="mobileNavOpen" (click)="mobileNavOpen = false"></div>
+
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <aside class="sidebar" [class.mobile-open]="mobileNavOpen" (click)="mobileNavOpen = false">
     <div class="sb-brand">
       <span class="sb-leaf"></span>
       <span>Amani Admin</span>
@@ -71,6 +74,10 @@
 
   <!-- Main content -->
   <main class="admin-main">
+
+    <button class="admin-hamburger" (click)="mobileNavOpen = !mobileNavOpen" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
 
     <!-- ── LIVE SOS BANNER — a survivor needs help right now ──── -->
     <div class="sos-top-banner" *ngIf="activeEmergencyBanner" (click)="openEmergencyBanner()">

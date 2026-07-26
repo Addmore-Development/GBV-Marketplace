@@ -101,6 +101,31 @@
   min-height: 100vh;
 }
 
+.admin-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 34px;
+  height: 34px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 12px;
+  span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--brown, #3B2A20);
+    border-radius: 2px;
+  }
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
 /* ── Sidebar ─────────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
@@ -935,6 +960,8 @@
    seller dashboard, which moves its tabs to the top) — it just
    narrows to an icon-first column so it doesn't eat the screen. */
 @media (max-width: 900px) {
+  .admin-hamburger { display: flex; }
+
   .sidebar {
     width: 76px;
     height: 100vh;
@@ -975,7 +1002,45 @@
       }
     }
     .sb-footer { padding: 8px 4px 12px; margin-left: 0; }
+
+    // Hamburger-expanded state: overlays the content with the full,
+    // labelled sidebar instead of the narrow icon rail above.
+    &.mobile-open {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 220px;
+      z-index: 1001;
+      box-shadow: 2px 0 16px rgba(0,0,0,.35);
+
+      .sb-brand {
+        flex-direction: row;
+        gap: 8px;
+        padding: 24px 20px 20px;
+        text-align: left;
+        font-size: 1rem;
+        span:not(.sb-leaf) { display: inline; }
+      }
+      .sb-nav button {
+        flex-direction: row;
+        text-align: left;
+        padding: 11px 20px;
+        font-size: .85rem;
+        gap: 10px;
+        .badge-count { position: static; margin-top: 0; margin-left: auto; }
+      }
+      .sb-footer { padding: 16px 20px; }
+    }
   }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+  }
+
   .tab-content { padding: 24px 20px; }
   .tab-header.row { flex-direction: column; align-items: stretch; gap: 12px; }
 }

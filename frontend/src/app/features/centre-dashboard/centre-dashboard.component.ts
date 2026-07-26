@@ -94,8 +94,8 @@ interface Need {
         <div class="sb-centre-name">{{ centreName }}</div>
         <div class="sb-centre-type">{{ centreType }}</div>
       </div>
-      <button class="sb-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
-        {{ sidebarCollapsed ? 'Expand' : 'Collapse' }}
+      <button class="sb-toggle" (click)="sidebarCollapsed = !sidebarCollapsed" [attr.aria-label]="sidebarCollapsed ? 'Expand menu' : 'Collapse menu'" title="Toggle menu">
+        <span></span><span></span><span></span>
       </button>
     </div>
 
@@ -117,7 +117,7 @@ interface Need {
     </nav>
 
     <div class="sb-footer" *ngIf="!sidebarCollapsed">
-      <a routerLink="/marketplace" class="sb-footer-link">View Marketplace</a>
+      <a routerLink="/marketplace" class="sb-footer-link">Marketplace</a>
       <a routerLink="/for-centres" class="sb-footer-link">Amani Guide</a>
       <div class="sb-signout" (click)="signOut()">Sign Out</div>
     </div>
@@ -722,7 +722,12 @@ interface Need {
     .sb-centre-info { flex: 1; min-width: 0; }
     .sb-centre-name { font-size: .82rem; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sb-centre-type { font-size: .66rem; color: rgba(255,255,255,.38); text-transform: uppercase; letter-spacing: .8px; }
-    .sb-toggle { background: none; border: none; color: rgba(255,255,255,.4); cursor: pointer; font-size: .8rem; flex-shrink: 0; padding: 0; transition: color .2s; &:hover { color: white; } }
+    .sb-toggle {
+      background: none; border: none; cursor: pointer; flex-shrink: 0; padding: 4px;
+      display: flex; flex-direction: column; justify-content: center; gap: 4px; width: 22px; height: 22px;
+      span { display: block; width: 100%; height: 2px; background: rgba(255,255,255,.5); border-radius: 2px; transition: background .2s; }
+      &:hover span { background: white; }
+    }
     .sb-status { display: flex; align-items: center; gap: 8px; padding: 10px 16px; }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; &.verified { background: var(--green); box-shadow: 0 0 6px rgba(22,163,74,.5); } &.pending { background: var(--amber); box-shadow: 0 0 6px rgba(184,134,11,.5); } }
     .status-label { font-size: .74rem; color: var(--green); font-weight: 600; &.pending-label { color: var(--amber); } }

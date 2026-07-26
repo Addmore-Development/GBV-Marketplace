@@ -12,8 +12,11 @@
 <!-- MAIN DASHBOARD -->
 <div class="sd-page" *ngIf="!isLoading && seller && !sanctuaryOpen">
 
+  <!-- Mobile-only backdrop, closes the drawer on tap-outside -->
+  <div class="sd-backdrop" *ngIf="mobileNavOpen" (click)="mobileNavOpen = false"></div>
+
   <!-- ── SIDEBAR ─────────────────────────────────────────── -->
-  <aside class="sd-sidebar">
+  <aside class="sd-sidebar" [class.open]="mobileNavOpen" (click)="mobileNavOpen = false">
     <div class="sb-brand" (dblclick)="handleLogoDblTap()" title="Double-tap to leave safely">
       <span class="sb-leaf"></span>
       <span class="sb-name">Amani</span>
@@ -86,6 +89,9 @@
     <!-- Top bar -->
     <div class="sd-topbar">
       <div class="tb-left">
+        <button class="tb-hamburger" (click)="mobileNavOpen = !mobileNavOpen" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
         <h1>{{ activeTab === 'home' ? 'My Studio' :
                activeTab === 'listings' ? 'My Listings' :
                activeTab === 'earnings' ? 'My Earnings' :
@@ -96,8 +102,8 @@
                activeTab === 'profile' ? 'My Story' : 'Dashboard' }}</h1>
       </div>
       <div class="tb-right">
-        <button class="tb-exit" (click)="quickExit()" title="Quick exit — leave this site instantly">
-          <span class="tb-exit-icon"></span><span class="tb-exit-label">Quick Exit</span>
+        <button class="tb-exit" (click)="goToMarketplace()" title="Back to the marketplace">
+          <span class="tb-exit-icon"></span><span class="tb-exit-label">Marketplace</span>
         </button>
         <div class="tb-avatar">{{ seller.alias.charAt(0).toUpperCase() }}</div>
       </div>

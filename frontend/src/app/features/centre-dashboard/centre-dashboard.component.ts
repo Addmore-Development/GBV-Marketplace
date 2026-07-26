@@ -6,8 +6,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { CentreAuthService } from '../../services/centre-auth.service';
+import { RealtimeService } from '../../services/realtime.service';
 
 interface SosAlert {
   id: string;
@@ -73,6 +75,8 @@ interface Need {
   urgency: 'critical' | 'moderate' | 'stable';
   description: string;
   active: boolean;
+  centre_id?: string;
+  created_at?: string;
 }
 
 @Component({
@@ -518,14 +522,16 @@ interface Need {
         </div>
       </div>
 
-      <div class="needs-grid">
+      <div class="sos-loading" *ngIf="loadingNeeds">Loading needs…</div>
+
+      <div class="needs-grid" *ngIf="!loadingNeeds">
         <div class="need-card" *ngFor="let n of needs" [ngClass]="n.urgency">
           <div class="nc-top">
             <span class="nc-category" [ngClass]="n.category">{{ n.category }}</span>
             <span class="nc-urgency" [ngClass]="n.urgency">{{ n.urgency }}</span>
             <div class="nc-active-toggle">
               <label class="toggle">
-                <input type="checkbox" [(ngModel)]="n.active" />
+                <input type="checkbox" [(ngModel)]="n.active" (change)="toggleNeedActive(n)" />
                 <span class="toggle-track"></span>
               </label>
               <span class="nc-active-label">{{ n.active ? 'Live' : 'Hidden' }}</span>
@@ -1025,7 +1031,12 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   private centreId = '';
   private pollHandle: any;
 
-  constructor(private http: HttpClient, private router: Router, private centreAuth: CentreAuthService) {}
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private centreAuth: CentreAuthService,
+    private realtime: RealtimeService
+  ) {}
 
   sidebarCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900;
   activeTab = 'overview';
@@ -1123,12 +1134,11 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     { id: '4810', product: 'Rooibos Body Scrub',       maker: 'Amahle N.', buyer_city: 'Bloemfontein', amount: 89,  survivor_share: 62,  centre_share: 26,  status: 'delivered', date: '14 May' },
   ];
 
-  needs: Need[] = [
-    { id: 'n1', title: 'Winter blankets for 20 residents', category: 'goods', urgency: 'critical', description: 'We need warm blankets before June. Currently 20 residents share 12 blankets.', active: true },
-    { id: 'n2', title: 'Emergency transport fund', category: 'money', urgency: 'critical', description: 'We need R8,000 to transport survivors to court hearings and police stations.', active: true },
-    { id: 'n3', title: 'Trauma counsellor (part-time)', category: 'volunteer', urgency: 'moderate', description: 'Looking for a qualified counsellor available 2 days per week.', active: true },
-    { id: 'n4', title: 'Beading skills trainer', category: 'skill', urgency: 'stable', description: 'We are expanding our marketplace programme. Need a skilled beader to train 8 survivors.', active: true },
-  ];
+  // Loaded live from the backend in ngOnInit (loadNeeds()) and kept in sync
+  // via Socket.IO — posting, hiding, or removing a need here now persists
+  // and shows up on the public Centres page in real time.
+  needs: Need[] = [];
+  loadingNeeds = false;
 
   get activeNeeds() { return this.needs.filter(n => n.active); }
 
@@ -1217,12 +1227,52 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
       // centre that just logged in (rather than one that just registered).
       this.loadCentreProfile();
       this.loadCentreSellers();
+      this.loadNeeds();
+      this.setupRealtime();
     }
+  }
+
+  // ── Real-time: instant SOS banner + live needs board sync ──────────
+  private setupRealtime(): void {
+    this.realtime.join(`centre:${this.centreId}`);
+
+    this.realtimeSubs.push(
+      this.realtime.on<SosAlert>('emergency:new').subscribe((alert) => {
+        // The 15s poll above will eventually pick this up too — this just
+        // makes the banner appear the instant the alarm fires instead of
+        // waiting on the next poll tick.
+        if (!this.sosAlerts.some(a => a.id === alert.id)) {
+          this.sosAlerts = [alert, ...this.sosAlerts];
+        }
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<Need>('need:new').subscribe((need) => {
+        if (!this.needs.some(n => n.id === need.id)) this.needs = [need, ...this.needs];
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<Need>('need:updated').subscribe((need) => {
+        this.needs = this.needs.map(n => n.id === need.id ? need : n);
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<{ id: string }>('need:deleted').subscribe(({ id }) => {
+        this.needs = this.needs.filter(n => n.id !== id);
+      })
+    );
   }
 
   ngOnDestroy(): void {
     if (this.pollHandle) clearInterval(this.pollHandle);
+    this.realtimeSubs.forEach(s => s.unsubscribe());
+    this.realtimeSubs = [];
+    if (this.centreId) this.realtime.leave(`centre:${this.centreId}`);
   }
+  private realtimeSubs: Subscription[] = [];
 
   loadSosAlerts(): void {
     if (!this.centreId) return;
@@ -1253,13 +1303,58 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   markShipped(o: Order): void { o.status = 'shipped'; this.updateOrderStats(); }
   updateOrderStats(): void { this.stats.pendingOrders = this.orders.filter(o => o.status === 'new').length; if (this.stats.pendingOrders === 0) this.hasAlert = false; }
   postVolunteerNeed(): void { this.activeTab = 'needs'; this.showAddNeed = true; }
-  addNeed(): void {
-    if (!this.newNeed.title) return;
-    this.needs.unshift({ ...this.newNeed, id: `n${Date.now()}`, active: true });
-    this.newNeed = { title: '', category: 'goods', urgency: 'moderate', description: '' };
-    this.showAddNeed = false;
+
+  loadNeeds(): void {
+    if (!this.centreId) return;
+    this.loadingNeeds = this.needs.length === 0;
+    const token = localStorage.getItem('centreToken') || '';
+    this.http.get<Need[]>(
+      `${environment.apiUrl}/api/centres/${this.centreId}/needs`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (needs) => { this.needs = needs; this.loadingNeeds = false; },
+      error: () => { this.loadingNeeds = false; }
+    });
   }
-  deleteNeed(n: Need): void { this.needs = this.needs.filter(x => x.id !== n.id); }
+
+  addNeed(): void {
+    if (!this.newNeed.title || !this.centreId) return;
+    const token = localStorage.getItem('centreToken') || '';
+    this.http.post<Need>(
+      `${environment.apiUrl}/api/centres/${this.centreId}/needs`,
+      this.newNeed,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (need) => {
+        this.needs = [need, ...this.needs];
+        this.newNeed = { title: '', category: 'goods', urgency: 'moderate', description: '' };
+        this.showAddNeed = false;
+      },
+      error: () => { /* leave the form open so the centre can retry */ }
+    });
+  }
+
+  toggleNeedActive(n: Need): void {
+    const token = localStorage.getItem('centreToken') || '';
+    this.http.patch<Need>(
+      `${environment.apiUrl}/api/centres/needs/${n.id}`,
+      { active: n.active },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      error: () => { n.active = !n.active; /* revert the toggle if the save failed */ }
+    });
+  }
+
+  deleteNeed(n: Need): void {
+    const token = localStorage.getItem('centreToken') || '';
+    this.http.delete(
+      `${environment.apiUrl}/api/centres/needs/${n.id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: () => { this.needs = this.needs.filter(x => x.id !== n.id); },
+      error: () => { /* leave it in the list if the delete failed server-side */ }
+    });
+  }
   saveProfile(): void {
     const centreId = localStorage.getItem('centreId') || this.centreId;
     const token = localStorage.getItem('centreToken') || '';

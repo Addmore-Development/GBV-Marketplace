@@ -2,7 +2,9 @@
 // frontend/src/app/services/auth.service.ts
 // ============================================================
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface User {
   name: string;
@@ -18,7 +20,7 @@ export class AuthService {
   // Lazy reference to avoid circular DI — set by CartService
   private _cartClear?: () => void;
 
-  constructor() {
+  constructor(private http: HttpClient) {
     const stored = localStorage.getItem('amani_buyer_user');
     if (stored) {
       try { this.userSubject.next(JSON.parse(stored)); } catch { localStorage.removeItem('amani_buyer_user'); }
@@ -46,6 +48,14 @@ export class AuthService {
       const user: User = { name, email, role, initials };
       this.userSubject.next(user);
       localStorage.setItem('amani_buyer_user', JSON.stringify(user));
+
+      // Persist the registration so it shows up on the admin dashboard
+      // immediately (previously this only ever lived in localStorage).
+      // Fire-and-forget: a failure here shouldn't block the buyer from
+      // browsing/checking out, so there's no error handler beyond a
+      // silent subscribe to trigger the request.
+      this.http.post(`${environment.apiUrl}/api/marketplace/buyers/register`, { name, email })
+        .subscribe({ next: () => {}, error: () => {} });
     }
     return true;
   }

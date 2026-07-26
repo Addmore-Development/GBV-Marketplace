@@ -203,6 +203,49 @@
   max-width: 1100px;
 }
 
+/* ── Live SOS banner (survivor silent alarm) ────────────────── */
+.sos-top-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--red, #8B2635);
+  color: #fff;
+  padding: 14px 24px;
+  cursor: pointer;
+  animation: sosTopPulse 1.4s infinite;
+}
+.sos-top-pulse {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
+  animation: sosTopPulse 1.4s infinite;
+}
+.sos-top-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  strong { font-size: .92rem; font-weight: 800; }
+  span { font-size: .8rem; opacity: .92; }
+}
+.sos-top-dismiss {
+  background: rgba(255, 255, 255, .18);
+  border: 1px solid rgba(255, 255, 255, .4);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-size: .76rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  &:hover { background: rgba(255, 255, 255, .3); }
+}
+@keyframes sosTopPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 38, 53, .55); }
+  50% { box-shadow: 0 0 0 6px rgba(139, 38, 53, 0); }
+}
+
 /* ── Tab header ──────────────────────────────────────────── */
 .tab-header {
   margin-bottom: 28px;

@@ -1,9 +1,11 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { RealtimeService } from '../../services/realtime.service';
 
 type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety' | 'activity' | 'sales';
 
@@ -150,7 +152,7 @@ interface SaleRow {
   templateUrl: './admin.component.html',
   styleUrls: ['./admin.component.scss'],
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   private readonly API = `${environment.apiUrl}/api/admin`;
 
   // ── Auth ──────────────────────────────────────────────────
@@ -188,6 +190,10 @@ export class AdminComponent implements OnInit {
   private readonly MEDIA_BASE = environment.apiUrl;
   private emergencyPollHandle: any = null;
 
+  // ── Live top banner — a survivor needs help right now ──────
+  activeEmergencyBanner: EmergencyAlert | null = null;
+  private realtimeSubs: Subscription[] = [];
+
   // ── Login/Logout Activity ────────────────────────────────
   activity: ActivityRow[] = [];
   activityFilter: 'all' | 'centre' | 'seller' = 'all';
@@ -215,7 +221,8 @@ export class AdminComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private realtime: RealtimeService
   ) {}
 
   ngOnInit(): void {
@@ -244,7 +251,65 @@ export class AdminComponent implements OnInit {
     localStorage.removeItem('adminAuth');
     this.isAuthenticated = false;
     if (this.emergencyPollHandle) { clearInterval(this.emergencyPollHandle); this.emergencyPollHandle = null; }
+    this.teardownRealtime();
     this.router.navigate(['/marketplace']);
+  }
+
+  ngOnDestroy(): void {
+    if (this.emergencyPollHandle) clearInterval(this.emergencyPollHandle);
+    this.teardownRealtime();
+  }
+
+  // ── Real-time: live SOS banner + live seller/buyer signups ─────────
+  private setupRealtime(): void {
+    if (this.realtimeSubs.length) return; // already listening
+    this.realtime.join('admin');
+
+    this.realtimeSubs.push(
+      this.realtime.on<EmergencyAlert>('emergency:new').subscribe((alert) => {
+        // Show it on the banner immediately, and fold it into the list/stats
+        // that the Safety tab already renders, so both stay in sync.
+        this.activeEmergencyBanner = alert;
+        this.emergencyAlerts = [alert, ...this.emergencyAlerts.filter(a => a.id !== alert.id)];
+        this.emergencyStats = { ...this.emergencyStats, totalAlerts: this.emergencyStats.totalAlerts + 1 };
+        this.showToast(`🚨 Silent alarm: ${alert.seller_alias || 'a seller'} needs help`);
+        this.cdr.detectChanges();
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<SellerRow>('seller:new').subscribe((seller) => {
+        this.sellers = [seller, ...this.sellers.filter(s => s.id !== seller.id)];
+        this.stats = { ...this.stats, totalSellers: this.stats.totalSellers + 1, pendingSellers: this.stats.pendingSellers + 1 };
+        this.showToast(`New seller registered: ${seller.alias || seller.email}`);
+        this.cdr.detectChanges();
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<BuyerRow>('buyer:new').subscribe((buyer) => {
+        this.buyers = [buyer, ...this.buyers.filter(b => b.email !== buyer.email)];
+        this.stats = { ...this.stats, totalBuyers: this.stats.totalBuyers + 1 };
+        this.showToast(`New buyer registered: ${buyer.name || buyer.email}`);
+        this.cdr.detectChanges();
+      })
+    );
+  }
+
+  private teardownRealtime(): void {
+    this.realtimeSubs.forEach(s => s.unsubscribe());
+    this.realtimeSubs = [];
+    this.realtime.leave('admin');
+  }
+
+  openEmergencyBanner(): void {
+    this.activeTab = 'safety';
+    this.activeEmergencyBanner = null;
+  }
+
+  dismissEmergencyBanner(event: Event): void {
+    event.stopPropagation();
+    this.activeEmergencyBanner = null;
   }
 
   private get adminHeaders() {
@@ -275,6 +340,10 @@ export class AdminComponent implements OnInit {
         this.loadEmergencyStats();
       }, 15000);
     }
+    // Real-time push (Socket.IO) — the banner and live seller/buyer rows
+    // update instantly; the poll above stays as a safety net in case the
+    // socket connection drops.
+    this.setupRealtime();
     this.isLoading = false;
   }
 

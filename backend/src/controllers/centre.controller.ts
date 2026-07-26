@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { pool } from '../index';
 import { logActivity, getClientIp } from '../utils/activityLog';
+import { getIO } from '../socket';
 
 const signCentreToken = (centreId: string) =>
   jwt.sign({ id: centreId, role: 'centre' }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
@@ -564,5 +565,154 @@ export const uploadCentreProfilePicture = async (req: Request, res: Response) =>
   } catch (err) {
     console.error('uploadCentreProfilePicture error:', err);
     return res.status(500).json({ error: 'Failed to update profile picture' });
+  }
+};
+// ============================================================
+// NEEDS BOARD — a centre posts a need, it's persisted, and it's pushed
+// live (via Socket.IO) to: that centre's own dashboard, and the public
+// Centres page noticeboard. Previously this only lived in the browser's
+// in-memory array and never left the tab it was created in.
+// ============================================================
+
+// Centre dashboard — every need for this centre (active + hidden), so the
+// centre can manage its own board.
+export const getCentreNeeds = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const result = await pool.query(
+      `SELECT id, centre_id, title, category, urgency, description, active, created_at, updated_at
+       FROM needs WHERE centre_id = $1 ORDER BY created_at DESC`,
+      [centreId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreNeeds error:', err);
+    res.status(500).json({ error: 'Failed to load needs' });
+  }
+};
+
+// Public Centres page — every currently-active need, across every centre,
+// newest first. This is what powers the live noticeboard.
+export const getPublicNeeds = async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt((req.query['limit'] as string) || '50', 10) || 50, 200);
+    const result = await pool.query(
+      `SELECT n.id, n.centre_id, c.centre_name, n.title, n.category, n.urgency,
+              n.description, n.active, n.created_at
+       FROM needs n
+       JOIN centres c ON c.id = n.centre_id
+       WHERE n.active = TRUE
+       ORDER BY n.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getPublicNeeds error:', err);
+    res.status(500).json({ error: 'Failed to load needs' });
+  }
+};
+
+export const createNeed = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const { title, category, urgency, description } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    const centreRes = await pool.query(`SELECT centre_name FROM centres WHERE id = $1`, [centreId]);
+    if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
+
+    const result = await pool.query(
+      `INSERT INTO needs (centre_id, title, category, urgency, description, active)
+       VALUES ($1, $2, $3, $4, $5, TRUE)
+       RETURNING id, centre_id, title, category, urgency, description, active, created_at, updated_at`,
+      [centreId, title, category || 'goods', urgency || 'moderate', description || '']
+    );
+
+    const need = result.rows[0];
+    const payload = { ...need, centre_name: centreRes.rows[0].centre_name };
+
+    // Push live: to the centre's own dashboard (in case it's open in
+    // another tab/device) and to the public Centres page noticeboard.
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centreId}`).emit('need:new', payload);
+      io.to('public-feed').emit('need:new', payload);
+    }
+
+    res.status(201).json(need);
+  } catch (err) {
+    console.error('createNeed error:', err);
+    res.status(500).json({ error: 'Failed to post need' });
+  }
+};
+
+export const updateNeed = async (req: Request, res: Response) => {
+  try {
+    const { needId } = req.params;
+    const { title, category, urgency, description, active } = req.body;
+    const requestingCentreId = (req as any).centre?.id;
+
+    const ownerCheck = await pool.query(`SELECT centre_id FROM needs WHERE id = $1`, [needId]);
+    if (ownerCheck.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+    if (requestingCentreId && ownerCheck.rows[0].centre_id !== requestingCentreId) {
+      return res.status(403).json({ error: 'You may only manage needs for your own centre' });
+    }
+
+    const result = await pool.query(
+      `UPDATE needs SET
+         title       = COALESCE($1, title),
+         category    = COALESCE($2, category),
+         urgency     = COALESCE($3, urgency),
+         description = COALESCE($4, description),
+         active      = COALESCE($5, active)
+       WHERE id = $6
+       RETURNING id, centre_id, title, category, urgency, description, active, created_at, updated_at`,
+      [title, category, urgency, description, active, needId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+
+    const need = result.rows[0];
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${need.centre_id}`).emit('need:updated', need);
+      io.to('public-feed').emit(need.active ? 'need:updated' : 'need:removed', need);
+    }
+
+    res.json(need);
+  } catch (err) {
+    console.error('updateNeed error:', err);
+    res.status(500).json({ error: 'Failed to update need' });
+  }
+};
+
+export const deleteNeed = async (req: Request, res: Response) => {
+  try {
+    const { needId } = req.params;
+    const requestingCentreId = (req as any).centre?.id;
+
+    const ownerCheck = await pool.query(`SELECT centre_id FROM needs WHERE id = $1`, [needId]);
+    if (ownerCheck.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+    if (requestingCentreId && ownerCheck.rows[0].centre_id !== requestingCentreId) {
+      return res.status(403).json({ error: 'You may only manage needs for your own centre' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM needs WHERE id = $1 RETURNING id, centre_id`,
+      [needId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+
+    const { id, centre_id } = result.rows[0];
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centre_id}`).emit('need:deleted', { id, centre_id });
+      io.to('public-feed').emit('need:removed', { id, centre_id });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('deleteNeed error:', err);
+    res.status(500).json({ error: 'Failed to delete need' });
   }
 };

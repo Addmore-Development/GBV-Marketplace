@@ -2,16 +2,24 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import { Pool } from 'pg';
 import centreRoutes from './routes/centre.routes';
 import marketplaceRoutes from './routes/marketplace.routes';
 import sellerRoutes from './routes/seller.routes';
 import adminRoutes from './routes/admin.routes';
+import { initSocket } from './socket';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Wrap express in a raw http server so Socket.IO can share the same port —
+// this is what powers every real-time feature (SOS banners, live needs
+// board, live buyer/seller signups on the admin dashboard).
+const httpServer = createServer(app);
+initSocket(httpServer);
 
 // Middleware
 app.use(cors());
@@ -60,6 +68,7 @@ app.get('/', (req, res) => {
   res.json({ message: '🛒 GBV Marketplace API is running' });
 });
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🔌 Socket.IO real-time layer active`);
 });

@@ -10,7 +10,11 @@ export const getAdminStats = async (req: Request, res: Response): Promise<void> 
     const [sellers, centres, buyers, donations, orders] = await Promise.all([
       pool.query('SELECT verification_status, total_earned FROM sellers'),
       pool.query('SELECT status FROM centres'),
-      pool.query("SELECT DISTINCT buyer_email FROM orders WHERE buyer_email IS NOT NULL"),
+      pool.query(`
+        SELECT email FROM buyers
+        UNION
+        SELECT DISTINCT buyer_email AS email FROM orders WHERE buyer_email IS NOT NULL
+      `),
       pool.query('SELECT amount FROM donations'),
       pool.query('SELECT id, total FROM orders'),
     ]);
@@ -130,23 +134,27 @@ export const deleteCentre = async (req: Request, res: Response): Promise<void> =
 };
 
 // ── Buyers ────────────────────────────────────────────────
-// There's no buyer-accounts table in this schema — checkout is guest-only,
-// identified by buyer_email on the orders table. Build the buyer list by
-// grouping orders per email instead of querying a users table that doesn't exist.
+// Buyer registration is now persisted to the `buyers` table (see
+// registerBuyer in marketplace.controller.ts) instead of living only in
+// the browser's localStorage. This merges that table with guest-checkout
+// order history (buyer_email on orders, for anyone who checked out without
+// registering) so admin sees every buyer, registered or guest, in one list.
 export const getBuyers = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
       `SELECT
-         MIN(id::text)         AS id,
-         buyer_email           AS email,
-         MAX(buyer_name)       AS name,
-         COALESCE(SUM(total), 0) AS total_spent,
-         COUNT(*)::int         AS order_count,
-         MIN(created_at)       AS created_at
-       FROM orders
-       WHERE buyer_email IS NOT NULL AND buyer_email <> ''
-       GROUP BY buyer_email
-       ORDER BY MIN(created_at) DESC`
+         COALESCE(b.id::text, MIN(o.id::text)) AS id,
+         COALESCE(b.email, o.buyer_email)       AS email,
+         COALESCE(b.name, MAX(o.buyer_name))    AS name,
+         COALESCE(SUM(o.total), 0)              AS total_spent,
+         COUNT(o.id)::int                       AS order_count,
+         COALESCE(MIN(b.created_at), MIN(o.created_at)) AS created_at
+       FROM buyers b
+       FULL OUTER JOIN orders o
+         ON o.buyer_email = b.email AND o.buyer_email IS NOT NULL AND o.buyer_email <> ''
+       WHERE b.email IS NOT NULL OR (o.buyer_email IS NOT NULL AND o.buyer_email <> '')
+       GROUP BY b.id, b.email, b.name, o.buyer_email
+       ORDER BY created_at DESC`
     );
     res.json(result.rows);
   } catch (err: any) {
@@ -155,14 +163,17 @@ export const getBuyers = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// There's no buyer-accounts table to delete a row from (see getBuyers above),
-// so "deleting a buyer" removes their order history — order_items cascade
-// via the FK, so a single DELETE on orders is enough.
+// Deletes the registered-buyer row (if any) as well as their guest order
+// history — order_items cascade via the FK, so a single DELETE on each is
+// enough to fully remove the buyer.
 export const deleteBuyer = async (req: Request, res: Response): Promise<void> => {
   try {
     const email = decodeURIComponent(req.params['email'] as string);
-    const result = await pool.query(`DELETE FROM orders WHERE buyer_email = $1`, [email]);
-    res.json({ ok: true, ordersDeleted: result.rowCount });
+    const [buyerResult, orderResult] = await Promise.all([
+      pool.query(`DELETE FROM buyers WHERE email = $1`, [email]),
+      pool.query(`DELETE FROM orders WHERE buyer_email = $1`, [email]),
+    ]);
+    res.json({ ok: true, buyerDeleted: (buyerResult.rowCount ?? 0) > 0, ordersDeleted: orderResult.rowCount });
   } catch (err: any) {
     console.error('[Admin] deleteBuyer error:', err);
     res.status(500).json({ error: err.message });

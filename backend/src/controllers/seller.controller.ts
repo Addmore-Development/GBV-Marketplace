@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../index';
 import { logActivity, getClientIp } from '../utils/activityLog';
+import { getIO } from '../socket';
 
 import multer from 'multer';
 import path from 'path';
@@ -205,7 +206,7 @@ export const registerSeller = async (req: Request, res: Response) => {
             return res.status(409).json({ error: 'Email already registered', code: 'ALREADY_EXISTS' });
         }
 
-        const centreCheck = await pool.query(`SELECT id, status FROM centres WHERE id = $1`, [centre_id]);
+        const centreCheck = await pool.query(`SELECT id, status, centre_name FROM centres WHERE id = $1`, [centre_id]);
         if (centreCheck.rows.length === 0) {
             return res.status(400).json({ error: 'Selected centre does not exist' });
         }
@@ -259,6 +260,24 @@ export const registerSeller = async (req: Request, res: Response) => {
         await client.query('COMMIT');
 
         const s = result.rows[0];
+
+        // Push the new (pending) seller to the admin dashboard live, so
+        // admin can see and approve/reject it without refreshing.
+        const io = getIO();
+        if (io) {
+            io.to('admin').emit('seller:new', {
+                id: s.id,
+                alias: s.alias,
+                real_name,
+                real_surname: surname,
+                email: s.email,
+                centre_id: s.centre_id,
+                centre_name: centreCheck.rows[0].centre_name || null,
+                verification_status: 'pending',
+                created_at: s.created_at,
+            });
+        }
+
         res.status(201).json({
             message: 'Registration successful. Welcome to Amani.',
             seller_id: s.id,
@@ -662,6 +681,26 @@ export const triggerEmergencyAlert = async (req: Request, res: Response) => {
         console.log(`   Centre notified: ${centreEmail || 'none'}`);
         console.log(`   Admins: ${adminEmails.join(', ') || 'none'}`);
         console.log(`   Trusted contacts: ${contacts.rows.length}`);
+
+        // Push the alert live to the top banner on both the admin dashboard
+        // and the relevant centre's dashboard — this is the whole point of
+        // the silent alarm: someone needs to see it the instant it fires,
+        // not on the next 15-second poll.
+        const io = getIO();
+        if (io) {
+            const alertPayload = {
+                id: alertId,
+                seller_id,
+                seller_alias,
+                seller_email,
+                centre_id: centre_id || null,
+                centre_name: centre_name || null,
+                location_hint: location_hint || null,
+                created_at: timestamp || new Date().toISOString(),
+            };
+            io.to('admin').emit('emergency:new', alertPayload);
+            if (centre_id) io.to(`centre:${centre_id}`).emit('emergency:new', alertPayload);
+        }
 
         res.json({
             message: 'Silent alarm sent',

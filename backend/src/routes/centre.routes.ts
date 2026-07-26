@@ -5,7 +5,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture, getOwnCentreProfile, updateCentreProfile, getCentreSellers } from '../controllers/centre.controller';
+import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture, getOwnCentreProfile, updateCentreProfile, getCentreSellers, getCentreNeeds, getPublicNeeds, createNeed, updateNeed, deleteNeed } from '../controllers/centre.controller';
 import { verifyAdminToken, verifyCentreToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -99,10 +99,17 @@ router.post('/login', loginCentre);
 router.post('/logout', logoutCentre);
 router.get('/status/:id', getCentreStatus);
 
+// Needs board — public feed (used by the Centres page live noticeboard)
+router.get('/needs', getPublicNeeds);
+router.patch('/needs/:needId', verifyCentreToken, updateNeed);
+router.delete('/needs/:needId', verifyCentreToken, deleteNeed);
+
 // Centre self-service routes (requires the centre to be logged in)
 router.get('/:id/profile', verifyCentreToken, getOwnCentreProfile);
 router.patch('/:id/profile', verifyCentreToken, updateCentreProfile);
 router.get('/:id/sellers', verifyCentreToken, getCentreSellers);
+router.get('/:id/needs', verifyCentreToken, getCentreNeeds);
+router.post('/:id/needs', verifyCentreToken, createNeed);
 router.post(
   '/:id/profile-picture',
   verifyCentreToken,

@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import { pool } from '../index';
 import { v4 as uuidv4 } from 'uuid';
+import { getIO } from '../socket';
 
 // ─── HELPER: Calculate Impact Split ─────────────────────────
 const calculateImpact = (price: number, survivorPct: number, centrePct: number, platformPct: number) => ({
@@ -515,5 +516,35 @@ export const approveProduct = async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
+  }
+};
+// ─── REGISTER BUYER ──────────────────────────────────────────
+// Previously "registering as a buyer" only wrote to the browser's
+// localStorage — the admin dashboard had no way of knowing a new buyer
+// existed until (if ever) they placed an order. This persists the
+// registration and pushes it to the admin dashboard live.
+export const registerBuyer = async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO buyers (name, email, phone)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name, email, phone, created_at`,
+      [name, email, phone || null]
+    );
+
+    const buyer = result.rows[0];
+    const io = getIO();
+    if (io) io.to('admin').emit('buyer:new', buyer);
+
+    res.status(201).json(buyer);
+  } catch (err) {
+    console.error('registerBuyer error:', err);
+    res.status(500).json({ error: 'Registration failed' });
   }
 };

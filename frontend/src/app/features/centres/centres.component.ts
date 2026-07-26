@@ -10,6 +10,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService } from '../../services/seller-auth.service';
 import { CentreAuthService } from '../../services/centre-auth.service';
+import { RealtimeService } from '../../services/realtime.service';
 import { environment } from '../../../environments/environment';
 
 export interface Centre {
@@ -150,7 +151,9 @@ export class CentresComponent implements OnInit, OnDestroy {
     { value: 'old_age_home', label: 'Old Age Homes' },
   ];
 
-  readonly noticePosts: NoticePost[] = [
+  // Was `readonly` — now mutable so posted needs (from a centre's dashboard)
+  // can be prepended live via Socket.IO in loadLiveNeeds()/setupRealtime().
+  noticePosts: NoticePost[] = [
     {
       id: 'n1', centre_id: 'c1', centre_name: 'Thistle House GBV Centre',
       type: 'achievement', title: '500 survivors supported this year',
@@ -309,6 +312,7 @@ export class CentresComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
+    private realtime: RealtimeService,
   ) {}
 
   ngOnInit(): void {
@@ -354,12 +358,59 @@ export class CentresComponent implements OnInit, OnDestroy {
     });
 
     this.fetchCentres();
+    this.loadLiveNeeds();
+  }
+
+  // ── Live needs board — a centre posts a need on its dashboard and it
+  // shows up here, on the public noticeboard, in real time ─────────────
+  private urgencyColor(urgency: string): string {
+    return urgency === 'critical' ? '#8B2635' : urgency === 'moderate' ? '#B8860B' : '#1A3A6B';
+  }
+
+  private needToNoticePost(n: any): NoticePost {
+    return {
+      id: `need-${n.id}`,
+      centre_id: n.centre_id,
+      centre_name: n.centre_name,
+      type: 'appeal',
+      title: n.title,
+      body: n.description,
+      date: n.created_at,
+      badge_color: this.urgencyColor(n.urgency),
+    };
+  }
+
+  loadLiveNeeds(): void {
+    this.http.get<any[]>(`${environment.apiUrl}/api/centres/needs`).subscribe({
+      next: (needs) => {
+        const live = needs.map(n => this.needToNoticePost(n));
+        // Live needs lead the noticeboard; static content fills it out.
+        this.noticePosts = [...live, ...this.noticePosts];
+        this.cdr.detectChanges();
+      },
+      error: () => { /* fall back silently to the static noticeboard content */ }
+    });
+
+    this.realtime.join('public-feed');
+    this.realtime.on<any>('need:new').pipe(takeUntil(this.destroy$)).subscribe((n) => {
+      const post = this.needToNoticePost(n);
+      if (!this.noticePosts.some(p => p.id === post.id)) {
+        this.noticePosts = [post, ...this.noticePosts];
+        this.cdr.detectChanges();
+      }
+    });
+    this.realtime.on<any>('need:removed').pipe(takeUntil(this.destroy$)).subscribe((n) => {
+      this.noticePosts = this.noticePosts.filter(p => p.id !== `need-${n.id}`);
+      if (this.currentSlide >= this.noticePosts.length) this.currentSlide = 0;
+      this.cdr.detectChanges();
+    });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     clearInterval(this.slideInterval);
+    this.realtime.leave('public-feed');
   }
 
   // ── Resolve relative /uploads/... paths returned by the backend ──

@@ -7,7 +7,7 @@ import path from 'path';
 import {
   getProducts, getProduct, getCategories,
   getCart, updateCart, placeOrder, getImpactReceipt,
-  addProduct, approveProduct,
+  addProduct, approveProduct, registerBuyer,
 } from '../controllers/marketplace.controller';
 import { verifyAdminToken } from '../middleware/auth.middleware';
 
@@ -26,6 +26,7 @@ const upload = multer({ storage, limits: { fileSize: 8 * 1024 * 1024 } });
 router.get('/products',           getProducts);
 router.get('/products/:id',       getProduct);
 router.get('/categories',         getCategories);
+router.post('/buyers/register',   registerBuyer);
 
 // ── Cart ────────────────────────────────────────────────────
 router.get('/cart',               getCart);

@@ -72,6 +72,16 @@
   <!-- Main content -->
   <main class="admin-main">
 
+    <!-- ── LIVE SOS BANNER — a survivor needs help right now ──── -->
+    <div class="sos-top-banner" *ngIf="activeEmergencyBanner" (click)="openEmergencyBanner()">
+      <span class="sos-top-pulse"></span>
+      <div class="sos-top-text">
+        <strong>Survivor needs help</strong>
+        <span>{{ activeEmergencyBanner.seller_alias || 'A seller' }}{{ activeEmergencyBanner.centre_name ? ' · ' + activeEmergencyBanner.centre_name : '' }} triggered a silent alarm — tap to view</span>
+      </div>
+      <button class="sos-top-dismiss" (click)="dismissEmergencyBanner($event)">Dismiss</button>
+    </div>
+
     <!-- ── OVERVIEW ────────────────────────────────────────── -->
     <section *ngIf="activeTab === 'overview'" class="tab-content">
       <div class="tab-header">

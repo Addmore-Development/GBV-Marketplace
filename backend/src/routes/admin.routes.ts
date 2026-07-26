@@ -6,8 +6,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAdminStats,
   getSellers,
+  getSellerById,
   approveSeller,
   rejectSeller,
+  updateSeller,
   deleteSeller,
   getCentres,
   getCentreById,
@@ -46,6 +48,8 @@ router.get('/stats', requireAdmin, getAdminStats);
 
 // ── Sellers ───────────────────────────────────────────────
 router.get('/sellers',            requireAdmin, getSellers);
+router.get('/sellers/:id',        requireAdmin, getSellerById);
+router.patch('/sellers/:id',      requireAdmin, updateSeller);
 router.put('/sellers/:id/approve', requireAdmin, approveSeller);
 router.put('/sellers/:id/reject',  requireAdmin, rejectSeller);
 router.delete('/sellers/:id',      requireAdmin, deleteSeller);

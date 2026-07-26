@@ -692,6 +692,10 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     }
     this.currentUser = null;
     this.showToast('Signed out successfully');
+    // Signing out from a centre's public profile page should land back on
+    // the Centres listing, not on whatever generic screen a shared auth
+    // service might otherwise redirect to.
+    this.router.navigate(['/centres']);
   }
 
   submitDonate(): void {

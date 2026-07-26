@@ -5,6 +5,21 @@ import { Request, Response } from 'express';
 import { pool } from '../index';
 import { getIO } from '../socket';
 
+// Postgres unique-violation (23505) errors come through as raw messages like
+// `duplicate key value violates unique constraint "centres_contact_email_key"`
+// with the actual conflicting value in err.detail. This turns that into
+// something an admin can actually act on instead of a stack-trace fragment.
+function friendlyDbError(err: any): { status: number; message: string } {
+  if (err?.code === '23505') {
+    // err.detail looks like: Key (contact_email)=(foo@bar.com) already exists.
+    const match = /Key \(([^)]+)\)=\(([^)]+)\)/.exec(err.detail || '');
+    const field = match?.[1]?.replace(/_/g, ' ') || 'value';
+    const value = match?.[2] || '';
+    return { status: 409, message: `That ${field} (${value}) is already in use by another record.` };
+  }
+  return { status: 500, message: err?.message || 'Something went wrong' };
+}
+
 // ── Stats ──────────────────────────────────────────────────
 export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -86,6 +101,95 @@ export const deleteSeller = async (req: Request, res: Response): Promise<void> =
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+// ── View / edit a single seller's full profile from the admin dashboard ──
+// hidden_pin_hash is deliberately never selected — it's a credential, not
+// profile data, and has no business leaving the database.
+const SELLER_SAFE_COLUMNS = `
+  sellers.id, sellers.alias, sellers.public_bio, sellers.real_name, sellers.real_surname,
+  sellers.id_number, sellers.email, sellers.phone, sellers.centre_id, centres.centre_name,
+  sellers.product_categories, sellers.skills_experience, sellers.payout_method,
+  sellers.bank_details, sellers.cash_pickup_note, sellers.is_verified,
+  sellers.verification_status, sellers.total_sales, sellers.total_earned,
+  sellers.created_at, sellers.updated_at
+`;
+
+export const getSellerById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT ${SELLER_SAFE_COLUMNS}
+       FROM sellers LEFT JOIN centres ON centres.id = sellers.centre_id
+       WHERE sellers.id = $1`,
+      [req.params['id']]
+    );
+    if (!result.rows.length) { res.status(404).json({ error: 'Seller not found' }); return; }
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Verification status stays on the dedicated approve/reject/delete
+// endpoints above so there's one source of truth for that transition —
+// everything else about the seller's profile is editable here.
+const sellerEditableFields: { body: string; column: string }[] = [
+  { body: 'alias',              column: 'alias' },
+  { body: 'real_name',          column: 'real_name' },
+  { body: 'real_surname',       column: 'real_surname' },
+  { body: 'email',              column: 'email' },
+  { body: 'phone',              column: 'phone' },
+  { body: 'public_bio',         column: 'public_bio' },
+  { body: 'skills_experience',  column: 'skills_experience' },
+  { body: 'product_categories', column: 'product_categories' },
+  { body: 'payout_method',      column: 'payout_method' },
+  { body: 'cash_pickup_note',   column: 'cash_pickup_note' },
+];
+
+export const updateSeller = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+    for (const field of sellerEditableFields) {
+      if (body[field.body] === undefined) continue;
+      setClauses.push(`${field.column} = $${i}`);
+      values.push(body[field.body]);
+      i++;
+    }
+    // bank_details is JSONB — needs an explicit cast rather than a plain
+    // string bind, so it's handled separately from the simple fields above.
+    if (body.bank_details !== undefined) {
+      setClauses.push(`bank_details = $${i}::jsonb`);
+      values.push(JSON.stringify(body.bank_details));
+      i++;
+    }
+    if (setClauses.length === 0) { res.status(400).json({ error: 'No editable fields were provided' }); return; }
+
+    setClauses.push('updated_at = NOW()');
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE sellers SET ${setClauses.join(', ')} WHERE id = $${i} RETURNING id`,
+      values
+    );
+    if (!result.rows.length) { res.status(404).json({ error: 'Seller not found' }); return; }
+
+    const fresh = await pool.query(
+      `SELECT ${SELLER_SAFE_COLUMNS}
+       FROM sellers LEFT JOIN centres ON centres.id = sellers.centre_id
+       WHERE sellers.id = $1`,
+      [id]
+    );
+    res.json(fresh.rows[0]);
+  } catch (err: any) {
+    console.error('[Admin] updateSeller error:', err);
+    const { status, message } = friendlyDbError(err);
+    res.status(status).json({ error: message });
   }
 };
 
@@ -207,7 +311,8 @@ export const updateCentre = async (req: Request, res: Response): Promise<void> =
     res.json(result.rows[0]);
   } catch (err: any) {
     console.error('[Admin] updateCentre error:', err);
-    res.status(500).json({ error: err.message });
+    const { status, message } = friendlyDbError(err);
+    res.status(status).json({ error: message });
   }
 };
 

@@ -190,6 +190,7 @@
               <td>{{ formatCurrency(s.total_earned) }}</td>
               <td>{{ formatDate(s.created_at) }}</td>
               <td class="td-actions">
+                <button class="btn-view" (click)="viewSeller(s.id)">View</button>
                 <button class="btn-approve" *ngIf="s.verification_status !== 'approved'" (click)="approveSeller(s.id)">✓ Approve</button>
                 <button class="btn-reject"  *ngIf="s.verification_status === 'pending'"  (click)="rejectSeller(s.id)">✕ Reject</button>
                 <button class="btn-delete"  (click)="deleteSeller(s.id)">Delete</button>
@@ -202,6 +203,78 @@
         </table>
       </div>
     </section>
+
+    <!-- ── SELLER DETAIL / EDIT MODAL ──────────────────────── -->
+    <div class="modal-overlay" *ngIf="loadingSellerDetail || selectedSeller" (click)="closeSellerModal()">
+      <div class="modal-card wide" (click)="$event.stopPropagation()">
+        <div class="mc-loading" *ngIf="loadingSellerDetail">Loading seller…</div>
+
+        <ng-container *ngIf="!loadingSellerDetail && selectedSeller">
+          <div class="mc-header">
+            <h3>{{ selectedSeller.alias }}</h3>
+            <span class="badge" [ngClass]="statusClass(selectedSeller.verification_status)">{{ selectedSeller.verification_status }}</span>
+          </div>
+
+          <!-- VIEW MODE -->
+          <div class="centre-detail-grid" *ngIf="!sellerEditMode">
+            <div class="cd-field"><label>Real name</label><span>{{ selectedSeller.real_name }} {{ selectedSeller.real_surname }}</span></div>
+            <div class="cd-field"><label>ID number</label><span>{{ selectedSeller.id_number || '—' }}</span></div>
+            <div class="cd-field"><label>Email</label><span>{{ selectedSeller.email || '—' }}</span></div>
+            <div class="cd-field"><label>Phone</label><span>{{ selectedSeller.phone || '—' }}</span></div>
+            <div class="cd-field"><label>Centre</label><span>{{ selectedSeller.centre_name || '—' }}</span></div>
+            <div class="cd-field"><label>Payout method</label><span>{{ selectedSeller.payout_method || '—' }}</span></div>
+            <div class="cd-field full"><label>Public bio</label><span>{{ selectedSeller.public_bio || '—' }}</span></div>
+            <div class="cd-field full"><label>Skills / experience</label><span>{{ selectedSeller.skills_experience || '—' }}</span></div>
+            <div class="cd-field full"><label>Product categories</label><span>{{ (selectedSeller.product_categories || []).join(', ') || '—' }}</span></div>
+            <div class="cd-field full" *ngIf="selectedSeller.payout_method === 'eft'"><label>Bank details</label><span>{{ selectedSeller.bank_details?.bank_name || '—' }} · {{ selectedSeller.bank_details?.account_holder || '—' }} · {{ selectedSeller.bank_details?.account_number || '—' }} · Branch {{ selectedSeller.bank_details?.branch_code || '—' }}</span></div>
+            <div class="cd-field full" *ngIf="selectedSeller.payout_method === 'cash'"><label>Cash pickup note</label><span>{{ selectedSeller.cash_pickup_note || '—' }}</span></div>
+            <div class="cd-field"><label>Total sales</label><span>{{ selectedSeller.total_sales || 0 }}</span></div>
+            <div class="cd-field"><label>Total earned</label><span>{{ formatCurrency(selectedSeller.total_earned) }}</span></div>
+            <div class="cd-field"><label>Joined</label><span>{{ formatDate(selectedSeller.created_at) }}</span></div>
+          </div>
+
+          <!-- EDIT MODE -->
+          <div class="centre-detail-grid editing" *ngIf="sellerEditMode">
+            <div class="cd-field"><label>Alias</label><input [(ngModel)]="sellerEditForm.alias" /></div>
+            <div class="cd-field"><label>Real name</label><input [(ngModel)]="sellerEditForm.real_name" /></div>
+            <div class="cd-field"><label>Real surname</label><input [(ngModel)]="sellerEditForm.real_surname" /></div>
+            <div class="cd-field"><label>Email</label><input [(ngModel)]="sellerEditForm.email" /></div>
+            <div class="cd-field"><label>Phone</label><input [(ngModel)]="sellerEditForm.phone" /></div>
+            <div class="cd-field">
+              <label>Payout method</label>
+              <select [(ngModel)]="sellerEditForm.payout_method">
+                <option value="eft">EFT</option>
+                <option value="cash">Cash</option>
+              </select>
+            </div>
+            <div class="cd-field full"><label>Public bio</label><textarea rows="2" [(ngModel)]="sellerEditForm.public_bio"></textarea></div>
+            <div class="cd-field full"><label>Skills / experience</label><textarea rows="2" [(ngModel)]="sellerEditForm.skills_experience"></textarea></div>
+            <div class="cd-field full"><label>Product categories (comma-separated)</label><input [(ngModel)]="sellerEditForm.product_categories_text" /></div>
+            <div class="cd-field full" *ngIf="sellerEditForm.payout_method === 'cash'"><label>Cash pickup note</label><textarea rows="2" [(ngModel)]="sellerEditForm.cash_pickup_note"></textarea></div>
+            <ng-container *ngIf="sellerEditForm.payout_method === 'eft'">
+              <div class="cd-field"><label>Bank name</label><input [(ngModel)]="sellerEditForm.bank_name" /></div>
+              <div class="cd-field"><label>Account holder</label><input [(ngModel)]="sellerEditForm.account_holder" /></div>
+              <div class="cd-field"><label>Account number</label><input [(ngModel)]="sellerEditForm.account_number" /></div>
+              <div class="cd-field"><label>Branch code</label><input [(ngModel)]="sellerEditForm.branch_code" /></div>
+            </ng-container>
+          </div>
+
+          <p class="mc-error" *ngIf="sellerSaveError">{{ sellerSaveError }}</p>
+
+          <div class="mc-btns row">
+            <ng-container *ngIf="!sellerEditMode">
+              <button class="btn-approve" (click)="enableSellerEdit()">Edit</button>
+              <button class="btn-delete" (click)="deleteSeller(selectedSeller.id)">Delete</button>
+              <button class="btn-cancel" (click)="closeSellerModal()">Close</button>
+            </ng-container>
+            <ng-container *ngIf="sellerEditMode">
+              <button class="btn-approve" [disabled]="savingSeller" (click)="saveSellerEdit()">{{ savingSeller ? 'Saving…' : 'Save changes' }}</button>
+              <button class="btn-cancel" (click)="cancelSellerEdit()">Cancel</button>
+            </ng-container>
+          </div>
+        </ng-container>
+      </div>
+    </div>
 
     <!-- ── CENTRES ─────────────────────────────────────────── -->
     <section *ngIf="activeTab === 'centres'" class="tab-content">

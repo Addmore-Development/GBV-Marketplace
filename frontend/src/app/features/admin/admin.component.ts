@@ -454,6 +454,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: () => {
         const s = this.sellers.find(x => x.id === id);
         if (s) s.verification_status = 'approved';
+        if (this.selectedSeller?.id === id) this.selectedSeller.verification_status = 'approved';
         this.showToast('Seller approved');
         this.loadMockStats();
         this.cdr.detectChanges();
@@ -468,6 +469,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: () => {
         const s = this.sellers.find(x => x.id === id);
         if (s) s.verification_status = 'rejected';
+        if (this.selectedSeller?.id === id) this.selectedSeller.verification_status = 'rejected';
         this.showToast('Seller rejected');
         this.cdr.detectChanges();
       },
@@ -480,10 +482,115 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.http.delete(`${this.API}/sellers/${id}`, this.adminHeaders).subscribe({
       next: () => {
         this.sellers = this.sellers.filter(s => s.id !== id);
+        if (this.selectedSeller?.id === id) this.closeSellerModal();
         this.showToast('Seller deleted');
         this.cdr.detectChanges();
       },
       error: () => this.showToast('Error — check backend')
+    });
+  }
+
+  // ── Seller detail / edit modal ──────────────────────────────
+  selectedSeller: any = null;
+  sellerEditMode = false;
+  sellerEditForm: any = {};
+  loadingSellerDetail = false;
+  savingSeller = false;
+  sellerSaveError = '';
+
+  viewSeller(id: string): void {
+    this.selectedSeller = null;
+    this.sellerEditMode = false;
+    this.sellerSaveError = '';
+    this.loadingSellerDetail = true;
+    this.http.get<any>(`${this.API}/sellers/${id}`, this.adminHeaders).subscribe({
+      next: (s) => {
+        this.selectedSeller = s;
+        this.loadingSellerDetail = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingSellerDetail = false;
+        this.showToast('Could not load seller details');
+      }
+    });
+  }
+
+  closeSellerModal(): void {
+    this.selectedSeller = null;
+    this.sellerEditMode = false;
+    this.sellerSaveError = '';
+  }
+
+  enableSellerEdit(): void {
+    if (!this.selectedSeller) return;
+    const bank = this.selectedSeller.bank_details || {};
+    this.sellerEditForm = {
+      alias: this.selectedSeller.alias,
+      real_name: this.selectedSeller.real_name,
+      real_surname: this.selectedSeller.real_surname,
+      email: this.selectedSeller.email,
+      phone: this.selectedSeller.phone,
+      public_bio: this.selectedSeller.public_bio,
+      skills_experience: this.selectedSeller.skills_experience,
+      product_categories_text: (this.selectedSeller.product_categories || []).join(', '),
+      payout_method: this.selectedSeller.payout_method,
+      cash_pickup_note: this.selectedSeller.cash_pickup_note,
+      bank_name: bank.bank_name || '',
+      account_holder: bank.account_holder || '',
+      account_number: bank.account_number || '',
+      branch_code: bank.branch_code || '',
+    };
+    this.sellerEditMode = true;
+    this.sellerSaveError = '';
+  }
+
+  cancelSellerEdit(): void {
+    this.sellerEditMode = false;
+    this.sellerSaveError = '';
+  }
+
+  saveSellerEdit(): void {
+    if (!this.selectedSeller) return;
+    this.savingSeller = true;
+    this.sellerSaveError = '';
+
+    const f = this.sellerEditForm;
+    const payload: any = {
+      alias: f.alias,
+      real_name: f.real_name,
+      real_surname: f.real_surname,
+      email: f.email,
+      phone: f.phone,
+      public_bio: f.public_bio,
+      skills_experience: f.skills_experience,
+      product_categories: (f.product_categories_text || '').split(',').map((x: string) => x.trim()).filter(Boolean),
+      payout_method: f.payout_method,
+      cash_pickup_note: f.cash_pickup_note,
+    };
+    if (f.payout_method === 'eft') {
+      payload.bank_details = {
+        bank_name: f.bank_name,
+        account_holder: f.account_holder,
+        account_number: f.account_number,
+        branch_code: f.branch_code,
+      };
+    }
+
+    this.http.patch<any>(`${this.API}/sellers/${this.selectedSeller.id}`, payload, this.adminHeaders).subscribe({
+      next: (updated) => {
+        this.savingSeller = false;
+        this.sellerEditMode = false;
+        this.selectedSeller = { ...this.selectedSeller, ...updated };
+        const idx = this.sellers.findIndex(s => s.id === updated.id);
+        if (idx > -1) this.sellers[idx] = { ...this.sellers[idx], ...updated };
+        this.showToast('Seller updated');
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.savingSeller = false;
+        this.sellerSaveError = err.error?.error || 'Could not save changes. Please try again.';
+      }
     });
   }
 

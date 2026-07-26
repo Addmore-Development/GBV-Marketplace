@@ -61,7 +61,12 @@ export class SellerAuthService {
     localStorage.removeItem('sellerId');
     localStorage.removeItem('hiddenPin');
     this.userSubject.next(null);
-    this.router.navigate(['/login']);
+    // No navigation here on purpose — this service is shared by pages that
+    // each want different post-logout behaviour (marketplace/centres just
+    // stay put and update the nav; centre-profile sends the user back to
+    // /centres). The seller dashboard has its own logout() that navigates
+    // itself. Hard-coding a redirect to /login here was overriding all of
+    // that and always bouncing sellers to the maker login screen.
   }
 
   get currentUser(): SellerUser | null {

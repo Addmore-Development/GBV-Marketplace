@@ -399,6 +399,16 @@ formatPrice(p: number | string): string {
     }
   }
 
+  // Clicking the name chip next to "Sign out": a seller or centre should
+  // land back on their own dashboard, not the buyer profile modal (which
+  // only makes sense for buyers).
+  goToUserArea(): void {
+    if (!this.currentUser) return;
+    if (this.currentUser.role === 'seller') { this.router.navigate(['/seller/dashboard']); return; }
+    if (this.currentUser.role === 'centre') { this.router.navigate(['/centre-dashboard']); return; }
+    this.showAuthModal('profile');
+  }
+
   loadSellerCentres(): void {
     this.sellerCentresLoading = true;
     this.http.get<any[]>(`${environment.apiUrl}/api/sellers/centres/verified`).subscribe({

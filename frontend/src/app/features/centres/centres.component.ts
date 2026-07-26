@@ -697,6 +697,14 @@ export class CentresComponent implements OnInit, OnDestroy {
     this.showToast('Signed out successfully');
   }
 
+  // Clicking the name chip next to "Sign out": a seller or centre should
+  // land back on their own dashboard.
+  goToUserArea(): void {
+    if (!this.currentUser) return;
+    if (this.currentUser.role === 'seller') { this.router.navigate(['/seller/dashboard']); return; }
+    if (this.currentUser.role === 'centre') { this.router.navigate(['/centre-dashboard']); return; }
+  }
+
   // ── Donate submit ─────────────────────────────────────────
   submitDonate(): void {
     if (this.donateForm.invalid) { this.donateForm.markAllAsTouched(); return; }

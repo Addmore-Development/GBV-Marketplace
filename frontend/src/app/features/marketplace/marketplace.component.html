@@ -30,7 +30,7 @@
         <button class="btn-ghost" (click)="showAuthModal('login')">Sign In</button>
         <button class="btn-solid nav-register-btn" (click)="showAuthModal('register')">Register</button>
       </ng-container>
-      <div class="user-chip" *ngIf="currentUser" (click)="showAuthModal('profile')">
+      <div class="user-chip" *ngIf="currentUser" (click)="goToUserArea()">
         <div class="user-avatar">{{ currentUser.initials }}</div>
         <span class="user-name">{{ currentUser.name.split(' ')[0] }}</span>
       </div>

@@ -7,6 +7,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
+import { SellerAuthService } from '../../services/seller-auth.service';
 
 type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary' | 'centre' | 'volunteer';
 
@@ -222,7 +223,8 @@ export class SellerDashboardComponent implements OnInit {
     constructor(
         private http: HttpClient,
         private router: Router,
-        private cdr: ChangeDetectorRef
+        private cdr: ChangeDetectorRef,
+        private sellerAuth: SellerAuthService
     ) {}
 
     ngOnInit(): void {
@@ -296,7 +298,7 @@ export class SellerDashboardComponent implements OnInit {
                 this.isLoading = false;
                 this.cdr.detectChanges();
                 if (err.status === 404 || err.status === 401) {
-                    localStorage.removeItem('sellerId');
+                    this.sellerAuth.logout();
                     this.router.navigate(['/login/maker']);
                 } else {
                     this.seller = null;
@@ -847,14 +849,12 @@ export class SellerDashboardComponent implements OnInit {
     }
 
     logout(): void {
-        if (this.seller?.id) {
-            this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
-                seller_id: this.seller.id,
-                alias: this.seller.alias,
-                email: this.seller.email,
-            }).subscribe({ error: () => {} });
-        }
-        localStorage.clear();
+        // Go through the shared SellerAuthService (not a raw localStorage.clear())
+        // so its BehaviorSubject emits null. That's what marketplace and centres
+        // pages are subscribed to -- clearing localStorage alone left them showing
+        // the seller as still signed in until a full page reload.
+        this.sellerAuth.logout();
+        localStorage.removeItem('hiddenLayerAccess');
         this.router.navigate(['/login/maker']);
     }
 

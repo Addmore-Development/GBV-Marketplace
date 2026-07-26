@@ -1,7 +1,7 @@
 // ============================================================
 // frontend/src/app/features/centres/centre-profile.component.ts
 // ============================================================
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
@@ -530,6 +530,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     private centreAuth: CentreAuthService,
     private fb: FormBuilder,
     private http: HttpClient,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   // ── Resolve relative /uploads/... paths returned by the backend ──
@@ -539,7 +540,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
   }
 
   fetchCentre(id: string | null): void {
-    if (!id) { this.centre = null; this.centreLoading = false; return; }
+    if (!id) { this.centre = null; this.centreLoading = false; this.cdr.detectChanges(); return; }
 
     // Fall back to the static demo data only if the live API has nothing for this id
     const fallback = ALL_CENTRES.find(c => c.id === id) || null;
@@ -552,7 +553,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
       })
     ).subscribe({
       next: (data) => {
-        if (data === null) { this.centre = fallback; this.centreLoading = false; return; }
+        if (data === null) { this.centre = fallback; this.centreLoading = false; this.cdr.detectChanges(); return; }
         try {
           const match = (data || []).find((c: any) => c.id === id);
           if (match) {
@@ -590,12 +591,14 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
           this.centre = fallback;
         } finally {
           this.centreLoading = false;
+          this.cdr.detectChanges();
         }
       },
       error: (err) => {
         console.error('Failed to load /api/centres/all:', err);
         this.centre = fallback;
         this.centreLoading = false;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -614,11 +617,12 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
       }
     }
     this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => { if (u) this.currentUser = u; });
+      .subscribe(u => { if (u) this.currentUser = u; this.cdr.detectChanges(); });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
         if (u) this.currentUser = { name: u.alias, email: u.email, role: 'seller', initials: u.alias.slice(0,2).toUpperCase() };
         else if (!this.authService.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+        this.cdr.detectChanges();
       });
     // Reactive centre session -- fires immediately on load, on login/logout
     // from this page, and on login/logout from any other open tab.
@@ -626,6 +630,7 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
       .subscribe(u => {
         if (u) this.currentUser = { name: u.name, email: u.email, role: 'centre', initials: u.name.slice(0,2).toUpperCase() };
         else if (!this.authService.currentUser && !this.sellerAuth.currentUser) this.currentUser = null;
+        this.cdr.detectChanges();
       });
 
     this.donateForm = this.fb.group({

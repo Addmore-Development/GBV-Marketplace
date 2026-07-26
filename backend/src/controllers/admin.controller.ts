@@ -3,6 +3,7 @@
 // ============================================================
 import { Request, Response } from 'express';
 import { pool } from '../index';
+import { getIO } from '../socket';
 
 // ── Stats ──────────────────────────────────────────────────
 export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
@@ -129,6 +130,83 @@ export const deleteCentre = async (req: Request, res: Response): Promise<void> =
     await pool.query('DELETE FROM centres WHERE id = $1', [req.params['id']]);
     res.json({ ok: true });
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ── View / edit a single centre's full profile from the admin dashboard ──
+export const getCentreById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      `SELECT centres.*, COUNT(sellers.id) AS seller_count
+       FROM centres
+       LEFT JOIN sellers ON sellers.centre_id = centres.id
+       WHERE centres.id = $1
+       GROUP BY centres.id`,
+      [req.params['id']]
+    );
+    if (!result.rows.length) { res.status(404).json({ error: 'Centre not found' }); return; }
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Admin can edit more than a centre can edit about itself (contact person,
+// address, registration numbers, etc.) — approval status is deliberately
+// kept out of this and stays on the dedicated approve/reject endpoints.
+const adminEditableCentreFields: { body: string; column: string }[] = [
+  { body: 'centre_name',          column: 'centre_name' },
+  { body: 'contact_person_name',  column: 'contact_person_name' },
+  { body: 'contact_person_role',  column: 'contact_person_role' },
+  { body: 'contact_email',        column: 'contact_email' },
+  { body: 'contact_phone',        column: 'contact_phone' },
+  { body: 'whatsapp_number',      column: 'whatsapp_number' },
+  { body: 'website_url',          column: 'website_url' },
+  { body: 'physical_address',     column: 'physical_address' },
+  { body: 'suburb',               column: 'suburb' },
+  { body: 'city',                 column: 'city' },
+  { body: 'province',             column: 'province' },
+  { body: 'postal_code',          column: 'postal_code' },
+  { body: 'npo_number',           column: 'npo_number' },
+  { body: 'description',          column: 'description' },
+  { body: 'mission_statement',    column: 'mission_statement' },
+  { body: 'accepts_goods',        column: 'accepts_goods' },
+  { body: 'section18a',           column: 'section18a' },
+  { body: 'marketplace_active',   column: 'marketplace_active' },
+];
+
+export const updateCentre = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+    for (const field of adminEditableCentreFields) {
+      if (body[field.body] === undefined) continue;
+      setClauses.push(`${field.column} = $${i}`);
+      values.push(body[field.body]);
+      i++;
+    }
+    if (setClauses.length === 0) { res.status(400).json({ error: 'No editable fields were provided' }); return; }
+
+    setClauses.push('updated_at = NOW()');
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE centres SET ${setClauses.join(', ')} WHERE id = $${i} RETURNING *`,
+      values
+    );
+    if (!result.rows.length) { res.status(404).json({ error: 'Centre not found' }); return; }
+
+    const io = getIO();
+    if (io) io.to(`centre:${id}`).emit('centre:updated', result.rows[0]);
+
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error('[Admin] updateCentre error:', err);
     res.status(500).json({ error: err.message });
   }
 };

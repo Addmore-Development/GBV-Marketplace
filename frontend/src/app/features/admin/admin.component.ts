@@ -493,6 +493,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: () => {
         const c = this.centres.find(x => x.id === id);
         if (c) c.status = 'approved';
+        if (this.selectedCentre?.id === id) this.selectedCentre.status = 'approved';
         this.showToast('Centre approved');
         this.loadMockStats();
         this.cdr.detectChanges();
@@ -507,6 +508,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: () => {
         const c = this.centres.find(x => x.id === id);
         if (c) c.status = 'rejected';
+        if (this.selectedCentre?.id === id) this.selectedCentre.status = 'rejected';
         this.showToast('Centre rejected');
         this.cdr.detectChanges();
       },
@@ -519,10 +521,96 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.http.delete(`${this.API}/centres/${id}`, this.adminHeaders).subscribe({
       next: () => {
         this.centres = this.centres.filter(c => c.id !== id);
+        if (this.selectedCentre?.id === id) this.closeCentreModal();
         this.showToast('Centre deleted');
         this.cdr.detectChanges();
       },
       error: () => this.showToast('Error — check backend')
+    });
+  }
+
+  // ── Centre detail / edit modal ──────────────────────────────
+  selectedCentre: any = null;
+  centreEditMode = false;
+  centreEditForm: any = {};
+  loadingCentreDetail = false;
+  savingCentre = false;
+  centreSaveError = '';
+
+  viewCentre(id: string): void {
+    this.selectedCentre = null;
+    this.centreEditMode = false;
+    this.centreSaveError = '';
+    this.loadingCentreDetail = true;
+    this.http.get<any>(`${this.API}/centres/${id}`, this.adminHeaders).subscribe({
+      next: (c) => {
+        this.selectedCentre = c;
+        this.loadingCentreDetail = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingCentreDetail = false;
+        this.showToast('Could not load centre details');
+      }
+    });
+  }
+
+  closeCentreModal(): void {
+    this.selectedCentre = null;
+    this.centreEditMode = false;
+    this.centreSaveError = '';
+  }
+
+  enableCentreEdit(): void {
+    if (!this.selectedCentre) return;
+    this.centreEditForm = {
+      centre_name: this.selectedCentre.centre_name,
+      contact_person_name: this.selectedCentre.contact_person_name,
+      contact_person_role: this.selectedCentre.contact_person_role,
+      contact_email: this.selectedCentre.contact_email,
+      contact_phone: this.selectedCentre.contact_phone,
+      whatsapp_number: this.selectedCentre.whatsapp_number,
+      website_url: this.selectedCentre.website_url,
+      physical_address: this.selectedCentre.physical_address,
+      suburb: this.selectedCentre.suburb,
+      city: this.selectedCentre.city,
+      province: this.selectedCentre.province,
+      postal_code: this.selectedCentre.postal_code,
+      npo_number: this.selectedCentre.npo_number,
+      description: this.selectedCentre.description,
+      mission_statement: this.selectedCentre.mission_statement,
+      accepts_goods: this.selectedCentre.accepts_goods,
+      section18a: this.selectedCentre.section18a,
+      marketplace_active: this.selectedCentre.marketplace_active,
+    };
+    this.centreEditMode = true;
+    this.centreSaveError = '';
+  }
+
+  cancelCentreEdit(): void {
+    this.centreEditMode = false;
+    this.centreSaveError = '';
+  }
+
+  saveCentreEdit(): void {
+    if (!this.selectedCentre) return;
+    this.savingCentre = true;
+    this.centreSaveError = '';
+    this.http.patch<any>(`${this.API}/centres/${this.selectedCentre.id}`, this.centreEditForm, this.adminHeaders).subscribe({
+      next: (updated) => {
+        this.savingCentre = false;
+        this.centreEditMode = false;
+        this.selectedCentre = { ...this.selectedCentre, ...updated };
+        // Keep the row in the main table list in sync too
+        const idx = this.centres.findIndex(c => c.id === updated.id);
+        if (idx > -1) this.centres[idx] = { ...this.centres[idx], ...updated };
+        this.showToast('Centre updated');
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.savingCentre = false;
+        this.centreSaveError = err.error?.error || 'Could not save changes. Please try again.';
+      }
     });
   }
 

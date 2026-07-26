@@ -10,8 +10,10 @@ import {
   rejectSeller,
   deleteSeller,
   getCentres,
+  getCentreById,
   approveCentre,
   rejectCentre,
+  updateCentre,
   deleteCentre,
   getBuyers,
   deleteBuyer,
@@ -50,6 +52,8 @@ router.delete('/sellers/:id',      requireAdmin, deleteSeller);
 
 // ── Centres ───────────────────────────────────────────────
 router.get('/centres',             requireAdmin, getCentres);
+router.get('/centres/:id',         requireAdmin, getCentreById);
+router.patch('/centres/:id',       requireAdmin, updateCentre);
 router.put('/centres/:id/approve', requireAdmin, approveCentre);
 router.put('/centres/:id/reject',  requireAdmin, rejectCentre);
 router.delete('/centres/:id',      requireAdmin, deleteCentre);

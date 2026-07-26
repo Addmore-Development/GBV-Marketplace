@@ -241,6 +241,7 @@
               <td><span class="badge" [ngClass]="statusClass(c.status)">{{ c.status }}</span></td>
               <td>{{ formatDate(c.created_at) }}</td>
               <td class="td-actions">
+                <button class="btn-view" (click)="viewCentre(c.id)">View</button>
                 <button class="btn-approve" *ngIf="c.status !== 'approved'" (click)="approveCentre(c.id)">✓ Approve</button>
                 <button class="btn-reject"  *ngIf="c.status === 'pending'"  (click)="rejectCentre(c.id)">✕ Reject</button>
                 <button class="btn-delete"  (click)="deleteCentre(c.id)">Delete</button>
@@ -253,6 +254,74 @@
         </table>
       </div>
     </section>
+
+    <!-- ── CENTRE DETAIL / EDIT MODAL ──────────────────────── -->
+    <div class="modal-overlay" *ngIf="loadingCentreDetail || selectedCentre" (click)="closeCentreModal()">
+      <div class="modal-card wide" (click)="$event.stopPropagation()">
+        <div class="mc-loading" *ngIf="loadingCentreDetail">Loading centre…</div>
+
+        <ng-container *ngIf="!loadingCentreDetail && selectedCentre">
+          <div class="mc-header">
+            <h3>{{ selectedCentre.centre_name }}</h3>
+            <span class="badge" [ngClass]="statusClass(selectedCentre.status)">{{ selectedCentre.status }}</span>
+          </div>
+
+          <!-- VIEW MODE -->
+          <div class="centre-detail-grid" *ngIf="!centreEditMode">
+            <div class="cd-field"><label>Contact person</label><span>{{ selectedCentre.contact_person_name || '—' }} <em *ngIf="selectedCentre.contact_person_role">({{ selectedCentre.contact_person_role }})</em></span></div>
+            <div class="cd-field"><label>Email</label><span>{{ selectedCentre.contact_email || '—' }}</span></div>
+            <div class="cd-field"><label>Phone</label><span>{{ selectedCentre.contact_phone || '—' }}</span></div>
+            <div class="cd-field"><label>WhatsApp</label><span>{{ selectedCentre.whatsapp_number || '—' }}</span></div>
+            <div class="cd-field"><label>Website</label><span>{{ selectedCentre.website_url || '—' }}</span></div>
+            <div class="cd-field"><label>NPO number</label><span>{{ selectedCentre.npo_number || '—' }}</span></div>
+            <div class="cd-field full"><label>Address</label><span>{{ selectedCentre.physical_address || '—' }}, {{ selectedCentre.suburb }}, {{ selectedCentre.city }}, {{ selectedCentre.province }} {{ selectedCentre.postal_code }}</span></div>
+            <div class="cd-field full"><label>Mission statement</label><span>{{ selectedCentre.mission_statement || '—' }}</span></div>
+            <div class="cd-field full"><label>Description</label><span>{{ selectedCentre.description || '—' }}</span></div>
+            <div class="cd-field"><label>Sellers</label><span>{{ selectedCentre.seller_count || 0 }}</span></div>
+            <div class="cd-field"><label>Joined</label><span>{{ formatDate(selectedCentre.created_at) }}</span></div>
+            <div class="cd-field"><label>Accepts goods</label><span>{{ selectedCentre.accepts_goods ? 'Yes' : 'No' }}</span></div>
+            <div class="cd-field"><label>Section 18A</label><span>{{ selectedCentre.section18a ? 'Yes' : 'No' }}</span></div>
+            <div class="cd-field"><label>Marketplace active</label><span>{{ selectedCentre.marketplace_active ? 'Yes' : 'No' }}</span></div>
+          </div>
+
+          <!-- EDIT MODE -->
+          <div class="centre-detail-grid editing" *ngIf="centreEditMode">
+            <div class="cd-field"><label>Centre name</label><input [(ngModel)]="centreEditForm.centre_name" /></div>
+            <div class="cd-field"><label>Contact person</label><input [(ngModel)]="centreEditForm.contact_person_name" /></div>
+            <div class="cd-field"><label>Contact role</label><input [(ngModel)]="centreEditForm.contact_person_role" /></div>
+            <div class="cd-field"><label>Email</label><input [(ngModel)]="centreEditForm.contact_email" /></div>
+            <div class="cd-field"><label>Phone</label><input [(ngModel)]="centreEditForm.contact_phone" /></div>
+            <div class="cd-field"><label>WhatsApp</label><input [(ngModel)]="centreEditForm.whatsapp_number" /></div>
+            <div class="cd-field"><label>Website</label><input [(ngModel)]="centreEditForm.website_url" /></div>
+            <div class="cd-field"><label>NPO number</label><input [(ngModel)]="centreEditForm.npo_number" /></div>
+            <div class="cd-field"><label>Suburb</label><input [(ngModel)]="centreEditForm.suburb" /></div>
+            <div class="cd-field"><label>City</label><input [(ngModel)]="centreEditForm.city" /></div>
+            <div class="cd-field"><label>Province</label><input [(ngModel)]="centreEditForm.province" /></div>
+            <div class="cd-field"><label>Postal code</label><input [(ngModel)]="centreEditForm.postal_code" /></div>
+            <div class="cd-field full"><label>Physical address</label><input [(ngModel)]="centreEditForm.physical_address" /></div>
+            <div class="cd-field full"><label>Mission statement</label><textarea rows="2" [(ngModel)]="centreEditForm.mission_statement"></textarea></div>
+            <div class="cd-field full"><label>Description</label><textarea rows="3" [(ngModel)]="centreEditForm.description"></textarea></div>
+            <div class="cd-field checkbox"><label><input type="checkbox" [(ngModel)]="centreEditForm.accepts_goods" /> Accepts goods</label></div>
+            <div class="cd-field checkbox"><label><input type="checkbox" [(ngModel)]="centreEditForm.section18a" /> Section 18A</label></div>
+            <div class="cd-field checkbox"><label><input type="checkbox" [(ngModel)]="centreEditForm.marketplace_active" /> Marketplace active</label></div>
+          </div>
+
+          <p class="mc-error" *ngIf="centreSaveError">{{ centreSaveError }}</p>
+
+          <div class="mc-btns row">
+            <ng-container *ngIf="!centreEditMode">
+              <button class="btn-approve" (click)="enableCentreEdit()">Edit</button>
+              <button class="btn-delete" (click)="deleteCentre(selectedCentre.id)">Delete</button>
+              <button class="btn-cancel" (click)="closeCentreModal()">Close</button>
+            </ng-container>
+            <ng-container *ngIf="centreEditMode">
+              <button class="btn-approve" [disabled]="savingCentre" (click)="saveCentreEdit()">{{ savingCentre ? 'Saving…' : 'Save changes' }}</button>
+              <button class="btn-cancel" (click)="cancelCentreEdit()">Cancel</button>
+            </ng-container>
+          </div>
+        </ng-container>
+      </div>
+    </div>
 
     <!-- ── BUYERS ──────────────────────────────────────────── -->
     <section *ngIf="activeTab === 'buyers'" class="tab-content">

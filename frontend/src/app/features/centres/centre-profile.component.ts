@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, timeout, catchError, of } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService } from '../../services/seller-auth.service';
 import { CentreAuthService } from '../../services/centre-auth.service';
@@ -544,8 +544,15 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     // Fall back to the static demo data only if the live API has nothing for this id
     const fallback = ALL_CENTRES.find(c => c.id === id) || null;
 
-    this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).pipe(
+      timeout(8000),
+      catchError((err) => {
+        console.error('Failed to load /api/centres/all (timeout or network error):', err);
+        return of(null);
+      })
+    ).subscribe({
       next: (data) => {
+        if (data === null) { this.centre = fallback; this.centreLoading = false; return; }
         try {
           const match = (data || []).find((c: any) => c.id === id);
           if (match) {

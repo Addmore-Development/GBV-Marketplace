@@ -345,8 +345,8 @@ export const loginCentre = async (req: Request, res: Response) => {
       `SELECT id, centre_name, centre_type, contact_email, contact_person_name,
               city, province, contact_phone, npo_number, password_hash, status,
               profile_picture_url
-       FROM centres WHERE contact_email = $1`,
-      [email]
+       FROM centres WHERE LOWER(contact_email) = LOWER($1)`,
+      [email.trim()]
     );
     if (!result.rows.length) return res.status(401).json({ error: 'Invalid email or password' });
     const centre = result.rows[0];

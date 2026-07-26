@@ -19,7 +19,28 @@ export class SellerAuthService {
 
   constructor(private http: HttpClient, private router: Router) {
     const stored = localStorage.getItem('sellerUser');
-    if (stored) this.userSubject.next(JSON.parse(stored));
+    if (stored) {
+      this.userSubject.next(JSON.parse(stored));
+    } else {
+      // Some login paths only ever wrote the individual sellerId/sellerAlias/
+      // sellerEmail keys (used directly by the dashboard) without writing the
+      // combined sellerUser record this service reads. That left existing,
+      // otherwise-valid sessions looking signed-out anywhere that relies on
+      // user$ (marketplace nav, centre-profile nav). Rebuild it from the
+      // individual keys as a one-time repair so those sessions self-heal.
+      const id = localStorage.getItem('sellerId');
+      const alias = localStorage.getItem('sellerAlias');
+      const email = localStorage.getItem('sellerEmail');
+      if (id && alias && email) {
+        const repaired = {
+          id, alias, email,
+          verification_status: 'pending',
+          hidden_layer_granted: false,
+        };
+        localStorage.setItem('sellerUser', JSON.stringify(repaired));
+        this.userSubject.next(repaired);
+      }
+    }
   }
 
   login(email: string, pin: string): Observable<any> {

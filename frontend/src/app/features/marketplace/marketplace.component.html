@@ -344,7 +344,7 @@
       </div>
 
       <ng-container *ngIf="loginRole !== 'admin'">
-        <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" placeholder="you@example.com" /></div>
+        <div class="mf-group"><label>Email</label><input [(ngModel)]="loginEmail" type="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" /></div>
         <div class="mf-group"><label>Password</label><input [(ngModel)]="loginPassword" type="password" placeholder="Your password" /></div>
         <div class="modal-error" *ngIf="authError">{{ authError }}</div>
         <button class="modal-cta" (click)="doLogin()">Sign In</button>

@@ -553,7 +553,7 @@ formatPrice(p: number | string): string {
     if (this.loginRole === 'seller') {
       // Seller uses email + PIN via real API
       this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
-        email: this.loginEmail, pin: this.loginPassword
+        email: this.loginEmail.trim().toLowerCase(), pin: this.loginPassword
       }).subscribe({
         next: (res) => {
           localStorage.setItem('sellerId', res.id);
@@ -561,6 +561,22 @@ formatPrice(p: number | string): string {
           localStorage.setItem('sellerEmail', res.email);
           localStorage.setItem('hiddenPin', this.loginPassword);
           localStorage.setItem('hiddenLayerAccess', 'false');
+          // Update auth state so nav reflects logged-in seller -- this was
+          // missing here (unlike doRegister below), so SellerAuthService's
+          // user$ never emitted for sellers who logged in via this form.
+          // The dashboard read sellerId from localStorage directly and
+          // stayed logged in, but any page relying on sellerAuth.user$
+          // (marketplace, centre-profile) saw no active session and showed
+          // the signed-out nav state.
+          const sellerUser = {
+            id: res.id,
+            alias: res.alias,
+            email: res.email,
+            verification_status: res.verification_status || 'pending',
+            hidden_layer_granted: !!res.hidden_layer_granted,
+          };
+          localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
+          this.sellerAuth['userSubject'].next(sellerUser);
           this.authModal = '';
           this.router.navigate(['/seller/dashboard']);
         },
@@ -571,7 +587,7 @@ formatPrice(p: number | string): string {
 
     if (this.loginRole === 'centre') {
       this.http.post<any>(`${environment.apiUrl}/api/centres/login`, {
-        email: this.loginEmail, password: this.loginPassword
+        email: this.loginEmail.trim().toLowerCase(), password: this.loginPassword
       }).subscribe({
         next: (res) => {
           this.centreAuth.setSession(res);

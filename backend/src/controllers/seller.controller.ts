@@ -201,7 +201,7 @@ export const registerSeller = async (req: Request, res: Response) => {
             alias = `${baseAlias}${aliasSuffix}`;
         }
 
-        const existingEmail = await pool.query(`SELECT id FROM sellers WHERE email = $1`, [email]);
+        const existingEmail = await pool.query(`SELECT id FROM sellers WHERE LOWER(email) = LOWER($1)`, [email.trim()]);
         if (existingEmail.rows.length > 0) {
             return res.status(409).json({ error: 'Email already registered', code: 'ALREADY_EXISTS' });
         }
@@ -309,8 +309,8 @@ export const loginSeller = async (req: Request, res: Response) => {
                     verification_status, hidden_layer_granted, centre_id,
                     profile_complete, product_categories, payout_method,
                     total_sales, total_earned
-             FROM sellers WHERE email = $1`,
-            [email]
+             FROM sellers WHERE LOWER(email) = LOWER($1)`,
+            [email.trim()]
         );
         if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
 

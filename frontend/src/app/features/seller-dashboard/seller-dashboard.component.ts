@@ -1,6 +1,4 @@
-// ============================================================
-// frontend/src/app/features/seller-dashboard/seller-dashboard.component.ts
-// ============================================================
+
 import { Component, OnInit, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
@@ -869,13 +867,6 @@ export class SellerDashboardComponent implements OnInit {
                 this.cdr.detectChanges();
             }
         });
-    }
-
-    // ── Helper to prepend backend URL for uploaded files ──
-    getFileUrl(fileUrl: string): string {
-        if (!fileUrl) return '';
-        // Backend serves static files on port 3000
-        return `http://localhost:3000${fileUrl}`;
     }
 
     // ============================================================

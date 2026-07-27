@@ -9,6 +9,7 @@ import fs from 'fs';
 import { pool } from '../index';
 import { logActivity, getClientIp } from '../utils/activityLog';
 import { getIO } from '../socket';
+import { uploadLocalFileToSupabase } from '../utils/supabaseStorage';
 
 const signCentreToken = (centreId: string) =>
   jwt.sign({ id: centreId, role: 'centre' }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
@@ -210,7 +211,11 @@ export const registerCentre = async (req: Request, res: Response) => {
     let profilePictureUrl: string | null = null;
     const profilePicFile = files.profile_picture?.[0];
     if (profilePicFile) {
-      profilePictureUrl = `/uploads/centre-profile/${profilePicFile.filename}`;
+      profilePictureUrl = await uploadLocalFileToSupabase(
+        profilePicFile.path,
+        `centre-profile/${profilePicFile.filename}`,
+        profilePicFile.mimetype
+      );
       await client.query(
         `UPDATE centres SET profile_picture_url = $1 WHERE id = $2`,
         [profilePictureUrl, centre.id]
@@ -548,7 +553,11 @@ export const uploadCentreProfilePicture = async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'No image file was uploaded' });
     }
 
-    const profilePictureUrl = `/uploads/centre-profile/${file.filename}`;
+    const profilePictureUrl = await uploadLocalFileToSupabase(
+      file.path,
+      `centre-profile/${file.filename}`,
+      file.mimetype
+    );
 
     const result = await pool.query(
       `UPDATE centres SET profile_picture_url = $1, updated_at = NOW()

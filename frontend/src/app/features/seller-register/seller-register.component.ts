@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { SellerAuthService } from '../../services/seller-auth.service';
 
 interface Centre {
   id: string;
@@ -49,7 +50,7 @@ export class SellerRegisterComponent implements OnInit {
     );
   }
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private sellerAuth: SellerAuthService) {}
 
   ngOnInit(): void {
     this.fetchCentres();
@@ -129,11 +130,9 @@ export class SellerRegisterComponent implements OnInit {
 
     this.http.post<any>(`${this.API}/register`, payload).subscribe({
       next: (res) => {
-        localStorage.setItem('sellerId', res.seller_id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.pin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
+        // Route through SellerAuthService so the shared session state
+        // updates and any other role's stale session gets cleared.
+        this.sellerAuth.setSessionFromRegistration(res.seller_id, res.alias, res.email, this.pin);
         this.isLoading = false;
         this.router.navigate(['/seller/dashboard']);
       },

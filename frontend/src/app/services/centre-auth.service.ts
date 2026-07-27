@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { AuthCoordinatorService } from './auth-coordinator.service';
 
 export interface CentreUser {
   id: string;
@@ -34,11 +35,18 @@ export class CentreAuthService {
   private userSubject = new BehaviorSubject<CentreUser | null>(this.readFromStorage());
   user$ = this.userSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private coordinator: AuthCoordinatorService) {
     window.addEventListener('storage', (e: StorageEvent) => {
       if (e.key && CENTRE_KEYS.includes(e.key)) {
         this.userSubject.next(this.readFromStorage());
       }
+    });
+
+    // Amani only supports one active role per browser session. If a buyer
+    // or seller signs in, drop any leftover centre session immediately so
+    // it can't keep winning on other pages.
+    this.coordinator.roleActivated$.subscribe(role => {
+      if (role !== 'centre') this.clearLocalSession();
     });
   }
 
@@ -77,6 +85,7 @@ export class CentreAuthService {
     if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
     else localStorage.removeItem('centreProfilePic');
     this.userSubject.next(this.readFromStorage());
+    this.coordinator.announce('centre');
   }
 
   logout(): void {
@@ -88,6 +97,13 @@ export class CentreAuthService {
         centre_id: centreId, centre_name: centreName, contact_email: centreEmail,
       }).subscribe({ error: () => {} });
     }
+    this.clearLocalSession();
+  }
+
+  // Clears only this centre's local session data, without hitting the
+  // logout endpoint. Used both for an explicit centre logout and when a
+  // buyer or seller session becomes active elsewhere in the app.
+  private clearLocalSession(): void {
     CENTRE_KEYS.forEach(k => localStorage.removeItem(k));
     this.userSubject.next(null);
   }

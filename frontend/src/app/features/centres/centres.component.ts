@@ -608,13 +608,9 @@ export class CentresComponent implements OnInit, OnDestroy {
     };
     this.http.post<any>(`${environment.apiUrl}/api/sellers/register`, payload).subscribe({
       next: (res) => {
-        localStorage.setItem('sellerId', res.seller_id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.sellerPin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
-        const sellerUser = { id: res.seller_id, alias: res.alias, email: res.email, verification_status: res.verification_status || 'pending', hidden_layer_granted: false };
-        localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
+        // Route through SellerAuthService so the shared session state
+        // updates and any other role's stale session gets cleared.
+        this.sellerAuth.setSessionFromRegistration(res.seller_id, res.alias, res.email, this.sellerPin);
         this.sellerIsLoading = false;
         this.closeModalDirect();
         this.router.navigate(['/seller/dashboard']);
@@ -636,15 +632,11 @@ export class CentresComponent implements OnInit, OnDestroy {
     if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
 
     if (this.loginRole === 'seller') {
-      this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
-        email: this.loginEmail, pin: this.loginPassword
-      }).subscribe({
-        next: (res) => {
-          localStorage.setItem('sellerId', res.id);
-          localStorage.setItem('sellerAlias', res.alias);
-          localStorage.setItem('sellerEmail', res.email);
-          localStorage.setItem('hiddenPin', this.loginPassword);
-          localStorage.setItem('hiddenLayerAccess', 'false');
+      // Route through SellerAuthService (rather than a raw HTTP call) so
+      // the shared session state and nav across the app updates right away,
+      // instead of only "self-healing" on the next page load.
+      this.sellerAuth.login(this.loginEmail, this.loginPassword).subscribe({
+        next: () => {
           this.closeModalDirect();
           this.router.navigate(['/seller/dashboard']);
         },

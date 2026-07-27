@@ -499,21 +499,9 @@ formatPrice(p: number | string): string {
 
     this.http.post<any>(`${environment.apiUrl}/api/sellers/register`, payload).subscribe({
       next: (res) => {
-        localStorage.setItem('sellerId', res.seller_id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.sellerPin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
-        // Update auth state so nav reflects logged-in seller
-        const sellerUser = {
-          id: res.seller_id,
-          alias: res.alias,
-          email: res.email,
-          verification_status: res.verification_status || 'pending',
-          hidden_layer_granted: false,
-        };
-        localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
-        this.sellerAuth['userSubject'].next(sellerUser);
+        // Route through SellerAuthService so the shared session state
+        // updates and any other role's stale session gets cleared.
+        this.sellerAuth.setSessionFromRegistration(res.seller_id, res.alias, res.email, this.sellerPin);
         this.sellerIsLoading = false;
         this.authModal = '';
         this.router.navigate(['/seller/dashboard']);
@@ -552,31 +540,11 @@ formatPrice(p: number | string): string {
 
     if (this.loginRole === 'seller') {
       // Seller uses email + PIN via real API
-      this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
-        email: this.loginEmail.trim().toLowerCase(), pin: this.loginPassword
-      }).subscribe({
-        next: (res) => {
-          localStorage.setItem('sellerId', res.id);
-          localStorage.setItem('sellerAlias', res.alias);
-          localStorage.setItem('sellerEmail', res.email);
-          localStorage.setItem('hiddenPin', this.loginPassword);
-          localStorage.setItem('hiddenLayerAccess', 'false');
-          // Update auth state so nav reflects logged-in seller -- this was
-          // missing here (unlike doRegister below), so SellerAuthService's
-          // user$ never emitted for sellers who logged in via this form.
-          // The dashboard read sellerId from localStorage directly and
-          // stayed logged in, but any page relying on sellerAuth.user$
-          // (marketplace, centre-profile) saw no active session and showed
-          // the signed-out nav state.
-          const sellerUser = {
-            id: res.id,
-            alias: res.alias,
-            email: res.email,
-            verification_status: res.verification_status || 'pending',
-            hidden_layer_granted: !!res.hidden_layer_granted,
-          };
-          localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
-          this.sellerAuth['userSubject'].next(sellerUser);
+      // Route through SellerAuthService (rather than a raw HTTP call reaching
+      // into its private userSubject) so the shared session state announces
+      // properly and other roles' stale sessions get cleared on sign-in.
+      this.sellerAuth.login(this.loginEmail.trim().toLowerCase(), this.loginPassword).subscribe({
+        next: () => {
           this.authModal = '';
           this.router.navigate(['/seller/dashboard']);
         },

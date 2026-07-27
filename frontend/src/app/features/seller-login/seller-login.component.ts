@@ -32,29 +32,11 @@ export class SellerLoginComponent {
     this.isLoading = true;
     this.error = '';
 
-    this.http.post<any>(`${environment.apiUrl}/api/sellers/login`, {
-      email: this.email.trim().toLowerCase(),
-      pin: this.pin,
-    }).subscribe({
-      next: (res) => {
-        // Store all session keys needed by dashboard
-        localStorage.setItem('sellerId', res.id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.pin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
-        // Update auth state so nav reflects logged-in seller on the
-        // marketplace/centre pages, which read sellerAuth.user$ rather
-        // than localStorage directly.
-        const sellerUser = {
-          id: res.id,
-          alias: res.alias,
-          email: res.email,
-          verification_status: res.verification_status || 'pending',
-          hidden_layer_granted: !!res.hidden_layer_granted,
-        };
-        localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
-        this.sellerAuth['userSubject'].next(sellerUser);
+    // Route through SellerAuthService so the shared session state updates
+    // on the marketplace/centre pages and any other role's stale session
+    // (e.g. an old buyer login) gets cleared on sign-in.
+    this.sellerAuth.login(this.email.trim().toLowerCase(), this.pin).subscribe({
+      next: () => {
         this.isLoading = false;
         this.router.navigate(['/seller/dashboard']);
       },

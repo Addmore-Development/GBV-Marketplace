@@ -285,6 +285,12 @@
   gap: 48px;
   align-items: center;
 
+  // Grid items default to min-width:auto, which lets their content push
+  // past the track's width instead of shrinking with it. That's what was
+  // squeezing the image grid's own right-hand column off-screen on
+  // narrower/tablet widths — this makes each side respect its 1fr track.
+  > * { min-width: 0; }
+
   @media (max-width: 600px) { grid-template-columns: 1fr; }
 }
 
@@ -349,36 +355,25 @@
   &:hover { background: var(--brown); color: var(--white); }
 }
 
-/* Hero image grid */
+/* Hero image grid — even 2x2 grid of squares, capped so it can never grow
+   wider than its column and push content out of view. */
 .hero-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  height: 380px;
-}
-
-.hg-tall {
-  grid-row: 1 / 4;
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-
-  img { width: 100%; height: 100%; object-fit: cover; }
-}
-
-.hg-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin-left: auto;
 }
 
 .hg-img {
   position: relative;
   border-radius: 10px;
   overflow: hidden;
-  flex: 1;
+  aspect-ratio: 1 / 1;
+  width: 100%;
 
-  img { width: 100%; height: 100%; object-fit: cover; }
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
 }
 
 .hg-label {

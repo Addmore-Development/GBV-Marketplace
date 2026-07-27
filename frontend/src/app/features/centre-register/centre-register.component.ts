@@ -8,6 +8,7 @@ import { RouterModule, Router } from '@angular/router';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
+import { CentreAuthService } from '../../services/centre-auth.service';
 import { environment } from '../../../environments/environment';
 
 function passwordMatchValidator(control: AbstractControl): ValidationErrors | null {
@@ -104,7 +105,8 @@ export class CentreRegisterComponent implements OnInit, OnDestroy {
     private fb:          FormBuilder,
     private router:      Router,
     private http:        HttpClient,
-    private authService: AuthService
+    private authService: AuthService,
+    private centreAuth:  CentreAuthService
   ) {
     this.form = this.fb.group({
       // Step 0
@@ -378,22 +380,27 @@ export class CentreRegisterComponent implements OnInit, OnDestroy {
         this.centreId = res.centre_id;
 
         // Store the session so the dashboard can identify this centre.
-        localStorage.setItem('centreId',           res.centre_id || '');
-        localStorage.setItem('centreToken',        res.token || '');
-        localStorage.setItem('centreStatus',       res.status || 'pending');
-        localStorage.setItem('centreName',         v.centre_name || '');
-        localStorage.setItem('centreType',         v.centre_type || '');
-        localStorage.setItem('centreCity',         v.city || '');
-        localStorage.setItem('centreProvince',     v.province || '');
-        localStorage.setItem('centreEmail',        v.contact_email || '');
-        localStorage.setItem('centreManagerName',  v.contact_person_name || '');
-        localStorage.setItem('centrePhone',        v.contact_phone || '');
-        localStorage.setItem('centreNpoNumber',    v.npo_number || '');
+        // Routed through CentreAuthService (rather than raw localStorage
+        // writes) so the shared session state updates everywhere and any
+        // other role's stale session gets cleared on registration.
+        this.centreAuth.setSession({
+          centre_id: res.centre_id,
+          token: res.token,
+          status: res.status || 'pending',
+          centre_name: v.centre_name,
+          centre_type: v.centre_type,
+          city: v.city,
+          province: v.province,
+          contact_email: v.contact_email,
+          contact_person_name: v.contact_person_name,
+          contact_phone: v.contact_phone,
+          npo_number: v.npo_number,
+          profile_picture_url: res.profile_picture_url,
+        });
         if (v.description)       localStorage.setItem('centreDescription', v.description);
         if (v.mission_statement) localStorage.setItem('centreMission',     v.mission_statement);
         if (v.website_url)       localStorage.setItem('centreWebsite',     v.website_url);
         if (v.whatsapp_number)   localStorage.setItem('centreWhatsapp',    v.whatsapp_number);
-        if (res.profile_picture_url) localStorage.setItem('centreProfilePic', res.profile_picture_url);
 
         this.submitSuccess = true;
         this.isSubmitting  = false;

@@ -1,4 +1,3 @@
-
 import { Component, OnInit, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
@@ -228,8 +227,15 @@ export class SellerDashboardComponent implements OnInit {
     ngOnInit(): void {
         const id = localStorage.getItem('sellerId');
         console.log('[Dashboard] ngOnInit, sellerId from localStorage:', id);
-        if (!id) {
-            console.warn('[Dashboard] No sellerId, redirecting to login');
+        // A previous bug wrote the literal string "undefined" into this key
+        // (localStorage.setItem coerces an actual `undefined` value to that
+        // string), which passed `!id` since it's a non-empty string, then
+        // got sent to the backend as a UUID and 500'd. Guard against that
+        // literal explicitly so a similar bug elsewhere fails safely here
+        // instead of hitting the API with garbage.
+        if (!id || id === 'undefined' || id === 'null') {
+            console.warn('[Dashboard] No valid sellerId, redirecting to login');
+            localStorage.removeItem('sellerId');
             this.isLoading = false;
             this.cdr.detectChanges();
             this.router.navigate(['/login/maker']);

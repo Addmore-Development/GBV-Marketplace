@@ -58,15 +58,22 @@ export class SellerAuthService {
   login(email: string, pin: string): Observable<any> {
     return this.http.post(`${environment.apiUrl}/api/sellers/login`, { email, pin })
       .pipe(tap((res: any) => {
+        // /api/sellers/login returns the seller row as `id` — unlike
+        // /api/sellers/register, which returns `seller_id`. Reading
+        // res.seller_id here was always undefined, which localStorage
+        // happily stringified to the literal text "undefined". That
+        // passed every truthiness check downstream and got sent straight
+        // to the backend as a UUID (GET /profile/undefined), which
+        // Postgres correctly rejected with a 500.
         const user: SellerUser = {
-          id: res.seller_id,
+          id: res.id,
           alias: res.alias,
           email: res.email,
           verification_status: res.verification_status,
-          hidden_layer_granted: false // will be fetched separately if needed
+          hidden_layer_granted: !!res.hidden_layer_granted,
         };
         localStorage.setItem('sellerUser', JSON.stringify(user));
-        localStorage.setItem('sellerId', res.seller_id);
+        localStorage.setItem('sellerId', res.id);
         localStorage.setItem('sellerAlias', res.alias);
         localStorage.setItem('sellerEmail', res.email);
         localStorage.setItem('hiddenPin', pin);

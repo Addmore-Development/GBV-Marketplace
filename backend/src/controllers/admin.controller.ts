@@ -409,7 +409,7 @@ export const getDonations = async (req: Request, res: Response): Promise<void> =
 export const getVolunteers = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await pool.query(
-      'SELECT volunteer_applications.*, centres.centre_name FROM volunteer_applications LEFT JOIN centres ON volunteer_applications.centre_id = centres.id ORDER BY volunteer_applications.created_at DESC'
+      'SELECT volunteer_signups.*, centres.centre_name FROM volunteer_signups LEFT JOIN centres ON volunteer_signups.centre_id = centres.id ORDER BY volunteer_signups.created_at DESC'
     );
     res.json(result.rows);
   } catch (err: any) {

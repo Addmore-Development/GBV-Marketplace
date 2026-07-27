@@ -773,7 +773,7 @@ export const createVolunteerApplication = async (req: Request, res: Response) =>
     if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
 
     const result = await pool.query(
-      `INSERT INTO volunteer_applications (centre_id, full_name, email, phone, skills, availability, message)
+      `INSERT INTO volunteer_signups (centre_id, full_name, email, phone, skills, availability, message)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, centre_id, full_name, email, phone, skills, availability, message, status, created_at`,
       [centre_id, full_name, email, phone || null, skills || null, availability || null, message || null]
@@ -817,7 +817,7 @@ export const getCentreVolunteers = async (req: Request, res: Response) => {
     const centreId = req.params.id;
     const result = await pool.query(
       `SELECT id, centre_id, full_name, email, phone, skills, availability, message, status, created_at
-       FROM volunteer_applications WHERE centre_id = $1 ORDER BY created_at DESC`,
+       FROM volunteer_signups WHERE centre_id = $1 ORDER BY created_at DESC`,
       [centreId]
     );
     res.json(result.rows);

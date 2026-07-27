@@ -264,10 +264,17 @@ import { AuthService, User } from '../../services/auth.service';
 
           <div class="error-msg" *ngIf="orderError">⚠️ {{ orderError }}</div>
 
+          <p class="signin-hint" *ngIf="!currentUser">
+            🔒 You'll be asked to sign in to complete your purchase — your delivery details are saved.
+          </p>
+
           <button type="submit" class="place-order-btn"
             [disabled]="checkoutForm.invalid || isPlacingOrder">
-            <span *ngIf="!isPlacingOrder">🌿 Place Order — {{ formatPrice(getTotal()) }}</span>
             <span *ngIf="isPlacingOrder" class="loading-dots">Placing Order<span>.</span><span>.</span><span>.</span></span>
+            <ng-container *ngIf="!isPlacingOrder">
+              <span *ngIf="currentUser">🌿 Place Order — {{ formatPrice(getTotal()) }}</span>
+              <span *ngIf="!currentUser">🔒 Sign In &amp; Place Order — {{ formatPrice(getTotal()) }}</span>
+            </ng-container>
           </button>
 
           <div class="trust-badges">
@@ -835,6 +842,11 @@ import { AuthService, User } from '../../services/auth.service';
       padding: 10px 14px; color: #DC2626; font-size: .84rem; margin-bottom: 14px;
     }
 
+    .signin-hint {
+      background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 8px;
+      padding: 10px 14px; color: #92400E; font-size: .82rem; margin: 0 0 14px;
+    }
+
     .place-order-btn {
       width: 100%; padding: 15px;
       background: linear-gradient(135deg, var(--gold), var(--gold-dark));
@@ -960,6 +972,10 @@ export class CartComponent implements OnInit, OnDestroy {
   promoCode = '';
   promoApplied = false;
   currentUser: User | null = null;
+  // True once a signed-out buyer has a valid delivery form and hits
+  // "Place Order" — lets us finish the purchase automatically right
+  // after they sign in, instead of requiring a second click.
+  pendingCheckout = false;
 
   // ── Auth modal state ──────────────────────────────────
   authModal = '';
@@ -1068,9 +1084,16 @@ export class CartComponent implements OnInit, OnDestroy {
 
   // ── Place order ───────────────────────────────────────
   placeOrder(): void {
-    if (!this.currentUser) { this.showAuthModal('login'); return; }
     if (this.checkoutForm.invalid || this.isPlacingOrder) {
       this.checkoutForm.markAllAsTouched();
+      return;
+    }
+    if (!this.currentUser) {
+      // Form is valid and ready — just need the buyer to be signed in.
+      // Remember that, so we can finish the purchase automatically the
+      // moment they sign in, instead of making them click twice.
+      this.pendingCheckout = true;
+      this.showAuthModal('login');
       return;
     }
     this.isPlacingOrder = true;
@@ -1101,6 +1124,12 @@ export class CartComponent implements OnInit, OnDestroy {
     if (ok) {
       this.authModal = '';
       this.checkoutForm.patchValue({ buyer_name: this.currentUser!.name, buyer_email: this.currentUser!.email });
+      // Signed in — if they already had a valid delivery form waiting,
+      // finish the purchase right away instead of requiring another click.
+      if (this.pendingCheckout && this.currentUser) {
+        this.pendingCheckout = false;
+        this.placeOrder();
+      }
     }
   }
 
@@ -1109,7 +1138,14 @@ export class CartComponent implements OnInit, OnDestroy {
     if (!this.registerName || !this.registerEmail || !this.registerPassword) { this.authError = 'Please fill in all fields.'; return; }
     if (this.registerPassword.length < 8) { this.authError = 'Password must be at least 8 characters.'; return; }
     const ok = this.authService.register(this.registerName, this.registerEmail, this.registerPassword, this.registerRole);
-    if (ok && this.registerRole === 'buyer') { this.authModal = ''; }
+    if (ok && this.registerRole === 'buyer') {
+      this.authModal = '';
+      this.checkoutForm.patchValue({ buyer_name: this.currentUser!.name, buyer_email: this.currentUser!.email });
+      if (this.pendingCheckout && this.currentUser) {
+        this.pendingCheckout = false;
+        this.placeOrder();
+      }
+    }
   }
 
   formatPrice(p: number): string { return `R${(p || 0).toFixed(2)}`; }

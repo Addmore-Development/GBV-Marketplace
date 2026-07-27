@@ -86,8 +86,11 @@ interface Need {
   template: `
 <div class="cd-page">
 
+  <!-- Mobile-only backdrop, closes the drawer on tap-outside -->
+  <div class="cd-backdrop" *ngIf="mobileNavOpen" (click)="mobileNavOpen = false"></div>
+
   <!-- SIDEBAR -->
-  <aside class="sidebar" [class.collapsed]="sidebarCollapsed">
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed" [class.mobile-open]="mobileNavOpen" (click)="mobileNavOpen = false">
     <div class="sb-header">
       <div class="sb-logo">A</div>
       <div class="sb-centre-info" *ngIf="!sidebarCollapsed">
@@ -129,6 +132,9 @@ interface Need {
     <!-- TOP BAR -->
     <div class="cd-topbar">
       <div class="tb-left">
+        <button class="cd-hamburger" (click)="mobileNavOpen = !mobileNavOpen; sidebarCollapsed = false" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
         <h1 class="tb-title">{{ currentTab?.label }}</h1>
         <span class="tb-date">{{ todayDate }}</span>
       </div>
@@ -760,6 +766,13 @@ interface Need {
       position: sticky; top: 0; z-index: 100;
     }
     .tb-left { display: flex; align-items: baseline; gap: 14px; }
+    .cd-hamburger {
+      display: none; flex-direction: column; justify-content: center; gap: 4px;
+      width: 34px; height: 34px; background: none; border: none; cursor: pointer; padding: 0;
+      align-self: center;
+      span { display: block; width: 20px; height: 2px; background: var(--text-dark); border-radius: 2px; }
+    }
+    .cd-backdrop { display: none; }
     .tb-title { font-family: 'Playfair Display', serif; font-size: 1.15rem; color: var(--text-dark); margin: 0; font-weight: 600; }
     .tb-date  { font-size: .76rem; color: var(--text-muted); }
     .tb-right { display: flex; align-items: center; gap: 16px; }
@@ -1023,16 +1036,38 @@ interface Need {
 
     /* Math shortcut */
     @media (max-width: 900px) {
-      /* The sidebar keeps its normal left-docked, sticky, collapsible
-         layout on mobile too (same as the admin dashboard) — it just
-         starts narrower so it doesn't eat the whole screen. The
-         existing sb-toggle button still expands it out (wider, labels
-         visible) or collapses it back down (narrower, icons only),
-         same mechanic as desktop. */
-      .sidebar { width: 72px; &.collapsed { width: 72px; } }
-      .sidebar:not(.collapsed) { width: 220px; }
-      .sb-header { padding: 14px 8px 10px; }
-      .sb-nav { padding: 8px 6px; }
+      /* Off-canvas drawer on the left, toggled by the hamburger —
+         same look and behaviour as the seller dashboard's mobile
+         nav: hidden by default so content takes the full width,
+         then slides fully in as an overlay with a backdrop. */
+      .cd-hamburger { display: flex; }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 240px;
+        min-width: 240px;
+        height: 100vh;
+        flex-direction: column;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 1001;
+        &.mobile-open { transform: translateX(0); }
+        &.collapsed { width: 240px; } // ignore desktop icon-collapse width on mobile
+      }
+      .sb-toggle { display: none; }
+      .sb-header { padding: 18px 16px 12px; }
+      .sb-nav { padding: 8px 8px; }
+
+      .cd-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+      }
+
       .overview-grid { grid-template-columns: 1fr; }
       .ov-card.wide { grid-column: span 1; }
       .donations-summary, .orders-summary { grid-template-columns: repeat(2, 1fr); }
@@ -1054,7 +1089,8 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     private realtime: RealtimeService
   ) {}
 
-  sidebarCollapsed = typeof window !== 'undefined' && window.innerWidth <= 900;
+  sidebarCollapsed = false;
+  mobileNavOpen = false;
   activeTab = 'overview';
   hasAlert = true;
   unreadNotifications = 3;

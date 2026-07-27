@@ -355,14 +355,19 @@
   &:hover { background: var(--brown); color: var(--white); }
 }
 
-/* Hero image grid — even 2x2 grid of squares, capped so it can never grow
-   wider than its column and push content out of view. */
+/* Hero image grid — a guaranteed 2x2 of perfectly even squares. The
+   container itself is squared off (aspect-ratio 1/1), then split into
+   two equal columns/rows, so every tile is identical no matter what
+   the source photos look like — capped so it can never grow wider
+   than its column and push content out of view. */
 .hero-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   gap: 10px;
   width: 100%;
   max-width: 360px;
+  aspect-ratio: 1 / 1;
   margin-left: auto;
 }
 
@@ -370,8 +375,8 @@
   position: relative;
   border-radius: 10px;
   overflow: hidden;
-  aspect-ratio: 1 / 1;
   width: 100%;
+  height: 100%;
 
   img { width: 100%; height: 100%; object-fit: cover; display: block; }
 }

@@ -17,6 +17,10 @@ export interface SellerUser {
 export class SellerAuthService {
   private userSubject = new BehaviorSubject<SellerUser | null>(null);
   user$ = this.userSubject.asObservable();
+  // Lazy reference to avoid circular DI — set by CartService
+  private _cartClear?: () => void;
+
+  registerCartClear(fn: () => void): void { this._cartClear = fn; }
 
   constructor(
     private http: HttpClient,
@@ -142,6 +146,7 @@ export class SellerAuthService {
     localStorage.removeItem('hiddenPin');
     localStorage.removeItem('hiddenLayerAccess');
     this.userSubject.next(null);
+    if (this._cartClear) this._cartClear();
   }
 
   get currentUser(): SellerUser | null {

@@ -4,6 +4,8 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { AuthService } from './auth.service';
+import { SellerAuthService } from './seller-auth.service';
+import { CentreAuthService } from './centre-auth.service';
 
 export interface CartItem {
   product_id: string;
@@ -31,9 +33,13 @@ export class CartService {
   cart$ = this.cartSubject.asObservable();
   cartCount$ = new BehaviorSubject<number>(this.cartSubject.value.items.reduce((s, i) => s + i.quantity, 0));
 
-  constructor(authService: AuthService) {
-    // Register clearCart so AuthService can wipe it on logout without circular DI
+  constructor(authService: AuthService, sellerAuth: SellerAuthService, centreAuth: CentreAuthService) {
+    // Register clearCart so each role's auth service can wipe it on sign-out
+    // without circular DI (buyer, seller, and centre sessions all count as
+    // "signed in" for cart persistence, so all three must be able to clear it).
     authService.registerCartClear(() => this.clearCart());
+    sellerAuth.registerCartClear(() => this.clearCart());
+    centreAuth.registerCartClear(() => this.clearCart());
   }
 
   private loadFromStorage(): Cart {

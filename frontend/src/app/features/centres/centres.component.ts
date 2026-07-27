@@ -494,7 +494,17 @@ export class CentresComponent implements OnInit, OnDestroy {
   nextSlide(): void { this.goToSlide((this.currentSlide + 1) % this.noticePosts.length); }
 
   get currentNotice(): NoticePost { return this.noticePosts[this.currentSlide]; }
-  get currentNoticeImg(): string { return this.currentNotice.img || 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80'; }
+  get currentNoticeImg(): string { return this.noticeImage(this.currentNotice) || 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=80'; }
+
+  // Notice board posts ship with a hardcoded stock photo, but once a centre
+  // has uploaded its own profile picture that should take over instead.
+  // Resolved live against allCentres rather than baked into noticePosts so
+  // it always reflects the latest upload without needing to resync the list.
+  noticeImage(post: NoticePost): string {
+    const centre = this.allCentres.find(c => c.id === post.centre_id);
+    if (centre?.profilePicture) return this.mediaUrl(centre.profilePicture);
+    return post.img || '';
+  }
 
   // ── Filtering ─────────────────────────────────────────────
   get filteredCentres(): Centre[] {

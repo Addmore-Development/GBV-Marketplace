@@ -956,81 +956,25 @@
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
-/* Admin keeps its sidebar on the left even on mobile (unlike the
-   seller dashboard, which moves its tabs to the top) — it just
-   narrows to an icon-first column so it doesn't eat the screen. */
+/* Admin's sidebar now behaves exactly like the seller dashboard's
+   on mobile: fully off-canvas (hidden) by default so the content
+   takes the full width, then slides in as a full overlay drawer
+   with a backdrop when the hamburger is tapped. */
 @media (max-width: 900px) {
   .admin-hamburger { display: flex; }
 
   .sidebar {
-    width: 76px;
-    height: 100vh;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    width: 220px;
+    min-width: 220px;
+    height: 100vh;
     flex-direction: column;
-    align-items: stretch;
-    flex-wrap: nowrap;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-
-    .sb-brand {
-      flex-direction: column;
-      gap: 2px;
-      padding: 14px 6px;
-      text-align: center;
-      font-size: .62rem;
-      span:not(.sb-leaf) { display: none; }
-    }
-    .sb-nav {
-      flex-direction: column;
-      flex-wrap: nowrap;
-      overflow-x: visible;
-      overflow-y: visible;
-      padding: 4px 4px 10px;
-      gap: 2px;
-
-      button {
-        width: 100%;
-        flex-direction: column;
-        white-space: normal;
-        padding: 10px 2px;
-        font-size: .62rem;
-        gap: 3px;
-        text-align: center;
-
-        .badge-count { position: static; margin-top: 2px; }
-      }
-    }
-    .sb-footer { padding: 8px 4px 12px; margin-left: 0; }
-
-    // Hamburger-expanded state: overlays the content with the full,
-    // labelled sidebar instead of the narrow icon rail above.
-    &.mobile-open {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 220px;
-      z-index: 1001;
-      box-shadow: 2px 0 16px rgba(0,0,0,.35);
-
-      .sb-brand {
-        flex-direction: row;
-        gap: 8px;
-        padding: 24px 20px 20px;
-        text-align: left;
-        font-size: 1rem;
-        span:not(.sb-leaf) { display: inline; }
-      }
-      .sb-nav button {
-        flex-direction: row;
-        text-align: left;
-        padding: 11px 20px;
-        font-size: .85rem;
-        gap: 10px;
-        .badge-count { position: static; margin-top: 0; margin-left: auto; }
-      }
-      .sb-footer { padding: 16px 20px; }
-    }
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 1001;
+    &.mobile-open { transform: translateX(0); }
   }
 
   .sidebar-backdrop {

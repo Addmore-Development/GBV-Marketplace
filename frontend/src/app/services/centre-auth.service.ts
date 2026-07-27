@@ -34,6 +34,10 @@ const CENTRE_KEYS = [
 export class CentreAuthService {
   private userSubject = new BehaviorSubject<CentreUser | null>(this.readFromStorage());
   user$ = this.userSubject.asObservable();
+  // Lazy reference to avoid circular DI — set by CartService
+  private _cartClear?: () => void;
+
+  registerCartClear(fn: () => void): void { this._cartClear = fn; }
 
   constructor(private http: HttpClient, private coordinator: AuthCoordinatorService) {
     window.addEventListener('storage', (e: StorageEvent) => {
@@ -106,6 +110,7 @@ export class CentreAuthService {
   private clearLocalSession(): void {
     CENTRE_KEYS.forEach(k => localStorage.removeItem(k));
     this.userSubject.next(null);
+    if (this._cartClear) this._cartClear();
   }
 
   get currentUser(): CentreUser | null {

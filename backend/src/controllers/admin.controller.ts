@@ -2,6 +2,7 @@
 // backend/src/controllers/admin.controller.ts
 // ============================================================
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { pool } from '../index';
 import { getIO } from '../socket';
 
@@ -537,6 +538,57 @@ export const getEmergencyStats = async (req: Request, res: Response): Promise<vo
     });
   } catch (err: any) {
     console.error('[Admin] emergency stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ── One-off test-data helper ─────────────────────────────────
+// Resets every seller's login email to firstname@gmail.com (derived from
+// real_name) and every seller's password to the same shared value, so
+// testing/demoing the seller login flow doesn't require remembering a
+// different real password per account. Not something you'd run against a
+// live production dataset with real sellers — it's here for a
+// development/staging database seeded with test accounts.
+const TEST_SELLER_PASSWORD = 'Happy@123';
+
+export const normalizeSellerCredentials = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sellers = await pool.query(
+      `SELECT id, real_name, email FROM sellers ORDER BY created_at ASC`
+    );
+
+    const passwordHash = await bcrypt.hash(TEST_SELLER_PASSWORD, 12);
+    const usedEmails = new Set<string>();
+    const changes: { id: string; old_email: string; new_email: string }[] = [];
+
+    for (const seller of sellers.rows) {
+      const firstNameRaw = (seller.real_name || 'seller').trim().split(/\s+/)[0] || 'seller';
+      const firstName = firstNameRaw.toLowerCase().replace(/[^a-z0-9]/g, '') || 'seller';
+
+      // Two sellers can share a first name — the email column is UNIQUE,
+      // so duplicates get a numeric suffix (lopez@gmail.com, lopez2@gmail.com...).
+      let candidate = `${firstName}@gmail.com`;
+      let suffix = 2;
+      while (usedEmails.has(candidate)) {
+        candidate = `${firstName}${suffix}@gmail.com`;
+        suffix += 1;
+      }
+      usedEmails.add(candidate);
+
+      await pool.query(
+        `UPDATE sellers SET email = $1, hidden_pin_hash = $2 WHERE id = $3`,
+        [candidate, passwordHash, seller.id]
+      );
+      changes.push({ id: seller.id, old_email: seller.email, new_email: candidate });
+    }
+
+    res.json({
+      message: `Updated ${changes.length} seller account(s). Password for all of them is now "${TEST_SELLER_PASSWORD}".`,
+      password: TEST_SELLER_PASSWORD,
+      sellers: changes,
+    });
+  } catch (err: any) {
+    console.error('[Admin] normalize seller credentials error:', err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -1112,7 +1112,11 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   get currentTab() { return this.navItems.find(n => n.key === this.activeTab); }
 
   stats: DashboardStats = {
-    totalDonations: 142000, thisMonthDonations: 18400, activeVolunteers: 12,
+    // totalDonations/thisMonthDonations start at 0 and get set from the
+    // real, persisted donation records in loadDonations() below — these
+    // used to be hardcoded demo numbers (R142,000 / R18,400) that never
+    // changed no matter what actually came in.
+    totalDonations: 0, thisMonthDonations: 0, activeVolunteers: 12,
     pendingVolunteers: 3, totalSales: 28600, pendingOrders: 3,
     survivorEarnings: 20020, profileViews: 1840,
     totalMakers: 0, pendingMakers: 0,
@@ -1125,14 +1129,11 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   ];
   get maxMonthly() { return Math.max(...this.monthlyData.map(m => m.amount)); }
 
-  recentDonations: Donation[] = [
-    { id: 'd1', donor: 'Anonymous',      amount: 500,  type: 'money', date: '21 May 2026', recurring: true,  s18aIssued: true },
-    { id: 'd2', donor: 'Priya Naidoo',   amount: 1000, type: 'money', date: '20 May 2026', recurring: false, s18aIssued: true },
-    { id: 'd3', donor: 'MTN Foundation', amount: 5000, type: 'money', date: '18 May 2026', recurring: true,  s18aIssued: true },
-    { id: 'd4', donor: 'James van Wyk',  amount: 0,    type: 'goods', date: '17 May 2026', recurring: false, s18aIssued: false, goods: ['Blankets', 'Clothing'] },
-    { id: 'd5', donor: 'Leila Adams',    amount: 250,  type: 'money', date: '15 May 2026', recurring: true,  s18aIssued: true },
-    { id: 'd6', donor: 'Sipho Dlamini',  amount: 100,  type: 'money', date: '12 May 2026', recurring: false, s18aIssued: false },
-  ];
+  // Loaded live from the backend in loadDonations() below, and kept in
+  // sync in real time via the 'donation:new' socket event — this used to
+  // be a permanent hardcoded list of 6 fake donations that never reflected
+  // anything a donor actually submitted.
+  recentDonations: Donation[] = [];
 
   volunteers: Volunteer[] = [
     { id: 'v1', name: 'Dr. Fatima Essop',   skill: 'Trauma counsellor', status: 'active',    hours: 28, joinDate: 'Mar 2026', avatar: '' },
@@ -1404,9 +1405,31 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (rows) => {
         const real = rows.map(r => this.mapApiDonation(r));
-        this.recentDonations = [...real, ...this.recentDonations];
+        // Dedupe by id in case a 'donation:new' socket event already
+        // added this same donation before this REST call resolved.
+        const existingIds = new Set(this.recentDonations.map(d => d.id));
+        this.recentDonations = [...real.filter(d => !existingIds.has(d.id)), ...this.recentDonations];
+
+        // Recompute the totals from the real, persisted records — these
+        // used to stay frozen at whatever hardcoded number the dashboard
+        // started with, regardless of what had actually come in.
+        const now = new Date();
+        let total = 0;
+        let thisMonth = 0;
+        for (const row of rows) {
+          const amount = Number(row.amount) || 0;
+          total += amount;
+          const created = new Date(row.created_at);
+          if (created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth()) {
+            thisMonth += amount;
+          }
+        }
+        this.stats = { ...this.stats, totalDonations: total, thisMonthDonations: thisMonth };
       },
-      error: () => {}
+      error: (err) => {
+        console.error('Failed to load donations:', err);
+        this.showToast('Could not load donations — please refresh the page.');
+      }
     });
   }
 

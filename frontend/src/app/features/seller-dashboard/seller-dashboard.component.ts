@@ -1,6 +1,4 @@
-// ============================================================
-// frontend/src/app/features/seller-dashboard/seller-dashboard.component.ts
-// ============================================================
+
 import { Component, OnInit, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';

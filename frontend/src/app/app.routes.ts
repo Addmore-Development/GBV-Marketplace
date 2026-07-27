@@ -1,6 +1,4 @@
-// ============================================================
-// frontend/src/app/app.routes.ts
-// ============================================================
+
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 

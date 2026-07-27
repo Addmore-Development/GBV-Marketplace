@@ -933,6 +933,18 @@ import { AuthService, User } from '../../services/auth.service';
     .rc-icon  { font-size: 1.3rem; margin-bottom: 4px; }
     .rc-label { font-size: .78rem; font-weight: 700; color: var(--text-dark); }
     .rc-desc  { font-size: .66rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .cart-nav { padding: 0 16px; }
+      .cart-layout { padding: 0 16px; }
+    }
+    @media (max-width: 600px) {
+      .cart-item { grid-template-columns: 20px 64px 1fr; }
+      .item-actions { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
+      .cf-row { grid-template-columns: 1fr; }
+      .role-grid { grid-template-columns: 1fr 1fr; }
+    }
   `]
 })
 export class CartComponent implements OnInit, OnDestroy {

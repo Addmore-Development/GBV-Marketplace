@@ -1,0 +1,117 @@
+<!-- shared-case.component.html -->
+<div class="shared-case-wrapper">
+
+  <div *ngIf="isLoading" class="sc-loading">
+    <p>Loading case file…</p>
+  </div>
+
+  <div *ngIf="error" class="sc-error">
+    <span class="sc-error__icon">⚠️</span>
+    <p>{{ error }}</p>
+  </div>
+
+  <ng-container *ngIf="!isLoading && !error && caseData">
+    <header class="sc-header">
+      <div class="sc-header__badge">🔒 Secure Case File</div>
+      <h1 class="sc-header__title">Shared Case — {{ caseData.seller_alias }}</h1>
+      <p class="sc-header__meta">
+        Shared with
+        <strong>{{ caseData.professional_name || 'a professional' }}</strong>
+        ({{ caseData.professional_type }}) ·
+        Expires {{ formatDate(caseData.expires_at) }}
+      </p>
+      <p *ngIf="caseData.notes" class="sc-header__notes">📝 {{ caseData.notes }}</p>
+    </header>
+
+    <!-- JOURNEY -->
+    <section
+      *ngIf="caseData.permission === 'journey_only' || caseData.permission === 'journey_and_evidence'"
+      class="sc-section"
+    >
+      <h2 class="sc-section__title">Case Journey</h2>
+      <div *ngIf="caseData.journey; else noJourney" class="sc-journey">
+        <div class="sc-journey__step" [class.sc-journey__step--done]="caseData.journey.medical_done">
+          <span class="sc-journey__icon">🏥</span>
+          <div>
+            <strong>Medical check-up</strong>
+            <span *ngIf="caseData.journey.medical_date"> · {{ formatDate(caseData.journey.medical_date) }}</span>
+          </div>
+          <span class="sc-journey__status">{{ caseData.journey.medical_done ? '✓' : '○' }}</span>
+        </div>
+        <div class="sc-journey__step" [class.sc-journey__step--done]="caseData.journey.police_done">
+          <span class="sc-journey__icon">📋</span>
+          <div>
+            <strong>Statement recorded</strong>
+            <span *ngIf="caseData.journey.police_date"> · {{ formatDate(caseData.journey.police_date) }}</span>
+          </div>
+          <span class="sc-journey__status">{{ caseData.journey.police_done ? '✓' : '○' }}</span>
+        </div>
+        <div class="sc-journey__step" [class.sc-journey__step--done]="caseData.journey.protection_done">
+          <span class="sc-journey__icon">🛡️</span>
+          <div>
+            <strong>Protection order</strong>
+            <span *ngIf="caseData.journey.protection_date"> · {{ formatDate(caseData.journey.protection_date) }}</span>
+          </div>
+          <span class="sc-journey__status">{{ caseData.journey.protection_done ? '✓' : '○' }}</span>
+        </div>
+        <div class="sc-journey__step" [class.sc-journey__step--done]="caseData.journey.court_done">
+          <span class="sc-journey__icon">⚖️</span>
+          <div>
+            <strong>Court proceedings</strong>
+            <span *ngIf="caseData.journey.court_date"> · {{ formatDate(caseData.journey.court_date) }}</span>
+          </div>
+          <span class="sc-journey__status">{{ caseData.journey.court_done ? '✓' : '○' }}</span>
+        </div>
+        <div class="sc-journey__step" [class.sc-journey__step--done]="caseData.journey.counselling_done">
+          <span class="sc-journey__icon">💬</span>
+          <div>
+            <strong>Counselling sessions</strong>
+            <span *ngIf="caseData.journey.counselling_date"> · {{ formatDate(caseData.journey.counselling_date) }}</span>
+          </div>
+          <span class="sc-journey__status">{{ caseData.journey.counselling_done ? '✓' : '○' }}</span>
+        </div>
+        <div *ngIf="caseData.journey.notes" class="sc-journey__notes">
+          <strong>Notes:</strong> {{ caseData.journey.notes }}
+        </div>
+      </div>
+      <ng-template #noJourney>
+        <p class="sc-empty">No journey information recorded yet.</p>
+      </ng-template>
+    </section>
+
+    <!-- EVIDENCE -->
+    <section
+      *ngIf="caseData.permission === 'evidence_only' || caseData.permission === 'journey_and_evidence'"
+      class="sc-section"
+    >
+      <h2 class="sc-section__title">Evidence Vault</h2>
+      <div *ngIf="caseData.evidence && caseData.evidence.length > 0; else noEvidence" class="sc-evidence">
+        <div *ngFor="let item of caseData.evidence" class="sc-evidence__item">
+          <span class="sc-evidence__icon">{{ evidenceIcon(item.item_type) }}</span>
+          <div class="sc-evidence__body">
+            <p class="sc-evidence__type">{{ item.item_type | titlecase }}</p>
+            <p *ngIf="item.description" class="sc-evidence__desc">{{ item.description }}</p>
+            <p *ngIf="item.date_of_incident" class="sc-evidence__date">
+              Incident date: {{ formatDate(item.date_of_incident) }}
+            </p>
+            <span *ngIf="item.is_court_ready" class="sc-evidence__badge">Court-ready</span>
+          </div>
+          <a
+            *ngIf="item.file_url"
+            [href]="getFileUrl(item.file_url)"
+            target="_blank"
+            class="sc-evidence__link"
+          >View file</a>
+        </div>
+      </div>
+      <ng-template #noEvidence>
+        <p class="sc-empty">No evidence items recorded yet.</p>
+      </ng-template>
+    </section>
+
+    <footer class="sc-footer">
+      <p>This case file was shared securely via Amani. Treat its contents with strict confidentiality.</p>
+    </footer>
+  </ng-container>
+
+</div>

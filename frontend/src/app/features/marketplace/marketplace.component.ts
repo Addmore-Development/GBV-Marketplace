@@ -1,12 +1,14 @@
 import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CartService } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
 import { SellerAuthService, SellerUser } from '../../services/seller-auth.service';
+import { CentreAuthService } from '../../services/centre-auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Product {
   id: string;
@@ -94,7 +96,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     { key: 'textiles',  label: 'Clothing & Textiles',     img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80' },
     { key: 'food',      label: 'Food & Jams',             img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&q=80' },
     { key: 'crafts',    label: 'Art & Crafts',            img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
-    { key: 'all',       label: 'Shop All',                img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=400&q=80' },
+    { key: 'all',       label: 'Shop All' },
   ];
 
   readonly staticProducts: Product[] = [
@@ -173,7 +175,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       centre_name: 'Khayelitsha Hub', category: 'food', price: 89,
       survivor_income: 62.3, centre_funding: 26.7, platform_fee: 4.45,
       stock: 22, rating: 4.7, reviews: 19, sold: 48,
-      img: 'https://images.unsplash.com/photo-1622428051717-dcd7a1af09a5?w=600&q=80',
+      img: 'https://images.unsplash.com/photo-1683944433023-027a3f443ae4?w=600&q=80',
       description: 'All-natural exfoliating scrub made with South African rooibos, raw honey, and brown sugar.',
       story: '"I started mixing scrubs during lockdown. Now it pays school fees." — Amahle',
       seller_type: 'survivor'
@@ -193,7 +195,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       centre_name: 'Ubuntu Youth Programme', category: 'crafts', price: 280,
       survivor_income: 196, centre_funding: 84, platform_fee: 14,
       stock: 6, rating: 4.8, reviews: 12, sold: 29,
-      img: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=600&q=80',
+      img: 'https://images.unsplash.com/photo-1695742968499-4555230b1d3f?w=600&q=80',
       description: 'Intricate wire bicycle sculpture, approx. 25cm.',
       story: '"I started making wire toys at 8 to sell at robots. Now I sell internationally." — Lebo, 22',
       seller_type: 'youth'
@@ -213,7 +215,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
       centre_name: 'Empilweni Centre', category: 'crafts', price: 295,
       survivor_income: 206.5, centre_funding: 88.5, platform_fee: 14.75,
       stock: 9, rating: 4.9, reviews: 24, sold: 58,
-      img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=600&q=80',
+      img: 'https://images.unsplash.com/photo-1455669175216-9017c9b02fc6?w=600&q=80',
       description: 'Large hand-woven sisal basket with leather handles.',
       story: '"My mother taught me this weave. I am teaching my daughter. Three generations." — Nomvula',
       badge: 'bestseller', seller_type: 'survivor'
@@ -246,16 +248,28 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
     private cartService: CartService,
     private authService: AuthService,
     private sellerAuth: SellerAuthService,
+    private centreAuth: CentreAuthService,
     private router: Router,
     private http: HttpClient,
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(p => {
+      if (p['authRequired']) {
+        setTimeout(() => this.showToast('Please log in or register to view centre profiles.'), 300);
+        this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      }
+    });
     this.loadRealProducts();
     this.cartService.cart$.pipe(takeUntil(this.destroy$))
       .subscribe(c => this.cartCount = c.items.reduce((s, i) => s + i.quantity, 0));
+
     this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => this.currentUser = u);
+      .subscribe(u => {
+        if (u) this.currentUser = u;
+        else if (!this.sellerAuth.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+      });
     this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
       .subscribe(u => {
         if (u) {
@@ -265,6 +279,20 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
             role: 'seller',
             initials: u.alias.slice(0,2).toUpperCase()
           };
+        } else {
+          // seller logged out — only clear if no buyer or centre session active
+          if (!this.authService.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+        }
+      });
+    // Reactive centre session — fires immediately on load, on login/logout
+    // from this page, and on login/logout from any other open tab, so
+    // signing out on the centre profile page is reflected here too.
+    this.centreAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) {
+          this.currentUser = { name: u.name, email: u.email, role: 'centre', initials: u.name.slice(0,2).toUpperCase() };
+        } else if (!this.authService.currentUser && !this.sellerAuth.currentUser) {
+          this.currentUser = null;
         }
       });
   }
@@ -276,7 +304,7 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
 
   loadRealProducts(): void {
     this.isLoadingProducts = true;
-    this.http.get<any>('http://localhost:3000/api/marketplace/products')
+    this.http.get<any>(`${environment.apiUrl}/api/marketplace/products`)
       .subscribe({
         next: (res) => {
           this.products = res.products ?? [];
@@ -309,6 +337,10 @@ formatPrice(p: number | string): string {
   }
 
   openProduct(p: Product): void {
+    if (!this.currentUser) {
+      this.showAuthModal('login');
+      return;
+    }
     this.selectedProduct = p;
     this.selectedQty = 1;
   }
@@ -367,9 +399,19 @@ formatPrice(p: number | string): string {
     }
   }
 
+  // Clicking the name chip next to "Sign out": a seller or centre should
+  // land back on their own dashboard, not the buyer profile modal (which
+  // only makes sense for buyers).
+  goToUserArea(): void {
+    if (!this.currentUser) return;
+    if (this.currentUser.role === 'seller') { this.router.navigate(['/seller/dashboard']); return; }
+    if (this.currentUser.role === 'centre') { this.router.navigate(['/centre-dashboard']); return; }
+    this.showAuthModal('profile');
+  }
+
   loadSellerCentres(): void {
     this.sellerCentresLoading = true;
-    this.http.get<any[]>('http://localhost:3000/api/sellers/centres/verified').subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/centres/verified`).subscribe({
       next: (data) => {
         this.sellerCentres = (data || []).map((c: any) => ({
           id: c.id,
@@ -427,7 +469,7 @@ formatPrice(p: number | string): string {
     return this.sellerIdVerified &&
       this.sellerFullName.trim().length > 0 &&
       this.sellerEmail.trim().length > 0 &&
-      /^\d{4,6}$/.test(this.sellerPin) &&
+      /^.{8,}$/.test(this.sellerPin) &&
       this.sellerCentreId.length > 0 &&
       !this.sellerIsLoading;
   }
@@ -438,7 +480,7 @@ formatPrice(p: number | string): string {
 
     const nameParts = this.sellerFullName.trim().split(/\s+/);
     const real_name = nameParts[0];
-    const real_surname = nameParts.slice(1).join(' ') || '';
+    const real_surname = nameParts.slice(1).join(' ') || nameParts[0];
     let alias = this.sellerEmail.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
     if (!alias) alias = `maker_${Date.now()}`;
 
@@ -455,23 +497,11 @@ formatPrice(p: number | string): string {
       accepted_terms: true, accepted_popia: true, safety_acknowledged: true,
     };
 
-    this.http.post<any>('http://localhost:3000/api/sellers/register', payload).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/api/sellers/register`, payload).subscribe({
       next: (res) => {
-        localStorage.setItem('sellerId', res.seller_id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.sellerPin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
-        // Update auth state so nav reflects logged-in seller
-        const sellerUser = {
-          id: res.seller_id,
-          alias: res.alias,
-          email: res.email,
-          verification_status: res.verification_status || 'pending',
-          hidden_layer_granted: false,
-        };
-        localStorage.setItem('sellerUser', JSON.stringify(sellerUser));
-        this.sellerAuth['userSubject'].next(sellerUser);
+        // Route through SellerAuthService so the shared session state
+        // updates and any other role's stale session gets cleared.
+        this.sellerAuth.setSessionFromRegistration(res.seller_id, res.alias, res.email, this.sellerPin);
         this.sellerIsLoading = false;
         this.authModal = '';
         this.router.navigate(['/seller/dashboard']);
@@ -507,7 +537,44 @@ formatPrice(p: number | string): string {
   doLogin(): void {
     this.authError = '';
     if (!this.loginEmail || !this.loginPassword) { this.authError = 'Please fill in all fields.'; return; }
-    const ok = this.authService.login(this.loginEmail, this.loginPassword, this.loginRole as 'buyer' | 'seller' | 'centre');
+
+    if (this.loginRole === 'seller') {
+      // Seller uses email + PIN via real API
+      // Route through SellerAuthService (rather than a raw HTTP call reaching
+      // into its private userSubject) so the shared session state announces
+      // properly and other roles' stale sessions get cleared on sign-in.
+      this.sellerAuth.login(this.loginEmail.trim().toLowerCase(), this.loginPassword).subscribe({
+        next: () => {
+          this.authModal = '';
+          this.router.navigate(['/seller/dashboard']);
+        },
+        error: (err) => { this.authError = err.error?.error || 'Invalid email or PIN.'; }
+      });
+      return;
+    }
+
+    if (this.loginRole === 'centre') {
+      this.http.post<any>(`${environment.apiUrl}/api/centres/login`, {
+        email: this.loginEmail.trim().toLowerCase(), password: this.loginPassword
+      }).subscribe({
+        next: (res) => {
+          this.centreAuth.setSession(res);
+          this.authModal = '';
+          this.router.navigate(['/centre-dashboard']);
+        },
+        error: (err) => { this.authError = err.error?.error || 'Invalid email or password.'; }
+      });
+      return;
+    }
+
+    if (this.loginRole === 'admin') {
+      this.authModal = '';
+      this.router.navigate(['/admin']);
+      return;
+    }
+
+    // Buyer — local auth service
+    const ok = this.authService.login(this.loginEmail, this.loginPassword, 'buyer');
     if (!ok) this.authError = 'Invalid credentials.';
     else this.authModal = '';
   }
@@ -523,7 +590,30 @@ formatPrice(p: number | string): string {
     else this.authError = 'Registration failed. Please try again.';
   }
 
-  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
+  logout(): void {
+    const sellerId = localStorage.getItem('sellerId');
+    const sellerAlias = localStorage.getItem('sellerAlias');
+    const sellerEmail = localStorage.getItem('sellerEmail');
+
+    if (sellerId) {
+      this.http.post(`${environment.apiUrl}/api/sellers/logout`, {
+        seller_id: sellerId, alias: sellerAlias, email: sellerEmail,
+      }).subscribe({ error: () => {} });
+    }
+    if (this.centreAuth.currentUser) {
+      this.centreAuth.logout();
+    }
+
+    this.authService.logout();
+    localStorage.removeItem('sellerId'); localStorage.removeItem('sellerUser');
+    localStorage.removeItem('sellerAlias'); localStorage.removeItem('sellerEmail');
+    localStorage.removeItem('hiddenPin'); localStorage.removeItem('hiddenLayerAccess');
+    // centreAuth.logout() above already clears every centre-related key and
+    // pushes null through user$, which every page (this one included, and
+    // any other open tab) is subscribed to -- so no manual clearing needed here.
+    this.currentUser = null;
+    this.showToast('Signed out successfully');
+  }
 
   stars(rating: number): boolean[] {
     return Array.from({ length: 5 }, (_, i) => i < Math.round(rating));

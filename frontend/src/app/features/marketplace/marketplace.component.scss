@@ -32,25 +32,19 @@
   color: var(--text-dark);
 }
 
-/* ── Announce Bar ──────────────────────────────────────────── */
-/* ── Announce Bar (now inside hero) ────────────────────────── */
-.announce-bar-hero {
-  position: relative;
-  z-index: 2;
+/* ── Announce Bar (standalone, before Shop by category) ────── */
+.announce-bar {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
   flex-wrap: wrap;
-  background: rgba(61,43,31,.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--brown);
   color: rgba(255,255,255,.92);
   font-size: .75rem;
   text-align: center;
   padding: 10px 24px;
   letter-spacing: .3px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
 
   .ab-dot { opacity: .45; font-size: .9rem; }
 }
@@ -250,39 +244,6 @@
 
 .user-name { font-size: .82rem; font-weight: 500; color: var(--text-dark); }
 
-/* Category strip */
-.cat-strip {
-  border-top: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-}
-
-.cat-strip-inner {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 32px;
-  display: flex;
-  gap: 0;
-}
-
-.cat-nav-btn {
-  padding: 12px 20px;
-  border: none;
-  background: none;
-  font-family: 'DM Sans', sans-serif;
-  font-size: .83rem;
-  font-weight: 400;
-  color: var(--text-light);
-  cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  transition: all .2s;
-
-  &:hover { color: var(--brown); }
-  &.active { color: var(--brown); border-bottom-color: var(--brown); font-weight: 600; }
-}
-
 /* ── Hero (Etsy split layout) ──────────────────────────────── */
 .hero {
   position: relative;
@@ -324,7 +285,13 @@
   gap: 48px;
   align-items: center;
 
-  @media (max-width: 860px) { grid-template-columns: 1fr; }
+  // Grid items default to min-width:auto, which lets their content push
+  // past the track's width instead of shrinking with it. That's what was
+  // squeezing the image grid's own right-hand column off-screen on
+  // narrower/tablet widths — this makes each side respect its 1fr track.
+  > * { min-width: 0; }
+
+  @media (max-width: 600px) { grid-template-columns: 1fr; }
 }
 
 .hero-text { display: flex; flex-direction: column; gap: 16px; }
@@ -388,36 +355,25 @@
   &:hover { background: var(--brown); color: var(--white); }
 }
 
-/* Hero image grid */
+/* Hero image grid — even 2x2 grid of squares, capped so it can never grow
+   wider than its column and push content out of view. */
 .hero-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  height: 380px;
-}
-
-.hg-tall {
-  grid-row: 1 / 4;
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-
-  img { width: 100%; height: 100%; object-fit: cover; }
-}
-
-.hg-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin-left: auto;
 }
 
 .hg-img {
   position: relative;
   border-radius: 10px;
   overflow: hidden;
-  flex: 1;
+  aspect-ratio: 1 / 1;
+  width: 100%;
 
-  img { width: 100%; height: 100%; object-fit: cover; }
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
 }
 
 .hg-label {
@@ -480,6 +436,16 @@
   border: 3px solid var(--beige-dark);
 
   img { width: 100%; height: 100%; object-fit: cover; }
+
+  &.is-collage {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: var(--beige-dark);
+
+    img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  }
 }
 
 .feat-cat-label {
@@ -953,6 +919,9 @@
     max-width: 860px;
     padding: 0;
     overflow: hidden;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -1144,18 +1113,17 @@
 .product-modal-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  min-height: 500px;
-
-  @media (max-width: 700px) { grid-template-columns: 1fr; }
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  @media (max-width: 700px) { grid-template-columns: 1fr; overflow-y: auto; }
 }
-
 .pm-image {
   position: relative;
   background: var(--beige);
-
+  overflow: hidden;
   img { width: 100%; height: 100%; object-fit: cover; }
 }
-
 .pm-category-badge {
   position: absolute;
   top: 14px;
@@ -1167,14 +1135,18 @@
   border-radius: 99px;
   text-transform: capitalize;
 }
-
 .pm-info {
   padding: 28px;
   overflow-y: auto;
-  max-height: 86vh;
+  height: 100%;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 }
 
 .pm-centre { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
@@ -1372,7 +1344,11 @@
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .nav-inner { padding: 0 16px; height: 60px; }
+  .nav-inner { padding: 0 16px; height: auto; min-height: 60px; flex-wrap: wrap; row-gap: 8px; }
+  .brand { order: 1; }
+  .nav-search-wrap { order: 2; flex: 1 1 auto; min-width: 0; max-width: none; margin: 0; }
+  .nav-actions { order: 3; width: 100%; margin-left: 0; }
+  .btn-contribute { padding: 8px 12px; font-size: .78rem; }
   .hero { padding: 0 0 28px; }
   .hero-inner { gap: 24px; padding: 28px 16px; }
   .footer-inner { grid-template-columns: 1fr; gap: 32px; padding: 40px 16px; }
@@ -1387,6 +1363,24 @@
   .hero-inner { grid-template-columns: 1fr; }
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .product-modal-grid { grid-template-columns: 1fr; }
+  .toolbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .feat-cat { width: 84px; }
+  .feat-cat-img { width: 76px; height: 76px; }
+}
+
+@media (max-width: 480px) {
+  .nav { height: auto; }
+  .nav-inner { height: auto; padding: 10px 12px; }
+  .brand-sub { display: none; }
+  .nav-actions { gap: 8px; flex-wrap: wrap; }
+  .nav-cart span:not(.cart-badge) { display: none; }
+  .user-name { display: none; }
+  .nav-register-btn { display: none; } /* Sign In stays; Register reachable via "Register here" inside the Sign In modal */
+  .hero-title { font-size: 1.6rem; }
+  .hero-sub { font-size: .85rem; }
+  .hero-actions { flex-direction: column; align-items: stretch; }
+  .product-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .section-heading { font-size: 1.2rem; }
 }
 
 /* ── Inline seller registration ─────────────────────────── */

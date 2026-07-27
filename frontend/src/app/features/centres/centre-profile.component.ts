@@ -1,13 +1,17 @@
 // ============================================================
 // frontend/src/app/features/centres/centre-profile.component.ts
 // ============================================================
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { Subject, takeUntil, timeout, catchError, of } from 'rxjs';
 import { AuthService, User } from '../../services/auth.service';
-import { Centre, NoticePost } from './centres.component';
+import { SellerAuthService } from '../../services/seller-auth.service';
+import { CentreAuthService } from '../../services/centre-auth.service';
+import { Centre, NoticePost, getCentreImage } from './centres.component';
+import { environment } from '../../../environments/environment';
 
 // Re-use the same static data from centres.component
 const ALL_CENTRES: Centre[] = [
@@ -116,7 +120,7 @@ const ALL_CENTRES: Centre[] = [
 @Component({
   selector: 'app-centre-profile',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, HttpClientModule],
   template: `
 <nav class="pp-nav">
   <div class="pp-nav-inner">
@@ -144,7 +148,12 @@ const ALL_CENTRES: Centre[] = [
   </div>
 </nav>
 
-<div class="pp-not-found" *ngIf="!centre">
+<div class="pp-loading" *ngIf="centreLoading">
+  <div class="pp-spinner"></div>
+  <p>Loading centre profile…</p>
+</div>
+
+<div class="pp-not-found" *ngIf="!centreLoading && !centre">
   <h2>Centre not found</h2>
   <p>This centre may have moved or been removed.</p>
   <a routerLink="/centres" class="pp-btn-solid">Back to Centres</a>
@@ -407,6 +416,11 @@ const ALL_CENTRES: Centre[] = [
 .pp-chip { display: flex; align-items: center; gap: 7px; }
 .pp-avatar { width: 30px; height: 30px; background: #8B2635; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; }
 
+/* Loading */
+.pp-loading { text-align: center; padding: 120px 24px; color: #7A6A5A; font-family: 'DM Sans', sans-serif; }
+.pp-spinner { width: 32px; height: 32px; margin: 0 auto 14px; border: 3px solid #EDE8E3; border-top-color: #8B2635; border-radius: 50%; animation: pp-spin .8s linear infinite; }
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+
 /* Not found */
 .pp-not-found { text-align: center; padding: 100px 24px; }
 
@@ -506,19 +520,118 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  centreLoading = true;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private authService: AuthService,
+    private sellerAuth: SellerAuthService,
+    private centreAuth: CentreAuthService,
     private fb: FormBuilder,
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef,
   ) {}
+
+  // ── Resolve relative /uploads/... paths returned by the backend ──
+  mediaUrl(path: string): string {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `${environment.apiUrl}${path}`;
+  }
+
+  fetchCentre(id: string | null): void {
+    if (!id) { this.centre = null; this.centreLoading = false; this.cdr.detectChanges(); return; }
+
+    // Fall back to the static demo data only if the live API has nothing for this id
+    const fallback = ALL_CENTRES.find(c => c.id === id) || null;
+
+    this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).pipe(
+      timeout(8000),
+      catchError((err) => {
+        console.error('Failed to load /api/centres/all (timeout or network error):', err);
+        return of(null);
+      })
+    ).subscribe({
+      next: (data) => {
+        if (data === null) { this.centre = fallback; this.centreLoading = false; this.cdr.detectChanges(); return; }
+        try {
+          const match = (data || []).find((c: any) => c.id === id);
+          if (match) {
+            this.centre = {
+              id: match.id,
+              name: match.name || '',
+              type: match.type || '',
+              city: match.city || '',
+              province: match.province || '',
+              suburb: match.suburb || match.city || '',
+              description: match.description || '',
+              mission: match.mission || '',
+              services: Array.isArray(match.services) ? match.services : [],
+              languages: Array.isArray(match.languages) ? match.languages : [],
+              is_24_hour: !!match.is_24_hour,
+              has_shelter: !!match.has_shelter,
+              provides_counselling: !!match.provides_counselling,
+              provides_legal_support: !!match.provides_legal_support,
+              capacity: match.capacity || 0,
+              img: match.profile_picture ? this.mediaUrl(match.profile_picture) : getCentreImage(match.type, match.id),
+              profilePicture: match.profile_picture || null,
+              contact_email: match.contact_email || '',
+              contact_phone: match.contact_phone || '',
+              whatsapp: match.whatsapp || '',
+              website: match.website || '',
+              verified: !!match.verified,
+              year_established: match.year_established || 0,
+              beneficiaries_per_year: match.beneficiaries_per_year || 0,
+            };
+          } else {
+            this.centre = fallback;
+          }
+        } catch (e) {
+          console.error('Failed to map centre data, falling back:', e);
+          this.centre = fallback;
+        } finally {
+          this.centreLoading = false;
+          this.cdr.detectChanges();
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load /api/centres/all:', err);
+        this.centre = fallback;
+        this.centreLoading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
-    this.centre = ALL_CENTRES.find(c => c.id === id) || null;
+    this.fetchCentre(id);
 
+    // Check seller localStorage session first (survives page reload)
+    const sellerId = localStorage.getItem('sellerId');
+    if (sellerId) {
+      const stored = localStorage.getItem('sellerUser');
+      if (stored) {
+        const s = JSON.parse(stored);
+        this.currentUser = { name: s.alias, email: s.email, role: 'seller', initials: s.alias.slice(0,2).toUpperCase() };
+      }
+    }
     this.authService.user$.pipe(takeUntil(this.destroy$))
-      .subscribe(u => this.currentUser = u);
+      .subscribe(u => { if (u) this.currentUser = u; this.cdr.detectChanges(); });
+    this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) this.currentUser = { name: u.alias, email: u.email, role: 'seller', initials: u.alias.slice(0,2).toUpperCase() };
+        else if (!this.authService.currentUser && !this.centreAuth.currentUser) this.currentUser = null;
+        this.cdr.detectChanges();
+      });
+    // Reactive centre session -- fires immediately on load, on login/logout
+    // from this page, and on login/logout from any other open tab.
+    this.centreAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => {
+        if (u) this.currentUser = { name: u.name, email: u.email, role: 'centre', initials: u.name.slice(0,2).toUpperCase() };
+        else if (!this.authService.currentUser && !this.sellerAuth.currentUser) this.currentUser = null;
+        this.cdr.detectChanges();
+      });
 
     this.donateForm = this.fb.group({
       donor_name:  ['', Validators.required],
@@ -580,7 +693,22 @@ export class CentreProfileComponent implements OnInit, OnDestroy {
     else { this.authError = 'Registration failed.'; }
   }
 
-  logout(): void { this.authService.logout(); this.showToast('Signed out successfully'); }
+  logout(): void {
+    const role = this.currentUser?.role;
+    if (role === 'seller') {
+      this.sellerAuth.logout();
+    } else if (role === 'centre') {
+      this.centreAuth.logout();
+    } else {
+      this.authService.logout();
+    }
+    this.currentUser = null;
+    this.showToast('Signed out successfully');
+    // Signing out from a centre's public profile page should land back on
+    // the Centres listing, not on whatever generic screen a shared auth
+    // service might otherwise redirect to.
+    this.router.navigate(['/centres']);
+  }
 
   submitDonate(): void {
     if (this.donateForm.invalid) { this.donateForm.markAllAsTouched(); return; }

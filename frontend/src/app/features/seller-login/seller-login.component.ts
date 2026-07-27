@@ -6,6 +6,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
+import { environment } from '../../../environments/environment';
+import { SellerAuthService } from '../../services/seller-auth.service';
 
 @Component({
   selector: 'app-seller-login',
@@ -20,7 +22,7 @@ export class SellerLoginComponent {
   error = '';
   isLoading = false;
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private sellerAuth: SellerAuthService) {}
 
   login(): void {
     if (!this.email || !this.pin) {
@@ -30,17 +32,11 @@ export class SellerLoginComponent {
     this.isLoading = true;
     this.error = '';
 
-    this.http.post<any>('http://localhost:3000/api/sellers/login', {
-      email: this.email,
-      pin: this.pin,
-    }).subscribe({
-      next: (res) => {
-        // Store all session keys needed by dashboard
-        localStorage.setItem('sellerId', res.id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.pin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
+    // Route through SellerAuthService so the shared session state updates
+    // on the marketplace/centre pages and any other role's stale session
+    // (e.g. an old buyer login) gets cleared on sign-in.
+    this.sellerAuth.login(this.email.trim().toLowerCase(), this.pin).subscribe({
+      next: () => {
         this.isLoading = false;
         this.router.navigate(['/seller/dashboard']);
       },

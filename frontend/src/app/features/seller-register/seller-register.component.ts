@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
+import { environment } from '../../../environments/environment';
+import { SellerAuthService } from '../../services/seller-auth.service';
 
 interface Centre {
   id: string;
@@ -10,17 +12,6 @@ interface Centre {
   city: string;
   province: string;
 }
-
-const STATIC_CENTRES: Centre[] = [
-  { id: 'c1', name: 'Thistle House GBV Centre',   city: 'Cape Town',      province: 'Western Cape' },
-  { id: 'c2', name: 'New Beginnings NPO',          city: 'Johannesburg',   province: 'Gauteng' },
-  { id: 'c3', name: 'Ubuntu Youth Programme',      city: 'Johannesburg',   province: 'Gauteng' },
-  { id: 'c4', name: 'Khanya Elderly Home',         city: 'Pretoria',       province: 'Gauteng' },
-  { id: 'c5', name: "Khayelitsha Women's Hub",     city: 'Cape Town',      province: 'Western Cape' },
-  { id: 'c6', name: 'Empilweni Care Centre',       city: 'Durban',         province: 'KwaZulu-Natal' },
-  { id: 'c7', name: "Sunshine Children's Village", city: 'Bloemfontein',   province: 'Free State' },
-  { id: 'c8', name: "Ubuntu Women's Centre",       city: 'Port Elizabeth', province: 'Eastern Cape' },
-];
 
 @Component({
   selector: 'app-seller-register',
@@ -30,7 +21,7 @@ const STATIC_CENTRES: Centre[] = [
   styleUrls: ['./seller-register.component.scss'],
 })
 export class SellerRegisterComponent implements OnInit {
-  private readonly API = 'http://localhost:3000/api/sellers';
+  private readonly API = `${environment.apiUrl}/api/sellers`;
 
   idNumber = '';
   fullName = '';
@@ -38,7 +29,9 @@ export class SellerRegisterComponent implements OnInit {
   pin = '';
   selectedCentreId = '';
 
-  readonly centres: Centre[] = STATIC_CENTRES;
+  centres: Centre[] = [];
+  centresLoading = false;
+  centresError = '';
 
   isLoading = false;
   error = '';
@@ -51,14 +44,43 @@ export class SellerRegisterComponent implements OnInit {
       this.idVerified &&
       this.fullName.trim().length > 0 &&
       this.email.trim().length > 0 &&
-      /^\d{4,6}$/.test(this.pin) &&
+      /^.{8,}$/.test(this.pin) &&
       this.selectedCentreId.length > 0 &&
       !this.isLoading
     );
   }
 
-  constructor(private http: HttpClient, private router: Router) {}
-  ngOnInit(): void {}
+  constructor(private http: HttpClient, private router: Router, private sellerAuth: SellerAuthService) {}
+
+  ngOnInit(): void {
+    this.fetchCentres();
+  }
+
+  fetchCentres(): void {
+    this.centresLoading = true;
+    this.centresError = '';
+    this.http.get<any[]>(`${this.API}/centres/verified`).subscribe({
+      next: (data) => {
+        if (data && data.length > 0) {
+          this.centres = data.map((c: any) => ({
+            id: c.id,
+            name: c.name || c.centre_name,
+            city: c.city,
+            province: c.province,
+          }));
+        } else {
+          this.centres = [];
+          this.centresError = 'No centres have been approved yet. Please check back soon.';
+        }
+        this.centresLoading = false;
+      },
+      error: () => {
+        this.centres = [];
+        this.centresError = "Couldn't load the list of centres — check your connection and try again.";
+        this.centresLoading = false;
+      }
+    });
+  }
 
   // ── BUG FIX: write cleaned digits BACK to the bound field ──
   onIdInput(): void {
@@ -108,11 +130,9 @@ export class SellerRegisterComponent implements OnInit {
 
     this.http.post<any>(`${this.API}/register`, payload).subscribe({
       next: (res) => {
-        localStorage.setItem('sellerId', res.seller_id);
-        localStorage.setItem('sellerAlias', res.alias);
-        localStorage.setItem('sellerEmail', res.email);
-        localStorage.setItem('hiddenPin', this.pin);
-        localStorage.setItem('hiddenLayerAccess', 'false');
+        // Route through SellerAuthService so the shared session state
+        // updates and any other role's stale session gets cleared.
+        this.sellerAuth.setSessionFromRegistration(res.seller_id, res.alias, res.email, this.pin);
         this.isLoading = false;
         this.router.navigate(['/seller/dashboard']);
       },
@@ -120,6 +140,8 @@ export class SellerRegisterComponent implements OnInit {
         this.isLoading = false;
         if (err.error?.code === 'ALREADY_EXISTS' || err.status === 409) {
           this.error = 'This email is already registered. Please sign in instead.';
+        } else if (err.error?.code === 'CENTRE_NOT_APPROVED') {
+          this.error = 'The centre you selected is still awaiting admin approval and cannot accept new sellers yet. Please choose another centre or check back soon.';
         } else {
           this.error = err.error?.error || 'Something went wrong. Please try again.';
         }

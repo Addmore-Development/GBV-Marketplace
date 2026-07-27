@@ -11,6 +11,7 @@ import {
     verifyID,
     registerSeller,
     loginSeller,
+    logoutSeller,
     getSellerPublicProfile,
     getSellerProfile,
     updateSellerProfile,
@@ -25,6 +26,9 @@ import {
     addTrustedContact,
     deleteTrustedContact,
     triggerEmergencyAlert,
+    attachEmergencyRecording,
+    uploadAlarmRecording,
+    getCentreEmergencyAlerts,
     createCaseShare,
     getMyShares,
     revokeCaseShare,
@@ -54,6 +58,7 @@ router.get('/centres/:id', getCentreById);
 router.post('/verify-id', verifyID);
 router.post('/register', registerSeller);
 router.post('/login', loginSeller);
+router.post('/logout', logoutSeller);
 router.get('/public/:alias', getSellerPublicProfile);
 
 // ── Profile ─────────────────────────────────────────────────
@@ -78,6 +83,8 @@ router.get('/contacts/:sellerId', getTrustedContacts);
 router.post('/contacts', addTrustedContact);
 router.delete('/contacts/:id', deleteTrustedContact);
 router.post('/emergency', triggerEmergencyAlert);
+router.post('/emergency/:alertId/recording', uploadAlarmRecording.single('recording'), attachEmergencyRecording);
+router.get('/emergency/centre/:centreId', getCentreEmergencyAlerts);
 
 // ── Unified Case File Sharing ─────────────────────────────────
 router.post('/case/share', createCaseShare);

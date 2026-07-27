@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-seller-hidden',
@@ -90,7 +91,7 @@ export class SellerHiddenComponent implements OnInit {
     if (this.newEvidence.description) formData.append('description', this.newEvidence.description);
     formData.append('file', this.selectedEvidenceFile);
 
-    this.http.post<any>('http://localhost:3000/api/sellers/evidence', formData).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/api/sellers/evidence`, formData).subscribe({
       next: (res) => {
         this.evidenceItems.unshift(res);
         this.showUploadModal = false;
@@ -108,7 +109,7 @@ export class SellerHiddenComponent implements OnInit {
 
   loadEvidence(): void {
     if (!this.sellerId) return;
-    this.http.get<any[]>(`http://localhost:3000/api/sellers/evidence/${this.sellerId}`).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/evidence/${this.sellerId}`).subscribe({
       next: (data) => { this.evidenceItems = data; },
       error: () => {}
     });
@@ -167,7 +168,7 @@ export class SellerHiddenComponent implements OnInit {
       return;
     }
     this.generatingAffidavit = true;
-    this.http.post('http://localhost:3000/api/sellers/affidavit/generate', {
+    this.http.post(`${environment.apiUrl}/api/sellers/affidavit/generate`, {
       seller_id: this.sellerId,
       statement: this.affidavitTranscript
     }, { responseType: 'blob' }).subscribe({
@@ -188,7 +189,7 @@ export class SellerHiddenComponent implements OnInit {
   // ── Unified Case Sharing ──────────────────────────────────────
   loadMyShares(): void {
     if (!this.sellerId) return;
-    this.http.get<any[]>(`http://localhost:3000/api/sellers/case/shares?seller_id=${this.sellerId}`).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/case/shares?seller_id=${this.sellerId}`).subscribe({
       next: (shares) => {
         this.myShares = shares.map(s => ({
           ...s,
@@ -215,7 +216,7 @@ export class SellerHiddenComponent implements OnInit {
       return;
     }
     this.shareCreating = true;
-    this.http.post<any>('http://localhost:3000/api/sellers/case/share', {
+    this.http.post<any>(`${environment.apiUrl}/api/sellers/case/share`, {
       seller_id: this.sellerId,
       professional_email: this.newShare.email,
       professional_name: this.newShare.name || null,
@@ -239,7 +240,7 @@ export class SellerHiddenComponent implements OnInit {
 
   revokeShare(shareId: string): void {
     if (!confirm('Revoke this share?')) return;
-    this.http.delete(`http://localhost:3000/api/sellers/case/share/${shareId}`, {
+    this.http.delete(`${environment.apiUrl}/api/sellers/case/share/${shareId}`, {
       body: { seller_id: this.sellerId }
     }).subscribe({
       next: () => this.loadMyShares(),
@@ -259,7 +260,7 @@ export class SellerHiddenComponent implements OnInit {
   // ── Support Request Status ────────────────────────────────────
   loadSupportRequests(): void {
     if (!this.sellerId) return;
-    this.http.get<any[]>(`http://localhost:3000/api/sellers/support-requests?seller_id=${this.sellerId}`).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/sellers/support-requests?seller_id=${this.sellerId}`).subscribe({
       next: (data) => { this.mySupportRequests = data; },
       error: () => {}
     });
@@ -268,7 +269,7 @@ export class SellerHiddenComponent implements OnInit {
   // ── Original methods (kept, but now integrated with real backend) ──
   requestSupport(type: string): void {
     if (!this.sellerId) return;
-    this.http.post('http://localhost:3000/api/sellers/support', {
+    this.http.post(`${environment.apiUrl}/api/sellers/support`, {
       seller_id: this.sellerId,
       request_type: type,
       message: 'Request from hidden layer'
@@ -281,7 +282,7 @@ export class SellerHiddenComponent implements OnInit {
 
   generateCourtPack(): void {
     if (!this.sellerId) return;
-    this.http.post(`http://localhost:3000/api/sellers/generate-court-pack/${this.sellerId}`, {}, { responseType: 'blob' })
+    this.http.post(`${environment.apiUrl}/api/sellers/generate-court-pack/${this.sellerId}`, {}, { responseType: 'blob' })
       .subscribe({
         next: (blob) => {
           const url = window.URL.createObjectURL(blob);

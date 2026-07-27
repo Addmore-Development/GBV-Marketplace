@@ -1,5 +1,6 @@
 
 import { Routes } from '@angular/router';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -43,7 +44,7 @@ export const routes: Routes = [
       ),
   },
 
-  // ── Contribute / Centres listing ─────────────────────────
+  // ── Centres listing (public) ──────────────────────────────
   {
     path: 'centres',
     loadComponent: () =>
@@ -52,7 +53,7 @@ export const routes: Routes = [
       ),
   },
 
-  // ── Centre profile page ───────────────────────────────────
+  // ── Centre profile page (requires login) ─────────────────
   {
     path: 'centres/:id',
     loadComponent: () =>
@@ -70,17 +71,18 @@ export const routes: Routes = [
   },
   {
     path: 'centre-dashboard',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/centre-dashboard/centre-dashboard.component').then(
         (m) => m.CentreDashboardComponent
       ),
   },
   {
+    // Legacy URL — the real, backend-wired registration form lives at
+    // /register/centre. Redirect so old links/buttons still work.
     path: 'register-centre',
-    loadComponent: () =>
-      import('./features/centres/register-centre.component').then(
-        (m) => m.RegisterCentreComponent
-      ),
+    redirectTo: 'register/centre',
+    pathMatch: 'full',
   },
 
   // ── Seller routes ─────────────────────────────────────────
@@ -97,14 +99,22 @@ export const routes: Routes = [
   },
   {
     path: 'seller/dashboard',
+    canActivate: [authGuard],
     loadComponent: () => import('./features/seller-dashboard/seller-dashboard.component')
       .then(m => m.SellerDashboardComponent),
   },
   {
+    path: 'shared-case/:token',
+    loadComponent: () => import('./features/shared-case/shared-case.component')
+      .then(m => m.SharedCaseComponent),
+  },
+  {
     path: 'seller/hidden',
+    canActivate: [authGuard],
     loadComponent: () => import('./features/seller-hidden/seller-hidden.component')
       .then(m => m.SellerHiddenComponent),
   },
+
   // ── Admin ─────────────────────────────────────────────────
   {
     path: 'admin',

@@ -3,7 +3,21 @@
 // ============================================================
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import fs from 'fs';
 import { pool } from '../index';
+import { logActivity, getClientIp } from '../utils/activityLog';
+import { getIO } from '../socket';
+
+const signCentreToken = (centreId: string) =>
+  jwt.sign({ id: centreId, role: 'centre' }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
+
+// Ensure the profile-picture upload directory exists
+const centreProfileDir = path.join(__dirname, '../../uploads/centre-profile');
+if (!fs.existsSync(centreProfileDir)) {
+  fs.mkdirSync(centreProfileDir, { recursive: true });
+}
 
 // ─── REGISTER A CENTRE ──────────────────────────────────────
 export const registerCentre = async (req: Request, res: Response) => {
@@ -12,10 +26,91 @@ export const registerCentre = async (req: Request, res: Response) => {
     const body = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
+    // ── Required text/selection fields (mirrors the frontend form's
+    //    Validators.required fields) ─────────────────────────────
+    const requiredTextFields: { key: string; label: string }[] = [
+      { key: 'centre_type',           label: 'Centre type' },
+      { key: 'centre_name',           label: 'Centre name' },
+      { key: 'npo_number',            label: 'NPO registration number' },
+      { key: 'contact_person_name',   label: 'Contact person name' },
+      { key: 'contact_person_role',   label: 'Contact person role' },
+      { key: 'contact_email',         label: 'Contact email' },
+      { key: 'contact_phone',         label: 'Contact phone' },
+      { key: 'physical_address',      label: 'Physical address' },
+      { key: 'suburb',                label: 'Suburb' },
+      { key: 'city',                  label: 'City' },
+      { key: 'province',              label: 'Province' },
+      { key: 'postal_code',           label: 'Postal code' },
+      { key: 'description',           label: 'Full description' },
+      { key: 'mission_statement',     label: 'Mission statement' },
+      { key: 'emergency_protocol',    label: 'Emergency protocol' },
+      { key: 'confidentiality_policy',label: 'Confidentiality policy' },
+      { key: 'password',              label: 'Password' },
+    ];
+
+    const missingFields: string[] = [];
+    for (const f of requiredTextFields) {
+      if (!body[f.key] || String(body[f.key]).trim() === '') {
+        missingFields.push(f.label);
+      }
+    }
+
+    // Array fields sent as JSON strings from FormData
+    const parseArrEarly = (val: string | string[]): any[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val;
+      try { const p = JSON.parse(val); return Array.isArray(p) ? p : [val]; } catch { return [val]; }
+    };
+    const servicesOffered  = parseArrEarly(body.services_offered);
+    const targetPopulation = parseArrEarly(body.target_population);
+    const languagesSpoken  = parseArrEarly(body.languages_spoken);
+
+    if (servicesOffered.length === 0)  missingFields.push('At least one service offered');
+    if (targetPopulation.length === 0) missingFields.push('At least one target population');
+    if (languagesSpoken.length === 0)  missingFields.push('At least one language spoken');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: `Missing required field(s): ${missingFields.join(', ')}`,
+        missing_fields: missingFields,
+      });
+    }
+
+    // ── Format validation ──────────────────────────────────────
+    const allowedCentreTypes = ['gbv_centre', 'orphanage', 'old_age_home'];
+    if (!allowedCentreTypes.includes(body.centre_type)) {
+      return res.status(400).json({ error: 'Centre type must be one of: gbv_centre, orphanage, old_age_home' });
+    }
+    if (String(body.centre_name).trim().length < 3) {
+      return res.status(400).json({ error: 'Centre name must be at least 3 characters' });
+    }
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(body.contact_email)) {
+      return res.status(400).json({ error: 'Please provide a valid contact email address' });
+    }
+    if (!/^0[0-9]{9}$/.test(body.contact_phone)) {
+      return res.status(400).json({ error: 'Contact phone must be a valid 10-digit South African number starting with 0' });
+    }
+    if (!/^\d{4}$/.test(body.postal_code)) {
+      return res.status(400).json({ error: 'Postal code must be exactly 4 digits' });
+    }
+    if (String(body.description).trim().length < 100) {
+      return res.status(400).json({ error: 'Full description must be at least 100 characters' });
+    }
+    if (String(body.mission_statement).trim().length < 50) {
+      return res.status(400).json({ error: 'Mission statement must be at least 50 characters' });
+    }
+    if (String(body.password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (body.agree_terms !== undefined && body.agree_terms !== 'true' && body.agree_terms !== true) {
+      return res.status(400).json({ error: 'You must agree to the declaration to submit your application' });
+    }
+
     // Required document check
-    const requiredDocs = ['npo_certificate', 'id_document', 'proof_of_address'];
+    const requiredDocs = ['profile_picture', 'npo_certificate', 'id_document', 'proof_of_address'];
     for (const doc of requiredDocs) {
-      if (!files[doc]?.length) {
+      if (!files?.[doc]?.length) {
         return res.status(400).json({
           error: `Missing required document: ${doc.replace(/_/g, ' ')}`,
         });
@@ -62,7 +157,7 @@ export const registerCentre = async (req: Request, res: Response) => {
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
         $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,
         $35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,
-        $51,$52,$53,$54,$55,$56,$57
+        $51,$52,$53,$54,$55,$56
       ) RETURNING id, centre_name, status`,
       [
         body.centre_type, body.centre_name, body.registration_number || null,
@@ -109,8 +204,22 @@ export const registerCentre = async (req: Request, res: Response) => {
 
     const centre = centreResult.rows[0];
 
+    // The profile picture isn't a verification document — it goes on the
+    // centre row itself (centre_documents.document_type is a fixed enum
+    // that doesn't include it), so pull it out before the doc-insert loop.
+    let profilePictureUrl: string | null = null;
+    const profilePicFile = files.profile_picture?.[0];
+    if (profilePicFile) {
+      profilePictureUrl = `/uploads/centre-profile/${profilePicFile.filename}`;
+      await client.query(
+        `UPDATE centres SET profile_picture_url = $1 WHERE id = $2`,
+        [profilePictureUrl, centre.id]
+      );
+    }
+
     // Insert documents
     for (const [fieldName, fileArray] of Object.entries(files)) {
+      if (fieldName === 'profile_picture') continue;
       for (const file of fileArray) {
         await client.query(
           `INSERT INTO centre_documents (centre_id, document_type, file_name, file_path, file_size, mime_type)
@@ -134,6 +243,8 @@ export const registerCentre = async (req: Request, res: Response) => {
       centre_id: centre.id,
       centre_name: centre.centre_name,
       status: centre.status,
+      profile_picture_url: profilePictureUrl,
+      token: signCentreToken(centre.id),
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
@@ -232,14 +343,18 @@ export const loginCentre = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT id, centre_name, centre_type, contact_email, contact_person_name,
-              city, province, contact_phone, npo_number, password_hash, status
-       FROM centres WHERE contact_email = $1`,
-      [email]
+              city, province, contact_phone, npo_number, password_hash, status,
+              profile_picture_url
+       FROM centres WHERE LOWER(contact_email) = LOWER($1)`,
+      [email.trim()]
     );
     if (!result.rows.length) return res.status(401).json({ error: 'Invalid email or password' });
     const centre = result.rows[0];
     const isValid = await bcrypt.compare(password, centre.password_hash);
     if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
+
+    await logActivity('centre', centre.id, centre.centre_name, centre.contact_email, 'login', getClientIp(req));
+
     return res.json({
       centre_id: centre.id,
       centre_name: centre.centre_name,
@@ -251,9 +366,463 @@ export const loginCentre = async (req: Request, res: Response) => {
       contact_phone: centre.contact_phone,
       npo_number: centre.npo_number,
       status: centre.status,
+      profile_picture_url: centre.profile_picture_url,
+      token: signCentreToken(centre.id),
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── LOGOUT ───────────────────────────────────────────────────
+export const logoutCentre = async (req: Request, res: Response) => {
+  const { centre_id, centre_name, contact_email } = req.body || {};
+  if (!centre_id) return res.status(400).json({ error: 'centre_id required' });
+  await logActivity('centre', centre_id, centre_name || null, contact_email || null, 'logout', getClientIp(req));
+  return res.json({ ok: true });
+};
+
+// ─── GET ALL CENTRES (public listing) ────────────────────────
+export const getAllCentres = async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+        id,
+        COALESCE(centre_name, '')       AS name,
+        COALESCE(centre_type::text, '') AS type,
+        COALESCE(city, '')              AS city,
+        COALESCE(province, '')          AS province,
+        COALESCE(suburb, city, '')      AS suburb,
+        COALESCE(description, '')       AS description,
+        COALESCE(mission_statement, '') AS mission,
+        profile_picture_url             AS profile_picture,
+        COALESCE(services_offered, '{}') AS services,
+        COALESCE(languages_spoken, '{}') AS languages,
+        COALESCE(is_24_hour, false)          AS is_24_hour,
+        COALESCE(has_shelter, false)         AS has_shelter,
+        COALESCE(provides_counselling, false) AS provides_counselling,
+        COALESCE(provides_legal_support, false) AS provides_legal_support,
+        COALESCE(capacity_total, 0)     AS capacity,
+        COALESCE(contact_email, '')     AS contact_email,
+        COALESCE(contact_phone, '')     AS contact_phone,
+        COALESCE(whatsapp_number, '')   AS whatsapp,
+        COALESCE(website_url, '')       AS website,
+        COALESCE(year_established, 0)   AS year_established,
+        COALESCE(annual_beneficiaries, 0) AS beneficiaries_per_year,
+        status::text                    AS status,
+        (status = 'approved')           AS verified
+       FROM centres
+       WHERE status IN ('approved', 'pending', 'under_review')
+       ORDER BY centre_name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getAllCentres error:', err);
+    res.status(500).json({ error: 'Failed to fetch centres' });
+  }
+};
+
+// ─── GET OWN FULL PROFILE (for the centre dashboard) ─────────
+// Protected by verifyCentreToken — a centre can only fetch its own
+// record. Returns every field the "Centre Profile" tab needs to
+// edit, not just the trimmed public-listing shape from getAllCentres.
+export const getOwnCentreProfile = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, centre_name, centre_type, contact_person_name, contact_person_role,
+              contact_email, contact_phone, whatsapp_number, website_url,
+              physical_address, suburb, city, province, postal_code,
+              description, mission_statement, npo_number, status,
+              profile_picture_url, accepts_goods, section18a, marketplace_active
+       FROM centres WHERE id = $1`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Centre not found' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('getOwnCentreProfile error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── GET SELLERS REGISTERED TO THIS CENTRE (for the centre dashboard) ──
+// Protected by verifyCentreToken — a centre can only see its own makers.
+export const getCentreSellers = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, alias, real_name, real_surname, email, phone,
+              verification_status, profile_complete, total_sales, total_earned,
+              created_at
+       FROM sellers
+       WHERE centre_id = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreSellers error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── UPDATE OWN PROFILE (editable fields only) ───────────────
+// Protected by verifyCentreToken. Only the fields shown on the
+// dashboard's "Centre Profile" tab are editable here — anything
+// that affects verification/approval status is deliberately left
+// out and can only be changed by an admin.
+const editableCentreFields: { body: string; column: string }[] = [
+  { body: 'name',        column: 'centre_name' },
+  { body: 'city',        column: 'city' },
+  { body: 'province',    column: 'province' },
+  { body: 'tagline',     column: 'mission_statement' },
+  { body: 'description', column: 'description' },
+  { body: 'npo_number',  column: 'npo_number' },
+  { body: 'phone',       column: 'contact_phone' },
+  { body: 'website',     column: 'website_url' },
+  { body: 'accepts_goods',       column: 'accepts_goods' },
+  { body: 'section18a',          column: 'section18a' },
+  { body: 'marketplace_active',  column: 'marketplace_active' },
+];
+
+export const updateCentreProfile = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+
+    for (const field of editableCentreFields) {
+      if (body[field.body] === undefined) continue;
+      setClauses.push(`${field.column} = $${i}`);
+      values.push(body[field.body]);
+      i++;
+    }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json({ error: 'No editable fields were provided' });
+    }
+
+    // Basic validation to mirror the registration form's constraints
+    if (body.name !== undefined && String(body.name).trim().length < 3) {
+      return res.status(400).json({ error: 'Centre name must be at least 3 characters' });
+    }
+    if (body.description !== undefined && String(body.description).trim().length < 100) {
+      return res.status(400).json({ error: 'Full description must be at least 100 characters' });
+    }
+
+    setClauses.push('updated_at = NOW()');
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE centres SET ${setClauses.join(', ')} WHERE id = $${i}
+       RETURNING id, centre_name, city, province, mission_statement, description,
+                 npo_number, contact_phone, website_url,
+                 accepts_goods, section18a, marketplace_active`,
+      values
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Centre not found' });
+
+    return res.json({ message: 'Profile updated', centre: result.rows[0] });
+  } catch (err) {
+    console.error('updateCentreProfile error:', err);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+};
+
+// ─── UPLOAD / UPDATE OWN PROFILE PICTURE ─────────────────────
+// Protected by verifyCentreToken — a centre can only set its own
+// picture. Approval status is NOT required here: a centre should
+// be able to finish setting up its profile while its application
+// is still under review.
+export const uploadCentreProfilePicture = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      return res.status(400).json({ error: 'No image file was uploaded' });
+    }
+
+    const profilePictureUrl = `/uploads/centre-profile/${file.filename}`;
+
+    const result = await pool.query(
+      `UPDATE centres SET profile_picture_url = $1, updated_at = NOW()
+       WHERE id = $2 RETURNING id, profile_picture_url`,
+      [profilePictureUrl, id]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Centre not found' });
+
+    return res.json({
+      message: 'Profile picture updated',
+      profile_picture_url: result.rows[0].profile_picture_url,
+    });
+  } catch (err) {
+    console.error('uploadCentreProfilePicture error:', err);
+    return res.status(500).json({ error: 'Failed to update profile picture' });
+  }
+};
+// ============================================================
+// NEEDS BOARD — a centre posts a need, it's persisted, and it's pushed
+// live (via Socket.IO) to: that centre's own dashboard, and the public
+// Centres page noticeboard. Previously this only lived in the browser's
+// in-memory array and never left the tab it was created in.
+// ============================================================
+
+// Centre dashboard — every need for this centre (active + hidden), so the
+// centre can manage its own board.
+export const getCentreNeeds = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const result = await pool.query(
+      `SELECT id, centre_id, title, category, urgency, description, active, created_at, updated_at
+       FROM needs WHERE centre_id = $1 ORDER BY created_at DESC`,
+      [centreId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreNeeds error:', err);
+    res.status(500).json({ error: 'Failed to load needs' });
+  }
+};
+
+// Public Centres page — every currently-active need, across every centre,
+// newest first. This is what powers the live noticeboard.
+export const getPublicNeeds = async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt((req.query['limit'] as string) || '50', 10) || 50, 200);
+    const result = await pool.query(
+      `SELECT n.id, n.centre_id, c.centre_name, n.title, n.category, n.urgency,
+              n.description, n.active, n.created_at
+       FROM needs n
+       JOIN centres c ON c.id = n.centre_id
+       WHERE n.active = TRUE
+       ORDER BY n.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getPublicNeeds error:', err);
+    res.status(500).json({ error: 'Failed to load needs' });
+  }
+};
+
+export const createNeed = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const { title, category, urgency, description } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    const centreRes = await pool.query(`SELECT centre_name FROM centres WHERE id = $1`, [centreId]);
+    if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
+
+    const result = await pool.query(
+      `INSERT INTO needs (centre_id, title, category, urgency, description, active)
+       VALUES ($1, $2, $3, $4, $5, TRUE)
+       RETURNING id, centre_id, title, category, urgency, description, active, created_at, updated_at`,
+      [centreId, title, category || 'goods', urgency || 'moderate', description || '']
+    );
+
+    const need = result.rows[0];
+    const payload = { ...need, centre_name: centreRes.rows[0].centre_name };
+
+    // Push live: to the centre's own dashboard (in case it's open in
+    // another tab/device) and to the public Centres page noticeboard.
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centreId}`).emit('need:new', payload);
+      io.to('public-feed').emit('need:new', payload);
+    }
+
+    res.status(201).json(need);
+  } catch (err) {
+    console.error('createNeed error:', err);
+    res.status(500).json({ error: 'Failed to post need' });
+  }
+};
+
+export const updateNeed = async (req: Request, res: Response) => {
+  try {
+    const { needId } = req.params;
+    const { title, category, urgency, description, active } = req.body;
+    const requestingCentreId = (req as any).centre?.id;
+
+    const ownerCheck = await pool.query(`SELECT centre_id FROM needs WHERE id = $1`, [needId]);
+    if (ownerCheck.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+    if (requestingCentreId && ownerCheck.rows[0].centre_id !== requestingCentreId) {
+      return res.status(403).json({ error: 'You may only manage needs for your own centre' });
+    }
+
+    const result = await pool.query(
+      `UPDATE needs SET
+         title       = COALESCE($1, title),
+         category    = COALESCE($2, category),
+         urgency     = COALESCE($3, urgency),
+         description = COALESCE($4, description),
+         active      = COALESCE($5, active)
+       WHERE id = $6
+       RETURNING id, centre_id, title, category, urgency, description, active, created_at, updated_at`,
+      [title, category, urgency, description, active, needId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+
+    const need = result.rows[0];
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${need.centre_id}`).emit('need:updated', need);
+      io.to('public-feed').emit(need.active ? 'need:updated' : 'need:removed', need);
+    }
+
+    res.json(need);
+  } catch (err) {
+    console.error('updateNeed error:', err);
+    res.status(500).json({ error: 'Failed to update need' });
+  }
+};
+
+export const deleteNeed = async (req: Request, res: Response) => {
+  try {
+    const { needId } = req.params;
+    const requestingCentreId = (req as any).centre?.id;
+
+    const ownerCheck = await pool.query(`SELECT centre_id FROM needs WHERE id = $1`, [needId]);
+    if (ownerCheck.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+    if (requestingCentreId && ownerCheck.rows[0].centre_id !== requestingCentreId) {
+      return res.status(403).json({ error: 'You may only manage needs for your own centre' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM needs WHERE id = $1 RETURNING id, centre_id`,
+      [needId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Need not found' });
+
+    const { id, centre_id } = result.rows[0];
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centre_id}`).emit('need:deleted', { id, centre_id });
+      io.to('public-feed').emit('need:removed', { id, centre_id });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('deleteNeed error:', err);
+    res.status(500).json({ error: 'Failed to delete need' });
+  }
+};
+
+// ============================================================
+// DONATIONS & VOLUNTEERS — public "Support a Centre" forms
+// ============================================================
+
+// Public Centres page — donate form. Persists the donation and pushes it
+// live to the donating centre's own dashboard and to the admin panel, the
+// same way a new need/seller/emergency shows up without a refresh.
+export const createDonation = async (req: Request, res: Response) => {
+  try {
+    const { centre_id, donor_name, donor_email, amount, goods_desc, message } = req.body;
+    if (!centre_id || !donor_name || !donor_email) {
+      return res.status(400).json({ error: 'centre_id, donor_name and donor_email are required' });
+    }
+
+    const centreRes = await pool.query(`SELECT centre_name FROM centres WHERE id = $1`, [centre_id]);
+    if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
+
+    const parsedAmount = amount !== undefined && amount !== null && amount !== '' ? Number(amount) : null;
+    const donationType = parsedAmount && parsedAmount > 0 ? 'money' : 'goods';
+    const goodsList = goods_desc ? String(goods_desc).split(',').map((g: string) => g.trim()).filter(Boolean) : [];
+
+    const result = await pool.query(
+      `INSERT INTO donations (centre_id, donor_name, donor_email, amount, donation_type, goods_list, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, centre_id, donor_name, donor_email, amount, donation_type, goods_list, recurring, s18a_issued, notes, created_at`,
+      [centre_id, donor_name, donor_email, parsedAmount, donationType, goodsList, message || null]
+    );
+
+    const donation = result.rows[0];
+    const payload = { ...donation, centre_name: centreRes.rows[0].centre_name };
+
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centre_id}`).emit('donation:new', payload);
+      io.to('admin').emit('donation:new', payload);
+    }
+
+    res.status(201).json(donation);
+  } catch (err) {
+    console.error('createDonation error:', err);
+    res.status(500).json({ error: 'Failed to record donation' });
+  }
+};
+
+// Public Centres page — volunteer form. Same persist + live-push pattern.
+export const createVolunteerApplication = async (req: Request, res: Response) => {
+  try {
+    const { centre_id, full_name, email, phone, skills, availability, message } = req.body;
+    if (!centre_id || !full_name || !email) {
+      return res.status(400).json({ error: 'centre_id, full_name and email are required' });
+    }
+
+    const centreRes = await pool.query(`SELECT centre_name FROM centres WHERE id = $1`, [centre_id]);
+    if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
+
+    const result = await pool.query(
+      `INSERT INTO volunteer_signups (centre_id, full_name, email, phone, skills, availability, message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, centre_id, full_name, email, phone, skills, availability, message, status, created_at`,
+      [centre_id, full_name, email, phone || null, skills || null, availability || null, message || null]
+    );
+
+    const application = result.rows[0];
+    const payload = { ...application, centre_name: centreRes.rows[0].centre_name };
+
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centre_id}`).emit('volunteer:new', payload);
+      io.to('admin').emit('volunteer:new', payload);
+    }
+
+    res.status(201).json(application);
+  } catch (err) {
+    console.error('createVolunteerApplication error:', err);
+    res.status(500).json({ error: 'Failed to record volunteer application' });
+  }
+};
+
+// Centre dashboard — this centre's own donations, newest first.
+export const getCentreDonations = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const result = await pool.query(
+      `SELECT id, centre_id, donor_name, donor_email, amount, donation_type, goods_list, recurring, s18a_issued, notes, created_at
+       FROM donations WHERE centre_id = $1 ORDER BY created_at DESC`,
+      [centreId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreDonations error:', err);
+    res.status(500).json({ error: 'Failed to load donations' });
+  }
+};
+
+// Centre dashboard — this centre's own volunteer applications, newest first.
+export const getCentreVolunteers = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const result = await pool.query(
+      `SELECT id, centre_id, full_name, email, phone, skills, availability, message, status, created_at
+       FROM volunteer_signups WHERE centre_id = $1 ORDER BY created_at DESC`,
+      [centreId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreVolunteers error:', err);
+    res.status(500).json({ error: 'Failed to load volunteer applications' });
   }
 };

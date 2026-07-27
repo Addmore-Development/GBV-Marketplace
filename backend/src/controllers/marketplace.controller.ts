@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import { pool } from '../index';
 import { v4 as uuidv4 } from 'uuid';
+import { getIO } from '../socket';
 
 // ─── HELPER: Calculate Impact Split ─────────────────────────
 const calculateImpact = (price: number, survivorPct: number, centrePct: number, platformPct: number) => ({
@@ -38,7 +39,7 @@ export const getProducts = async (req: Request, res: Response) => {
       idx++;
     }
     if (centre_id) {
-      where += ` AND s.centre_id = $${idx++}`;
+      where += ` AND p.centre_id = $${idx++}`;
       params.push(centre_id);
     }
     if (min_price) {
@@ -73,9 +74,9 @@ export const getProducts = async (req: Request, res: Response) => {
         COALESCE(p.stock, 0) AS stock,
         COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS img,
         p.seller_alias,
-        COALESCE(p.seller_type, 'survivor') AS seller_type,
-        5.0 AS rating,
-        0 AS reviews,
+        COALESCE(p.seller_type::text, 'survivor') AS seller_type,
+        COALESCE(p.rating_avg, 5.0) AS rating,
+        COALESCE(p.rating_count, 0) AS reviews,
         COALESCE(p.total_sold, 0) AS sold,
         c.centre_name,
         c.city,
@@ -86,8 +87,7 @@ export const getProducts = async (req: Request, res: Response) => {
              WHEN COALESCE(p.stock, 0) <= 5 THEN 'low-stock'
              ELSE NULL END AS badge
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
-       JOIN centres c ON c.id = s.centre_id
+       JOIN centres c ON c.id = p.centre_id
        ${where}
        ORDER BY p.${safeSort} ${safeOrder}
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -113,6 +113,10 @@ export const getProduct = async (req: Request, res: Response) => {
     const result = await pool.query(
       `SELECT
         p.*,
+        p.name AS title,
+        COALESCE(p.image_url, 'https://placehold.co/600x400?text=No+Image') AS thumbnail,
+        COALESCE(p.stock, 0) AS stock_quantity,
+        'ZAR' AS currency,
         c.centre_name, c.city, c.province, c.contact_phone,
         c.services_offered, c.languages_spoken,
         c.provides_counselling, c.provides_legal_support,
@@ -121,8 +125,7 @@ export const getProduct = async (req: Request, res: Response) => {
         ROUND(p.price * p.centre_pct   / 100, 2) as centre_funding,
         ROUND(p.price * p.platform_pct / 100, 2) as platform_fee
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
-       JOIN centres c ON c.id = s.centre_id
+       JOIN centres c ON c.id = p.centre_id
        WHERE p.id = $1 AND p.status = 'active'`,
       [id]
     );
@@ -201,12 +204,11 @@ export const updateCart = async (req: Request, res: Response) => {
     // Fetch product
     const prod = await pool.query(
       `SELECT p.id, p.name AS title, p.price, COALESCE(p.image_url, '') AS thumbnail,
-              p.seller_alias, p.currency, p.survivor_pct, p.centre_pct, p.platform_pct,
+              p.seller_alias, 'ZAR' AS currency, p.survivor_pct, p.centre_pct, p.platform_pct,
               COALESCE(p.stock, 0) AS stock_quantity,
               c.centre_name
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
-       JOIN centres c ON c.id = s.centre_id
+       JOIN centres c ON c.id = p.centre_id
        WHERE p.id = $1 AND p.status = 'active'`,
       [product_id]
     );
@@ -283,9 +285,8 @@ export const placeOrder = async (req: Request, res: Response) => {
 
     // Find nearest hub centre (simplified: use seller's centre of first item)
     const hubCentreId = items[0] ? await client.query(
-      `SELECT s.centre_id
+      `SELECT p.centre_id
        FROM products p
-       JOIN sellers s ON s.id = p.seller_id
        WHERE p.id = $1`,
       [items[0].product_id]
     ).then(r => r.rows[0]?.centre_id) : null;
@@ -301,10 +302,10 @@ export const placeOrder = async (req: Request, res: Response) => {
       const prod = await client.query(
         `SELECT p.id, p.name AS title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
                 COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias,
-                c.centre_name, s.centre_id
+                COALESCE(p.image_url, '') AS thumbnail,
+                c.centre_name, p.centre_id
          FROM products p
-         JOIN sellers s ON s.id = p.seller_id
-         JOIN centres c ON c.id = s.centre_id
+         JOIN centres c ON c.id = p.centre_id
          WHERE p.id = $1 AND p.status = 'active' FOR UPDATE`,
         [item.product_id]
       );
@@ -515,5 +516,35 @@ export const approveProduct = async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
+  }
+};
+// ─── REGISTER BUYER ──────────────────────────────────────────
+// Previously "registering as a buyer" only wrote to the browser's
+// localStorage — the admin dashboard had no way of knowing a new buyer
+// existed until (if ever) they placed an order. This persists the
+// registration and pushes it to the admin dashboard live.
+export const registerBuyer = async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO buyers (name, email, phone)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name, email, phone, created_at`,
+      [name, email, phone || null]
+    );
+
+    const buyer = result.rows[0];
+    const io = getIO();
+    if (io) io.to('admin').emit('buyer:new', buyer);
+
+    res.status(201).json(buyer);
+  } catch (err) {
+    console.error('registerBuyer error:', err);
+    res.status(500).json({ error: 'Registration failed' });
   }
 };

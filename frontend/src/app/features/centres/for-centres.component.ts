@@ -335,10 +335,13 @@ import { RouterModule, Router } from '@angular/router';
     .footer-bottom { max-width: 1100px; margin: 0 auto; padding: 14px 40px; border-top: 1px solid rgba(255,255,255,.06); display: flex; justify-content: space-between; font-size: .7rem; color: rgba(255,255,255,.22); flex-wrap: wrap; gap: 6px; }
 
     @media (max-width: 700px) {
+      .fc-nav { padding: 0 16px; }
+      .nav-links { display: none; }
       .fch-compare { grid-template-columns: 1fr; }
       .fch-arrow { display: none; }
       .ms-handle, .hs-cols { grid-template-columns: 1fr; }
       .footer-inner { grid-template-columns: 1fr; padding: 24px 24px 18px; }
+      .footer-links { grid-template-columns: repeat(2, 1fr); }
       .footer-bottom { padding: 12px 24px; }
     }
   `]

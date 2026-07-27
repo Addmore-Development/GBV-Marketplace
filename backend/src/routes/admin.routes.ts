@@ -23,6 +23,7 @@ import {
   markMessageRead,
   replyToMessage,
   getDonations,
+  getVolunteers,
   getEmergencyAlerts,
   getEmergencyStats,
   getLoginActivity,
@@ -73,6 +74,9 @@ router.post('/messages/:id/reply',   requireAdmin, replyToMessage);
 
 // ── Donations ─────────────────────────────────────────────
 router.get('/donations', requireAdmin, getDonations);
+
+// ── Volunteers ────────────────────────────────────────────
+router.get('/volunteers', requireAdmin, getVolunteers);
 
 // ── Emergency / SOS alerts ────────────────────────────────
 router.get('/emergency',       requireAdmin, getEmergencyAlerts);

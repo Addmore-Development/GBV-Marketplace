@@ -17,8 +17,6 @@
       </a>
     </div>
     <div class="nav-actions">
-      <button class="btn-donate-nav" (click)="showDonate()">Donate</button>
-      <button class="btn-volunteer-nav" (click)="showVolunteer()">Volunteer</button>
       <ng-container *ngIf="!currentUser">
         <button class="btn-ghost" (click)="activeModal = 'auth'; authTab = 'login'">Sign In</button>
         <button class="btn-solid" (click)="activeModal = 'auth'; authTab = 'register'; loadSellerCentres()">Register</button>

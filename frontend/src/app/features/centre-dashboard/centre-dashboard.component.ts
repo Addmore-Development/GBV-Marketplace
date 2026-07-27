@@ -151,6 +151,9 @@ interface Need {
       <strong>{{ sosAlerts.length }} active SOS alert{{ sosAlerts.length > 1 ? 's' : '' }}</strong> from sellers at your centre — tap to view
     </div>
 
+    <!-- TOAST — live donation / volunteer notifications -->
+    <div class="cd-toast" [class.show]="toastVisible">{{ toastMsg }}</div>
+
     <!-- ════════════════════════════════════
          TAB: OVERVIEW
     ════════════════════════════════════ -->
@@ -987,6 +990,14 @@ interface Need {
       display: flex; align-items: center; gap: 8px; animation: sosPulse 1.4s infinite;
       &:hover { background: #7a2130; }
     }
+    .cd-toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px);
+      background: var(--brown); color: white; padding: 11px 22px; border-radius: 8px;
+      font-size: .86rem; font-weight: 600; z-index: 9999;
+      box-shadow: 0 6px 24px rgba(26,18,16,.2);
+      opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+      &.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
     .sos-intro p { font-size: .86rem; color: var(--text-mid); max-width: 640px; margin: 0 0 20px; line-height: 1.6; }
     .sos-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .sos-empty-icon { font-size: 2rem; margin-bottom: 10px; }
@@ -1047,6 +1058,8 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
   activeTab = 'overview';
   hasAlert = true;
   unreadNotifications = 3;
+  toastMsg = '';
+  toastVisible = false;
   orderFilter = '';
   showAddNeed = false;
   profileSaved = false;
@@ -1233,6 +1246,8 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
       this.loadCentreProfile();
       this.loadCentreSellers();
       this.loadNeeds();
+      this.loadDonations();
+      this.loadVolunteerApplications();
       this.setupRealtime();
     }
   }
@@ -1267,6 +1282,32 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
     this.realtimeSubs.push(
       this.realtime.on<{ id: string }>('need:deleted').subscribe(({ id }) => {
         this.needs = this.needs.filter(n => n.id !== id);
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<any>('donation:new').subscribe((donation) => {
+        if (this.recentDonations.some(d => d.id === donation.id)) return;
+        const mapped = this.mapApiDonation(donation);
+        this.recentDonations = [mapped, ...this.recentDonations];
+        this.stats = {
+          ...this.stats,
+          totalDonations: this.stats.totalDonations + mapped.amount,
+          thisMonthDonations: this.stats.thisMonthDonations + mapped.amount,
+        };
+        this.unreadNotifications++;
+        this.showToast(`New donation from ${donation.donor_name}`);
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<any>('volunteer:new').subscribe((application) => {
+        if (this.volunteers.some(v => v.id === application.id)) return;
+        const mapped = this.mapApiVolunteer(application);
+        this.volunteers = [mapped, ...this.volunteers];
+        this.stats = { ...this.stats, pendingVolunteers: this.stats.pendingVolunteers + 1 };
+        this.unreadNotifications++;
+        this.showToast(`New volunteer application from ${application.full_name}`);
       })
     );
   }
@@ -1320,6 +1361,74 @@ export class CentreDashboardComponent implements OnInit, OnDestroy {
       next: (needs) => { this.needs = needs; this.loadingNeeds = false; },
       error: () => { this.loadingNeeds = false; }
     });
+  }
+
+  private mapApiDonation(d: any): Donation {
+    return {
+      id: d.id,
+      donor: d.donor_name,
+      amount: Number(d.amount) || 0,
+      type: d.donation_type === 'money' ? 'money' : 'goods',
+      date: this.formatShortDate(d.created_at),
+      recurring: !!d.recurring,
+      s18aIssued: !!d.s18a_issued,
+      goods: d.goods_list && d.goods_list.length ? d.goods_list : undefined,
+    };
+  }
+
+  private mapApiVolunteer(v: any): Volunteer {
+    const initials = (v.full_name || '')
+      .split(' ').map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+    return {
+      id: v.id,
+      name: v.full_name,
+      skill: v.skills || v.availability || 'General',
+      status: v.status === 'accepted' ? 'active' : v.status === 'declined' ? 'completed' : 'pending',
+      hours: 0,
+      joinDate: this.formatShortDate(v.created_at),
+      avatar: initials || '?',
+    };
+  }
+
+  private formatShortDate(iso: string): string {
+    try { return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }); }
+    catch { return iso; }
+  }
+
+  loadDonations(): void {
+    if (!this.centreId) return;
+    const token = localStorage.getItem('centreToken') || '';
+    this.http.get<any[]>(
+      `${environment.apiUrl}/api/centres/${this.centreId}/donations`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (rows) => {
+        const real = rows.map(r => this.mapApiDonation(r));
+        this.recentDonations = [...real, ...this.recentDonations];
+      },
+      error: () => {}
+    });
+  }
+
+  loadVolunteerApplications(): void {
+    if (!this.centreId) return;
+    const token = localStorage.getItem('centreToken') || '';
+    this.http.get<any[]>(
+      `${environment.apiUrl}/api/centres/${this.centreId}/volunteers`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).subscribe({
+      next: (rows) => {
+        const real = rows.map(r => this.mapApiVolunteer(r));
+        this.volunteers = [...real, ...this.volunteers];
+      },
+      error: () => {}
+    });
+  }
+
+  showToast(msg: string): void {
+    this.toastMsg = msg;
+    this.toastVisible = true;
+    setTimeout(() => this.toastVisible = false, 3500);
   }
 
   addNeed(): void {

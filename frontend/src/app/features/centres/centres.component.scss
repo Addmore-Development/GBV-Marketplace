@@ -29,6 +29,7 @@
 .page-nav-inner {
   max-width: 1440px; margin: 0 auto; padding: 0 28px; height: 62px;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
 }
 
 .nav-left { display: flex; align-items: center; gap: 20px; }
@@ -615,7 +616,9 @@
 }
 
 @media (max-width: 900px) {
-  .page-nav-inner { padding: 0 16px; }
+  .page-nav-inner { padding: 0 16px; height: auto; min-height: 62px; row-gap: 8px; }
+  .nav-left  { order: 1; }
+  .nav-actions { order: 2; width: 100%; justify-content: flex-end; flex-wrap: wrap; }
   .page-header    { padding: 32px 16px; }
   .noticeboard    { padding: 32px 16px; }
   .search-section { padding: 16px; }

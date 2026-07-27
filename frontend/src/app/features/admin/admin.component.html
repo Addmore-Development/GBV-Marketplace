@@ -52,7 +52,7 @@
         <span class="badge-count" *ngIf="unreadCount > 0">{{ unreadCount }}</span>
       </button>
       <button [class.active]="activeTab === 'donations'" (click)="activeTab = 'donations'">
-        <span class="nav-icon"></span> Donations
+        <span class="nav-icon"></span> Donations & Volunteers
       </button>
       <button class="nav-danger" [class.active]="activeTab === 'safety'" (click)="activeTab = 'safety'">
         <span class="nav-icon"></span> Safety Alerts
@@ -523,6 +523,32 @@
             </tr>
             <tr *ngIf="donations.length === 0">
               <td colspan="6" class="td-empty">No donations recorded yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tab-header" style="margin-top: 32px;">
+        <h1>Volunteers</h1>
+        <p class="tab-sub">Volunteer applications submitted across the platform.</p>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Centre</th><th>Skills</th><th>Availability</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let v of volunteers">
+              <td><strong>{{ v.full_name }}</strong></td>
+              <td class="td-email">{{ v.email }}</td>
+              <td>{{ v.centre_name }}</td>
+              <td class="td-msg">{{ v.skills || '—' }}</td>
+              <td>{{ v.availability || '—' }}</td>
+              <td>{{ formatDate(v.created_at) }}</td>
+            </tr>
+            <tr *ngIf="volunteers.length === 0">
+              <td colspan="6" class="td-empty">No volunteer applications yet.</td>
             </tr>
           </tbody>
         </table>

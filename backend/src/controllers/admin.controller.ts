@@ -405,6 +405,18 @@ export const getDonations = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+// ── Volunteer applications ───────────────────────────────────
+export const getVolunteers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await pool.query(
+      'SELECT volunteer_applications.*, centres.centre_name FROM volunteer_applications LEFT JOIN centres ON volunteer_applications.centre_id = centres.id ORDER BY volunteer_applications.created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ── Login / Logout Activity ──────────────────────────────────
 // Every centre & seller login/logout, most recent first, so admin
 // can see who is signing in/out of the platform and when.

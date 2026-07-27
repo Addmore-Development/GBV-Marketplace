@@ -708,15 +708,33 @@ export class CentresComponent implements OnInit, OnDestroy {
   // ── Donate submit ─────────────────────────────────────────
   submitDonate(): void {
     if (this.donateForm.invalid) { this.donateForm.markAllAsTouched(); return; }
-    this.closeModalDirect();
-    this.showToast('Thank you! Your contribution has been recorded.');
+    const payload = this.donateForm.value;
+    this.http.post(`${environment.apiUrl}/api/centres/donate`, payload).subscribe({
+      next: () => {
+        this.closeModalDirect();
+        this.showToast('Thank you! Your contribution has been recorded.');
+      },
+      error: () => {
+        this.closeModalDirect();
+        this.showToast('Something went wrong recording your donation — please try again.');
+      }
+    });
   }
 
   // ── Volunteer submit ──────────────────────────────────────
   submitVolunteer(): void {
     if (this.volunteerForm.invalid) { this.volunteerForm.markAllAsTouched(); return; }
-    this.closeModalDirect();
-    this.showToast('Application sent! The centre will review and contact you.');
+    const payload = this.volunteerForm.value;
+    this.http.post(`${environment.apiUrl}/api/centres/volunteer`, payload).subscribe({
+      next: () => {
+        this.closeModalDirect();
+        this.showToast('Application sent! The centre will review and contact you.');
+      },
+      error: () => {
+        this.closeModalDirect();
+        this.showToast('Something went wrong sending your application — please try again.');
+      }
+    });
   }
 
   // ── Toast ─────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture, getOwnCentreProfile, updateCentreProfile, getCentreSellers, getCentreNeeds, getPublicNeeds, createNeed, updateNeed, deleteNeed } from '../controllers/centre.controller';
+import { registerCentre, getCentreStatus, adminGetPending, adminReviewCentre, loginCentre, logoutCentre, getAllCentres, uploadCentreProfilePicture, getOwnCentreProfile, updateCentreProfile, getCentreSellers, getCentreNeeds, getPublicNeeds, createNeed, updateNeed, deleteNeed, createDonation, createVolunteerApplication, getCentreDonations, getCentreVolunteers } from '../controllers/centre.controller';
 import { verifyAdminToken, verifyCentreToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -104,12 +104,19 @@ router.get('/needs', getPublicNeeds);
 router.patch('/needs/:needId', verifyCentreToken, updateNeed);
 router.delete('/needs/:needId', verifyCentreToken, deleteNeed);
 
+// Donate / Volunteer — public "Support a Centre" forms on the Centres page.
+// Pushed live to the donating/volunteered-at centre's dashboard and to admin.
+router.post('/donate', createDonation);
+router.post('/volunteer', createVolunteerApplication);
+
 // Centre self-service routes (requires the centre to be logged in)
 router.get('/:id/profile', verifyCentreToken, getOwnCentreProfile);
 router.patch('/:id/profile', verifyCentreToken, updateCentreProfile);
 router.get('/:id/sellers', verifyCentreToken, getCentreSellers);
 router.get('/:id/needs', verifyCentreToken, getCentreNeeds);
 router.post('/:id/needs', verifyCentreToken, createNeed);
+router.get('/:id/donations', verifyCentreToken, getCentreDonations);
+router.get('/:id/volunteers', verifyCentreToken, getCentreVolunteers);
 router.post(
   '/:id/profile-picture',
   verifyCentreToken,

@@ -82,6 +82,19 @@ interface DonationRow {
   created_at: string;
 }
 
+interface VolunteerRow {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  skills?: string;
+  availability?: string;
+  centre_name: string;
+  message?: string;
+  status: string;
+  created_at: string;
+}
+
 interface EmergencyAlert {
   id: string;
   seller_id: string;
@@ -179,6 +192,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   buyers: BuyerRow[] = [];
   messages: MessageRow[] = [];
   donations: DonationRow[] = [];
+  volunteers: VolunteerRow[] = [];
 
   // ── Emergency / SOS alerts ──────────────────────────────────
   emergencyAlerts: EmergencyAlert[] = [];
@@ -295,6 +309,27 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       })
     );
+
+    this.realtimeSubs.push(
+      this.realtime.on<DonationRow>('donation:new').subscribe((donation) => {
+        this.donations = [donation, ...this.donations.filter(d => d.id !== donation.id)];
+        this.stats = {
+          ...this.stats,
+          totalDonations: this.stats.totalDonations + 1,
+          totalDonationAmount: this.stats.totalDonationAmount + (Number(donation.amount) || 0),
+        };
+        this.showToast(`New donation from ${donation.donor_name} to ${donation.centre_name}`);
+        this.cdr.detectChanges();
+      })
+    );
+
+    this.realtimeSubs.push(
+      this.realtime.on<VolunteerRow>('volunteer:new').subscribe((application) => {
+        this.volunteers = [application, ...this.volunteers.filter(v => v.id !== application.id)];
+        this.showToast(`New volunteer application from ${application.full_name} for ${application.centre_name}`);
+        this.cdr.detectChanges();
+      })
+    );
   }
 
   private teardownRealtime(): void {
@@ -329,6 +364,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadBuyers();
     this.loadMessages();
     this.loadDonations();
+    this.loadVolunteers();
     this.loadEmergencyAlerts();
     this.loadEmergencyStats();
     this.loadActivity();
@@ -419,6 +455,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   loadDonations(): void {
     this.http.get<DonationRow[]>(`${this.API}/donations`, this.adminHeaders).subscribe({
       next: (d) => { this.donations = d; this.cdr.detectChanges(); },
+      error: () => {}
+    });
+  }
+
+  loadVolunteers(): void {
+    this.http.get<VolunteerRow[]>(`${this.API}/volunteers`, this.adminHeaders).subscribe({
+      next: (v) => { this.volunteers = v; this.cdr.detectChanges(); },
       error: () => {}
     });
   }

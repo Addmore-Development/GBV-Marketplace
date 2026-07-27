@@ -716,3 +716,113 @@ export const deleteNeed = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to delete need' });
   }
 };
+
+// ============================================================
+// DONATIONS & VOLUNTEERS — public "Support a Centre" forms
+// ============================================================
+
+// Public Centres page — donate form. Persists the donation and pushes it
+// live to the donating centre's own dashboard and to the admin panel, the
+// same way a new need/seller/emergency shows up without a refresh.
+export const createDonation = async (req: Request, res: Response) => {
+  try {
+    const { centre_id, donor_name, donor_email, amount, goods_desc, message } = req.body;
+    if (!centre_id || !donor_name || !donor_email) {
+      return res.status(400).json({ error: 'centre_id, donor_name and donor_email are required' });
+    }
+
+    const centreRes = await pool.query(`SELECT centre_name FROM centres WHERE id = $1`, [centre_id]);
+    if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
+
+    const parsedAmount = amount !== undefined && amount !== null && amount !== '' ? Number(amount) : null;
+    const donationType = parsedAmount && parsedAmount > 0 ? 'money' : 'goods';
+    const goodsList = goods_desc ? String(goods_desc).split(',').map((g: string) => g.trim()).filter(Boolean) : [];
+
+    const result = await pool.query(
+      `INSERT INTO donations (centre_id, donor_name, donor_email, amount, donation_type, goods_list, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, centre_id, donor_name, donor_email, amount, donation_type, goods_list, recurring, s18a_issued, notes, created_at`,
+      [centre_id, donor_name, donor_email, parsedAmount, donationType, goodsList, message || null]
+    );
+
+    const donation = result.rows[0];
+    const payload = { ...donation, centre_name: centreRes.rows[0].centre_name };
+
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centre_id}`).emit('donation:new', payload);
+      io.to('admin').emit('donation:new', payload);
+    }
+
+    res.status(201).json(donation);
+  } catch (err) {
+    console.error('createDonation error:', err);
+    res.status(500).json({ error: 'Failed to record donation' });
+  }
+};
+
+// Public Centres page — volunteer form. Same persist + live-push pattern.
+export const createVolunteerApplication = async (req: Request, res: Response) => {
+  try {
+    const { centre_id, full_name, email, phone, skills, availability, message } = req.body;
+    if (!centre_id || !full_name || !email) {
+      return res.status(400).json({ error: 'centre_id, full_name and email are required' });
+    }
+
+    const centreRes = await pool.query(`SELECT centre_name FROM centres WHERE id = $1`, [centre_id]);
+    if (centreRes.rows.length === 0) return res.status(404).json({ error: 'Centre not found' });
+
+    const result = await pool.query(
+      `INSERT INTO volunteer_applications (centre_id, full_name, email, phone, skills, availability, message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, centre_id, full_name, email, phone, skills, availability, message, status, created_at`,
+      [centre_id, full_name, email, phone || null, skills || null, availability || null, message || null]
+    );
+
+    const application = result.rows[0];
+    const payload = { ...application, centre_name: centreRes.rows[0].centre_name };
+
+    const io = getIO();
+    if (io) {
+      io.to(`centre:${centre_id}`).emit('volunteer:new', payload);
+      io.to('admin').emit('volunteer:new', payload);
+    }
+
+    res.status(201).json(application);
+  } catch (err) {
+    console.error('createVolunteerApplication error:', err);
+    res.status(500).json({ error: 'Failed to record volunteer application' });
+  }
+};
+
+// Centre dashboard — this centre's own donations, newest first.
+export const getCentreDonations = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const result = await pool.query(
+      `SELECT id, centre_id, donor_name, donor_email, amount, donation_type, goods_list, recurring, s18a_issued, notes, created_at
+       FROM donations WHERE centre_id = $1 ORDER BY created_at DESC`,
+      [centreId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreDonations error:', err);
+    res.status(500).json({ error: 'Failed to load donations' });
+  }
+};
+
+// Centre dashboard — this centre's own volunteer applications, newest first.
+export const getCentreVolunteers = async (req: Request, res: Response) => {
+  try {
+    const centreId = req.params.id;
+    const result = await pool.query(
+      `SELECT id, centre_id, full_name, email, phone, skills, availability, message, status, created_at
+       FROM volunteer_applications WHERE centre_id = $1 ORDER BY created_at DESC`,
+      [centreId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('getCentreVolunteers error:', err);
+    res.status(500).json({ error: 'Failed to load volunteer applications' });
+  }
+};

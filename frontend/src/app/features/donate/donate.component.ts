@@ -1,10 +1,12 @@
 // ============================================================
 // frontend/src/app/features/donate/donate.component.ts
 // ============================================================
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 interface Centre {
   id: string;
@@ -91,7 +93,12 @@ interface Centre {
         <span class="sm-sort">Sorted by urgency</span>
       </div>
 
-      <div class="centres-grid">
+      <div class="no-centres" *ngIf="centresLoading">
+        <div class="nc-icon">⏳</div>
+        <h3>Loading centres…</h3>
+      </div>
+
+      <div class="centres-grid" *ngIf="!centresLoading">
         <div class="centre-card" *ngFor="let c of filteredCentres">
           <div class="cc-image">
             <img [src]="c.img" [alt]="c.name" loading="lazy" />
@@ -143,7 +150,7 @@ interface Centre {
       </div>
 
       <!-- Empty -->
-      <div class="no-centres" *ngIf="filteredCentres.length === 0">
+      <div class="no-centres" *ngIf="!centresLoading && filteredCentres.length === 0">
         <div class="nc-icon">🔍</div>
         <h3>No centres match your filters</h3>
         <button (click)="activeType = 'all'; activeProvince = ''; showUrgent = false">Clear filters</button>
@@ -237,6 +244,15 @@ interface Centre {
       <p class="dm-sub">📍 {{ selectedCentre.city }} · ✓ Verified NPO</p>
     </div>
 
+    <div class="cf-group">
+      <label>Your name</label>
+      <input type="text" [(ngModel)]="donorName" placeholder="Full name" />
+    </div>
+    <div class="cf-group">
+      <label>Your email</label>
+      <input type="email" [(ngModel)]="donorEmail" placeholder="you@example.com" />
+    </div>
+
     <div class="amount-grid">
       <button class="amount-btn" *ngFor="let a of presetAmounts"
         [class.selected]="donateAmount === a"
@@ -273,8 +289,10 @@ interface Centre {
       <span *ngIf="donateType === 'monthly'"> per month</span>
     </div>
 
-    <button class="btn-confirm-donate" [disabled]="effectiveAmount <= 0" (click)="confirmDonate()">
-      Proceed to payment →
+    <div class="donate-error" *ngIf="donateError">{{ donateError }}</div>
+
+    <button class="btn-confirm-donate" [disabled]="effectiveAmount <= 0 || donateSubmitting" (click)="confirmDonate()">
+      {{ donateSubmitting ? 'Submitting…' : 'Proceed to payment →' }}
     </button>
 
     <div class="modal-success-state" *ngIf="donated">
@@ -303,6 +321,14 @@ interface Centre {
       </label>
     </div>
     <div class="cf-group">
+      <label>Your name</label>
+      <input type="text" [(ngModel)]="donorName" placeholder="Full name" />
+    </div>
+    <div class="cf-group">
+      <label>Your email</label>
+      <input type="email" [(ngModel)]="donorEmail" placeholder="you@example.com" />
+    </div>
+    <div class="cf-group">
       <label>Your contact number</label>
       <input type="tel" [(ngModel)]="goodsPhone" placeholder="0821234567" />
     </div>
@@ -310,7 +336,10 @@ interface Centre {
       <label>Preferred drop-off / collection date</label>
       <input type="date" [(ngModel)]="goodsDate" />
     </div>
-    <button class="btn-confirm-donate" (click)="confirmGoods()">Submit goods donation →</button>
+    <div class="donate-error" *ngIf="goodsError">{{ goodsError }}</div>
+    <button class="btn-confirm-donate" [disabled]="goodsSubmitting" (click)="confirmGoods()">
+      {{ goodsSubmitting ? 'Submitting…' : 'Submit goods donation →' }}
+    </button>
     <div class="modal-success-state" *ngIf="goodsDonated">
       <div class="ms-icon">✓</div>
       <h3>Thank you!</h3>
@@ -557,6 +586,7 @@ interface Centre {
     .gi-icon { font-size: 1.1rem; }
     .gi-label { font-size: .86rem; font-weight: 500; color: var(--text-dark); }
     .cf-group { margin-bottom: 13px; label { display: block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text-dark); margin-bottom: 5px; } input { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: .86rem; outline: none; box-sizing: border-box; &:focus { border-color: var(--forest); } } }
+    .donate-error { background: #FEF2F2; border: 1px solid #FCA5A5; color: #B91C1C; font-size: .82rem; padding: 9px 12px; border-radius: 8px; margin-bottom: 12px; }
 
     /* ── Responsive ── */
     @media (max-width: 900px) {
@@ -580,7 +610,9 @@ interface Centre {
     }
   `]
 })
-export class DonateComponent {
+export class DonateComponent implements OnInit {
+  constructor(private http: HttpClient) {}
+
   activeType = 'all';
   activeProvince = '';
   showUrgent = false;
@@ -591,10 +623,18 @@ export class DonateComponent {
   customAmount = '';
   donateType: 'once' | 'monthly' = 'once';
   donated = false;
+  donateSubmitting = false;
+  donateError = '';
+  donorName = '';
+  donorEmail = '';
   goodsDonated = false;
+  goodsSubmitting = false;
+  goodsError = '';
   goodsPhone = '';
   goodsDate = '';
   Math = Math;
+
+  centresLoading = true;
 
   readonly presetAmounts = [50, 100, 200, 500, 1000, 2000];
   readonly provinces = ['Gauteng','Western Cape','KwaZulu-Natal','Eastern Cape','Limpopo','Mpumalanga','North West','Free State','Northern Cape'];
@@ -610,50 +650,48 @@ export class DonateComponent {
     { label: 'Medication (sealed)', icon: '💊', selected: false },
   ];
 
-  readonly centres: Centre[] = [
-    {
-      id: 'c001', name: 'Thistle House', type: 'gbv', city: 'Cape Town', province: 'Western Cape',
-      img: 'https://images.unsplash.com/photo-1593113598332-cd288d649433?w=600&q=80',
-      tagline: 'Emergency shelter and counselling for GBV survivors. 24/7 crisis line.',
-      raised: 142000, goal: 200000, donors: 384, accepts_goods: true, npo_number: 'NPO-045678',
-      section18a: true, needs: ['Counselling', 'Shelter', 'Legal aid'], urgency: 'critical'
-    },
-    {
-      id: 'c002', name: 'Khayelitsha Hub', type: 'gbv', city: 'Khayelitsha', province: 'Western Cape',
-      img: 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=600&q=80',
-      tagline: 'Skills training, safe housing and income support for survivors of abuse.',
-      raised: 89000, goal: 150000, donors: 201, accepts_goods: true, npo_number: 'NPO-067234',
-      section18a: true, needs: ['Skills training', 'Transport', 'Food parcels'], urgency: 'critical'
-    },
-    {
-      id: 'c003', name: 'Empilweni Children\'s Village', type: 'orphanage', city: 'Soweto', province: 'Gauteng',
-      img: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600&q=80',
-      tagline: 'Home to 84 children aged 2–17. Providing education, nutrition and love.',
-      raised: 218000, goal: 300000, donors: 612, accepts_goods: true, npo_number: 'NPO-012345',
-      section18a: true, needs: ['School fees', 'Food', 'Clothing'], urgency: 'moderate'
-    },
-    {
-      id: 'c004', name: 'Khanya Elderly Home', type: 'elderly', city: 'Durban', province: 'KwaZulu-Natal',
-      img: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=600&q=80',
-      tagline: 'Dignity and care for 60 elderly residents, many of whom have no family support.',
-      raised: 67000, goal: 120000, donors: 148, accepts_goods: true, npo_number: 'NPO-089012',
-      section18a: false, needs: ['Medication', 'Bedding', 'Wheelchairs'], urgency: 'critical'
-    },
-    {
-      id: 'c005', name: 'Ubuntu Women\'s Centre', type: 'gbv', city: 'Johannesburg', province: 'Gauteng',
-      img: 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=600&q=80',
-      tagline: 'Legal advocacy, psychosocial support, and skills development for GBV survivors.',
-      raised: 175000, goal: 200000, donors: 493, accepts_goods: false, npo_number: 'NPO-034567',
-      section18a: true, needs: ['Legal fees', 'Counselling', 'Computers'], urgency: 'stable'
-    },
-    {
-      id: 'c006', name: 'New Beginnings NPO', type: 'orphanage', city: 'Port Elizabeth', province: 'Eastern Cape',
-      img: 'https://images.unsplash.com/photo-1504439468489-c8920d796a29?w=600&q=80',
-      tagline: 'Foster care support and reunification services for 120 children in the Eastern Cape.',
-      raised: 44000, goal: 100000, donors: 87, accepts_goods: true, npo_number: 'NPO-023456',
-      section18a: false, needs: ['Foster care', 'Transport', 'Food'], urgency: 'moderate'
-    },
-  ];
+  // Loaded live from the backend in ngOnInit — this used to be a hardcoded
+  // list of fake centres with made-up ids (c001, c002...). Donating to one
+  // of those posted a centre_id that didn't exist in the real `centres`
+  // table, so the backend silently rejected it (404 "Centre not found")
+  // and nothing ever reached the admin or centre dashboards.
+  centres: Centre[] = [];
+
+  ngOnInit(): void {
+    this.http.get<any[]>(`${environment.apiUrl}/api/centres/all`).subscribe({
+      next: (data) => {
+        const typeMap: Record<string, Centre['type']> = {
+          gbv_centre: 'gbv',
+          orphanage: 'orphanage',
+          old_age_home: 'elderly',
+        };
+        this.centres = (data || []).map((c: any) => ({
+          id: c.id,
+          name: c.name || '',
+          type: typeMap[c.type] || 'gbv',
+          city: c.city || '',
+          province: c.province || '',
+          img: c.profile_picture
+            ? `${environment.apiUrl}${c.profile_picture}`
+            : 'https://images.unsplash.com/photo-1593113598332-cd288d649433?w=600&q=80',
+          tagline: c.description || c.mission || '',
+          // Fundraising totals, donor counts, tax-cert status, and live
+          // "needs" aren't tracked against a centre by this endpoint yet,
+          // so these are honest defaults rather than invented numbers.
+          raised: 0,
+          goal: 100000,
+          donors: 0,
+          accepts_goods: true,
+          npo_number: '',
+          section18a: false,
+          needs: [],
+          urgency: 'moderate',
+        }));
+        this.centresLoading = false;
+      },
+      error: () => { this.centres = []; this.centresLoading = false; },
+    });
+  }
 
   get effectiveAmount(): number {
     return this.donateAmount > 0 ? this.donateAmount : Number(this.customAmount) || 0;
@@ -682,12 +720,18 @@ export class DonateComponent {
     this.customAmount = '';
     this.donateType = 'once';
     this.donated = false;
+    this.donateError = '';
+    this.donorName = '';
+    this.donorEmail = '';
     this.donateModal = true;
   }
 
   openGoodsModal(c: Centre): void {
     this.selectedCentre = c;
     this.goodsDonated = false;
+    this.goodsError = '';
+    this.donorName = '';
+    this.donorEmail = '';
     this.goodsPhone = '';
     this.goodsDate = '';
     this.goodsOptions.forEach(g => g.selected = false);
@@ -695,11 +739,57 @@ export class DonateComponent {
   }
 
   confirmDonate(): void {
-    if (this.effectiveAmount <= 0) return;
-    this.donated = true;
+    if (this.effectiveAmount <= 0 || !this.selectedCentre) return;
+    if (!this.donorName.trim() || !this.donorEmail.trim()) {
+      this.donateError = 'Please enter your name and email so the centre can reach you.';
+      return;
+    }
+    this.donateError = '';
+    this.donateSubmitting = true;
+    const payload = {
+      centre_id: this.selectedCentre.id,
+      donor_name: this.donorName.trim(),
+      donor_email: this.donorEmail.trim(),
+      amount: this.effectiveAmount,
+      message: this.donateType === 'monthly' ? 'Monthly donation' : '',
+    };
+    this.http.post(`${environment.apiUrl}/api/centres/donate`, payload).subscribe({
+      next: () => {
+        this.donateSubmitting = false;
+        this.donated = true;
+      },
+      error: () => {
+        this.donateSubmitting = false;
+        this.donateError = 'Something went wrong recording your donation — please try again.';
+      },
+    });
   }
 
   confirmGoods(): void {
-    this.goodsDonated = true;
+    if (!this.selectedCentre) return;
+    if (!this.donorName.trim() || !this.donorEmail.trim() || !this.goodsPhone.trim()) {
+      this.goodsError = 'Please enter your name, email, and contact number.';
+      return;
+    }
+    this.goodsError = '';
+    this.goodsSubmitting = true;
+    const items = this.goodsOptions.filter(g => g.selected).map(g => g.label).join(', ');
+    const payload = {
+      centre_id: this.selectedCentre.id,
+      donor_name: this.donorName.trim(),
+      donor_email: this.donorEmail.trim(),
+      goods_desc: items,
+      message: `Contact: ${this.goodsPhone.trim()}${this.goodsDate ? `, preferred date: ${this.goodsDate}` : ''}`,
+    };
+    this.http.post(`${environment.apiUrl}/api/centres/donate`, payload).subscribe({
+      next: () => {
+        this.goodsSubmitting = false;
+        this.goodsDonated = true;
+      },
+      error: () => {
+        this.goodsSubmitting = false;
+        this.goodsError = 'Something went wrong recording your donation — please try again.';
+      },
+    });
   }
 }

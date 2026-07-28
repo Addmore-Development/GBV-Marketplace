@@ -858,7 +858,16 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   addToCart(): void {
     if (!this.product || this.isAddingToCart) return;
     this.isAddingToCart = true;
-    this.cartService.addToCart(this.product.id, this.quantity).subscribe({
+    this.cartService.addToCart(this.product.id, this.quantity, {
+      title: this.product.title,
+      price: this.product.price,
+      thumbnail: this.product.thumbnail,
+      seller_alias: this.product.seller_alias,
+      centre_name: this.product.centre_name,
+      survivor_income: this.product.survivor_income,
+      centre_funding: this.product.centre_funding,
+      platform_fee: this.product.platform_fee,
+    }).subscribe({
       next: () => {
         this.isAddingToCart = false;
         this.addedToCart = true;

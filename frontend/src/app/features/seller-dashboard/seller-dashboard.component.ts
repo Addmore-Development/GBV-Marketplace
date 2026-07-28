@@ -1,10 +1,12 @@
-import { Component, OnInit, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SellerAuthService } from '../../services/seller-auth.service';
+import { RealtimeService } from '../../services/realtime.service';
 
 type DashTab = 'home' | 'listings' | 'earnings' | 'learn' | 'profile' | 'contacts' | 'sanctuary' | 'centre' | 'volunteer';
 
@@ -115,7 +117,7 @@ interface CentreInfo {
     styleUrls: ['./seller-dashboard.component.scss'],
     encapsulation: ViewEncapsulation.None,
 })
-export class SellerDashboardComponent implements OnInit {
+export class SellerDashboardComponent implements OnInit, OnDestroy {
     private readonly API = `${environment.apiUrl}/api/sellers`;
 
     seller: SellerProfile | null = null;

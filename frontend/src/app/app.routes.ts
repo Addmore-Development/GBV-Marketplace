@@ -1,4 +1,3 @@
-
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 
@@ -27,6 +26,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/cart/cart.component').then(
         (m) => m.CartComponent
+      ),
+  },
+  {
+    path: 'orders',
+    loadComponent: () =>
+      import('./features/orders/orders.component').then(
+        (m) => m.OrdersComponent
       ),
   },
   {

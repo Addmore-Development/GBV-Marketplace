@@ -271,17 +271,26 @@ export const placeOrder = async (req: Request, res: Response) => {
       delivery_address, delivery_suburb, delivery_city,
       delivery_province, delivery_postal,
       payment_method, notes,
+      items: bodyItems,
     } = req.body;
 
-    // Get cart
-    const cartResult = await client.query(
-      `SELECT items FROM carts WHERE session_id = $1`, [sessionId]
-    );
-    if (!cartResult.rows.length || !cartResult.rows[0].items?.length) {
-      return res.status(400).json({ error: 'Cart is empty' });
+    // The cart can arrive two ways: from the server-side session cart
+    // (legacy flow), or directly from the client's cart in the request
+    // body (product_id + quantity only — price is always looked up fresh
+    // from the products table below, never trusted from the client).
+    let items: any[] = [];
+    if (Array.isArray(bodyItems) && bodyItems.length) {
+      items = bodyItems.map((i: any) => ({ product_id: i.product_id, quantity: i.quantity }));
+    } else {
+      const cartResult = await client.query(
+        `SELECT items FROM carts WHERE session_id = $1`, [sessionId]
+      );
+      items = cartResult.rows.length ? (cartResult.rows[0].items || []) : [];
     }
 
-    const items = cartResult.rows[0].items;
+    if (!items.length) {
+      return res.status(400).json({ error: 'Cart is empty' });
+    }
 
     // Find nearest hub centre (simplified: use seller's centre of first item)
     const hubCentreId = items[0] ? await client.query(
@@ -404,8 +413,10 @@ export const placeOrder = async (req: Request, res: Response) => {
       ]
     );
 
-    // Clear cart
-    await client.query(`DELETE FROM carts WHERE session_id = $1`, [sessionId]);
+    // Clear server-side cart, if one was used
+    if (sessionId) {
+      await client.query(`DELETE FROM carts WHERE session_id = $1`, [sessionId]);
+    }
 
     await client.query('COMMIT');
 
@@ -451,6 +462,98 @@ export const getImpactReceipt = async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── BUYER: ORDER HISTORY (all orders, incl. cancelled) ─────
+export const getOrders = async (req: Request, res: Response) => {
+  try {
+    const buyerEmail = req.query.buyer_email as string;
+    if (!buyerEmail) return res.status(400).json({ error: 'buyer_email is required' });
+
+    const result = await pool.query(
+      `SELECT o.id, o.status, o.payment_status, o.fulfilment_status,
+              o.subtotal, o.delivery_fee, o.total, o.payment_method,
+              o.delivery_address, o.delivery_suburb, o.delivery_city,
+              o.delivery_province, o.delivery_postal, o.notes,
+              o.created_at, ir.shareable_code,
+              COALESCE(json_agg(json_build_object(
+                'product_id', oi.product_id,
+                'title', oi.product_title,
+                'thumbnail', oi.product_thumbnail,
+                'quantity', oi.quantity,
+                'unit_price', oi.unit_price,
+                'total_price', oi.total_price,
+                'seller_alias', oi.seller_alias,
+                'centre_name', oi.centre_name
+              )) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
+       FROM orders o
+       LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN impact_receipts ir ON ir.order_id = o.id
+       WHERE o.buyer_email = $1
+       GROUP BY o.id, ir.shareable_code
+       ORDER BY o.created_at DESC`,
+      [buyerEmail]
+    );
+
+    return res.json({ orders: result.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ─── BUYER: CANCEL ORDER ─────────────────────────────────────
+export const cancelOrder = async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { orderId } = req.params;
+    const { buyer_email } = req.body;
+
+    await client.query('BEGIN');
+
+    const order = await client.query(
+      `SELECT id, status, buyer_email FROM orders WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    );
+    if (!order.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    if (buyer_email && order.rows[0].buyer_email !== buyer_email) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Not authorized to cancel this order' });
+    }
+    if (['cancelled', 'completed', 'delivered'].includes(order.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Order is already ${order.rows[0].status} and can't be cancelled` });
+    }
+
+    // Restock items
+    const items = await client.query(
+      `SELECT product_id, quantity FROM order_items WHERE order_id = $1`, [orderId]
+    );
+    for (const item of items.rows) {
+      if (!item.product_id) continue;
+      await client.query(
+        `UPDATE products SET stock = stock + $1, total_sold = GREATEST(total_sold - $1, 0) WHERE id = $2`,
+        [item.quantity, item.product_id]
+      );
+    }
+
+    await client.query(
+      `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+      [orderId]
+    );
+
+    await client.query('COMMIT');
+    return res.json({ success: true, order_id: orderId, status: 'cancelled' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    return res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

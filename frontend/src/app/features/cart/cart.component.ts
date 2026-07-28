@@ -28,6 +28,7 @@ import { AuthService, User } from '../../services/auth.service';
         <button class="nav-sign-in" (click)="showAuthModal('login')">Sign In</button>
         <button class="nav-register" (click)="showAuthModal('register')">Register</button>
       </ng-container>
+      <a routerLink="/orders" class="nav-orders-link" *ngIf="currentUser">My Orders</a>
       <div class="user-chip" *ngIf="currentUser">
         <div class="user-avatar">{{ currentUser.initials }}</div>
         <span class="user-name">{{ currentUser.name.split(' ')[0] }}</span>
@@ -56,7 +57,6 @@ import { AuthService, User } from '../../services/auth.service';
 
   <!-- ── EMPTY CART ── -->
   <div class="empty-cart" *ngIf="cart.items.length === 0 && !orderPlaced">
-    <div class="empty-icon">🛒</div>
     <h2>Your cart is empty</h2>
     <p>Discover handmade products by survivors, youth, and the elderly across South Africa.</p>
     <a routerLink="/marketplace" class="btn-shop">Browse the Marketplace</a>
@@ -77,7 +77,7 @@ import { AuthService, User } from '../../services/auth.service';
     </div>
 
     <div class="impact-summary-final">
-      <h3>🧾 Where your money went</h3>
+      <h3>Where your money went</h3>
       <div class="isf-row">
         <div class="isf-left">
           <span class="isf-dot survivor"></span>
@@ -105,7 +105,10 @@ import { AuthService, User } from '../../services/auth.service';
       </div>
     </div>
 
-    <a routerLink="/marketplace" class="btn-shop">Keep Shopping</a>
+    <div class="success-actions">
+      <a routerLink="/marketplace" class="btn-shop">Keep Shopping</a>
+      <a routerLink="/orders" class="btn-shop-outline">View My Orders</a>
+    </div>
   </div>
 
   <!-- ── CART LAYOUT ── -->
@@ -136,12 +139,12 @@ import { AuthService, User } from '../../services/auth.service';
           </div>
 
           <div class="item-details">
-            <div class="item-centre">🏠 {{ item.centre_name }}</div>
+            <div class="item-centre">{{ item.centre_name }}</div>
             <h3 class="item-title">{{ item.title }}</h3>
             <div class="item-seller">by {{ item.seller_alias }}</div>
             <div class="item-impact-chips">
-              <span class="chip survivor">💛 {{ formatPrice(item.survivor_income) }} to maker</span>
-              <span class="chip centre">🏠 {{ formatPrice(item.centre_funding) }} to centre</span>
+              <span class="chip survivor">{{ formatPrice(item.survivor_income) }} to maker</span>
+              <span class="chip centre">{{ formatPrice(item.centre_funding) }} to centre</span>
             </div>
           </div>
 
@@ -154,7 +157,7 @@ import { AuthService, User } from '../../services/auth.service';
             </div>
             <div class="item-price">{{ formatPrice(item.price * item.quantity) }}</div>
             <button class="remove-btn" (click)="removeItem(item.product_id)">
-              🗑 Remove
+              Remove
             </button>
           </div>
 
@@ -163,7 +166,6 @@ import { AuthService, User } from '../../services/auth.service';
 
       <!-- Delivery note -->
       <div class="delivery-note">
-        <span class="dn-icon">📦</span>
         <div>
           <strong>Centre Hub Delivery</strong>
           <p>Your order ships from a verified Centre Hub. Your delivery address is never shared with the seller — only the courier sees it.</p>
@@ -188,7 +190,7 @@ import { AuthService, User } from '../../services/auth.service';
 
       <!-- Delivery Details (below You Might Also Like) -->
       <div class="checkout-form-box" style="margin-top:24px;">
-        <h3 class="cfb-title">📍 Delivery Details</h3>
+        <h3 class="cfb-title">Delivery Details</h3>
         <form [formGroup]="checkoutForm" (ngSubmit)="placeOrder()">
 
           <div class="cf-group">
@@ -251,7 +253,6 @@ import { AuthService, User } from '../../services/auth.service';
               <label class="payment-opt" *ngFor="let pm of paymentMethods"
                 [class.selected]="checkoutForm.get('payment_method')?.value === pm.value">
                 <input type="radio" formControlName="payment_method" [value]="pm.value" />
-                <span class="pm-icon">{{ pm.icon }}</span>
                 <span class="pm-label">{{ pm.label }}</span>
               </label>
             </div>
@@ -262,25 +263,25 @@ import { AuthService, User } from '../../services/auth.service';
             <textarea formControlName="notes" rows="2" placeholder="Special delivery instructions…"></textarea>
           </div>
 
-          <div class="error-msg" *ngIf="orderError">⚠️ {{ orderError }}</div>
+          <div class="error-msg" *ngIf="orderError">{{ orderError }}</div>
 
           <p class="signin-hint" *ngIf="!currentUser">
-            🔒 You'll be asked to sign in to complete your purchase — your delivery details are saved.
+            You'll be asked to sign in to complete your purchase — your delivery details are saved.
           </p>
 
           <button type="submit" class="place-order-btn"
             [disabled]="checkoutForm.invalid || isPlacingOrder">
             <span *ngIf="isPlacingOrder" class="loading-dots">Placing Order<span>.</span><span>.</span><span>.</span></span>
             <ng-container *ngIf="!isPlacingOrder">
-              <span *ngIf="currentUser">🌿 Place Order — {{ formatPrice(getTotal()) }}</span>
-              <span *ngIf="!currentUser">🔒 Sign In &amp; Place Order — {{ formatPrice(getTotal()) }}</span>
+              <span *ngIf="currentUser">Place Order — {{ formatPrice(getTotal()) }}</span>
+              <span *ngIf="!currentUser">Sign In &amp; Place Order — {{ formatPrice(getTotal()) }}</span>
             </ng-container>
           </button>
 
           <div class="trust-badges">
-            <span>🔒 SSL Secured</span>
-            <span>📦 Tracked Delivery</span>
-            <span>✅ POPIA Compliant</span>
+            <span>SSL Secured</span>
+            <span>Tracked Delivery</span>
+            <span>POPIA Compliant</span>
           </div>
 
         </form>
@@ -293,7 +294,6 @@ import { AuthService, User } from '../../services/auth.service';
 
       <!-- Sign-in prompt if not logged in -->
       <div class="signin-prompt" *ngIf="!currentUser">
-        <div class="sip-icon">🔒</div>
         <p>Sign in or register to complete your purchase</p>
         <div class="sip-btns">
           <button class="sip-btn-primary" (click)="showAuthModal('login')">Sign In</button>
@@ -311,7 +311,7 @@ import { AuthService, User } from '../../services/auth.service';
       <!-- Impact summary -->
       <div class="impact-summary-box">
         <div class="isb-header">
-          <span>🧾 Your Impact</span>
+          <span>Your Impact</span>
           <span class="isb-sub">Every rand tracked</span>
         </div>
         <div class="is-row">
@@ -405,22 +405,22 @@ import { AuthService, User } from '../../services/auth.service';
       </div>
       <div class="role-grid">
         <div class="role-card" [class.selected]="registerRole === 'buyer'"  (click)="registerRole = 'buyer'">
-          <div class="rc-icon">🛒</div><div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
+          <div class="rc-label">Buyer</div><div class="rc-desc">Shop &amp; donate</div>
         </div>
         <div class="role-card" [class.selected]="registerRole === 'seller'" (click)="registerRole = 'seller'">
-          <div class="rc-icon">🎨</div><div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
+          <div class="rc-label">Seller</div><div class="rc-desc">Sell creations</div>
         </div>
         <div class="role-card" [class.selected]="registerRole === 'centre'" (click)="registerRole = 'centre'">
-          <div class="rc-icon">🏠</div><div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
+          <div class="rc-label">Centre</div><div class="rc-desc">Register centre</div>
         </div>
       </div>
       <div class="mf-group"><label>Full Name</label><input [(ngModel)]="registerName" placeholder="Your full name" /></div>
       <div class="mf-group"><label>Email</label><input [(ngModel)]="registerEmail" type="email" placeholder="you@example.com" /></div>
       <div class="mf-group"><label>Password</label><input [(ngModel)]="registerPassword" type="password" placeholder="Min. 8 characters" /></div>
       <div class="mf-note" [class.vetting]="registerRole !== 'buyer'">
-        <span *ngIf="registerRole === 'buyer'">ℹ️ Buyer accounts activate immediately.</span>
-        <span *ngIf="registerRole === 'seller'">⚠️ Seller accounts require NRSO vetting.</span>
-        <span *ngIf="registerRole === 'centre'">⚠️ Centre registration requires site visit &amp; NPO documentation.</span>
+        <span *ngIf="registerRole === 'buyer'">Buyer accounts activate immediately.</span>
+        <span *ngIf="registerRole === 'seller'">Seller accounts require NRSO vetting.</span>
+        <span *ngIf="registerRole === 'centre'">Centre registration requires site visit &amp; NPO documentation.</span>
       </div>
       <div class="modal-error" *ngIf="authError">{{ authError }}</div>
       <button class="modal-cta" (click)="doRegister()">Create Account →</button>
@@ -450,6 +450,7 @@ import { AuthService, User } from '../../services/auth.service';
       --green:       #2D6A4F;
       --red:         #8B2635;
       --gold:        #B8860B;
+      --gold-dark:   #8C6508;
       --gold-light:  #F5E9C8;
       --forest:      #3D2B1F;
       --forest-deep: #1A1210;
@@ -497,6 +498,15 @@ import { AuthService, User } from '../../services/auth.service';
       font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--forest-deep);
     }
     .brand-name { font-family: 'Playfair Display', serif; color: white; font-size: 1rem; font-weight: 700; }
+    .nav-orders-link {
+      color: rgba(255,255,255,.85);
+      text-decoration: none;
+      font-size: .84rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: color .2s;
+    }
+    .nav-orders-link:hover { color: white; }
 
     .nav-right { display: flex; align-items: center; gap: 8px; }
     .nav-sign-in {
@@ -561,6 +571,13 @@ import { AuthService, User } from '../../services/auth.service';
       display: inline-block; background: var(--forest); color: white; text-decoration: none;
       padding: 13px 32px; border-radius: 9px; font-weight: 700; font-size: .95rem; transition: all .2s;
       &:hover { background: var(--sage); transform: translateY(-1px); }
+    }
+    .success-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-shop-outline {
+      display: inline-block; background: transparent; color: var(--forest);
+      text-decoration: none; border: 1.5px solid var(--forest);
+      padding: 13px 32px; border-radius: 9px; font-weight: 700; font-size: .95rem; transition: all .2s;
+      &:hover { background: var(--forest); color: white; transform: translateY(-1px); }
     }
 
     /* ORDER SUCCESS */
@@ -991,9 +1008,9 @@ export class CartComponent implements OnInit, OnDestroy {
   readonly provinces = ['Gauteng','Western Cape','KwaZulu-Natal','Eastern Cape','Limpopo','Mpumalanga','North West','Free State','Northern Cape'];
 
   readonly paymentMethods = [
-    { value: 'snapscan', icon: '📱', label: 'SnapScan' },
-    { value: 'eft',      icon: '🏦', label: 'EFT / Bank Transfer' },
-    { value: 'card',     icon: '💳', label: 'Credit / Debit Card' },
+    { value: 'snapscan', label: 'SnapScan' },
+    { value: 'eft',      label: 'EFT / Bank Transfer' },
+    { value: 'card',     label: 'Credit / Debit Card' },
   ];
 
   readonly recommended = [

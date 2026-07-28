@@ -7,6 +7,7 @@ import path from 'path';
 import {
   getProducts, getProduct, getCategories,
   getCart, updateCart, placeOrder, getImpactReceipt,
+  getOrders, cancelOrder,
   addProduct, approveProduct, registerBuyer,
 } from '../controllers/marketplace.controller';
 import { verifyAdminToken } from '../middleware/auth.middleware';
@@ -34,7 +35,9 @@ router.post('/cart',              updateCart);
 
 // ── Checkout ────────────────────────────────────────────────
 router.post('/orders',            placeOrder);
+router.get('/orders',             getOrders);
 router.get('/orders/:orderId/receipt', getImpactReceipt);
+router.patch('/orders/:orderId/cancel', cancelOrder);
 
 // ── Centre: add product ─────────────────────────────────────
 router.post('/products', upload.fields([{ name: 'images', maxCount: 5 }]), addProduct);

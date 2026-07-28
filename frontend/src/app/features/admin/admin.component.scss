@@ -430,6 +430,7 @@
   .td-amount { font-weight: 700; color: var(--green); }
   .td-msg { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
   .td-empty { text-align: center; color: var(--text-muted); padding: 32px; font-style: italic; }
+  .td-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; display: block; }
 
   .td-actions {
     display: flex;

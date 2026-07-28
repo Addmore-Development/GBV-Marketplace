@@ -28,6 +28,7 @@ import {
   getEmergencyStats,
   getLoginActivity,
   getSales,
+  getAllListings,
   normalizeSellerCredentials,
 } from '../controllers/admin.controller';
 
@@ -88,6 +89,9 @@ router.get('/activity', requireAdmin, getLoginActivity);
 
 // ── Sales ─────────────────────────────────────────────────
 router.get('/sales', requireAdmin, getSales);
+
+// ── Listings (every product, every seller) ────────────────
+router.get('/listings', requireAdmin, getAllListings);
 
 // ── Test-data helper: reset every seller to firstname@gmail.com / Happy@123 ──
 router.post('/sellers/normalize-test-credentials', requireAdmin, normalizeSellerCredentials);

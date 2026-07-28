@@ -310,7 +310,7 @@ export const placeOrder = async (req: Request, res: Response) => {
     for (const item of items) {
       const prod = await client.query(
         `SELECT p.id, p.name AS title, p.price, p.survivor_pct, p.centre_pct, p.platform_pct,
-                COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias,
+                COALESCE(p.stock, 0) AS stock_quantity, p.seller_alias, p.seller_id,
                 COALESCE(p.image_url, '') AS thumbnail,
                 c.centre_name, p.centre_id
          FROM products p
@@ -335,6 +335,7 @@ export const placeOrder = async (req: Request, res: Response) => {
       orderItems.push({
         product_id: p.id,
         centre_id: p.centre_id,
+        seller_id: p.seller_id,
         quantity: item.quantity,
         unit_price: p.price,
         total_price: lineTotal,
@@ -419,6 +420,31 @@ export const placeOrder = async (req: Request, res: Response) => {
     }
 
     await client.query('COMMIT');
+
+    // ── Notify sellers that their product sold ──────────────────
+    // One notification per line item (a seller with two different
+    // products in the same order gets two notifications, one per
+    // product). Runs after COMMIT so a notification failure never
+    // rolls back the order itself.
+    try {
+      const io = getIO();
+      for (const oi of orderItems) {
+        if (!oi.seller_id) continue; // e.g. legacy product with no seller_id set
+        const title = 'Your product sold! 🎉';
+        const message = `${oi.product_title} (x${oi.quantity}) was just purchased for R${oi.total_price.toFixed(2)}.`;
+        const notif = await pool.query(
+          `INSERT INTO notifications (user_id, user_type, title, message)
+           VALUES ($1, 'seller', $2, $3)
+           RETURNING id, title, message, is_read, created_at`,
+          [oi.seller_id, title, message]
+        );
+        if (io) {
+          io.to(`seller:${oi.seller_id}`).emit('notification:new', notif.rows[0]);
+        }
+      }
+    } catch (notifyErr) {
+      console.error('Failed to notify seller(s) of purchase:', notifyErr);
+    }
 
     return res.status(201).json({
       order_id: orderId,

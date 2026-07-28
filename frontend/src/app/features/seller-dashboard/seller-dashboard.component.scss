@@ -2235,6 +2235,15 @@
   }
   textarea { resize: vertical; }
 }
+.pm-image-preview {
+  margin-top: 10px;
+  width: 120px;
+  height: 120px;
+  border-radius: var(--r-sm);
+  background-size: cover;
+  background-position: center;
+  border: 1.5px solid var(--border);
+}
 
 // Suppliers panel
 .suppliers-overlay {

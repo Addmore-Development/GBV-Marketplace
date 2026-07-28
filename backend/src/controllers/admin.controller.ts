@@ -441,6 +441,28 @@ export const getLoginActivity = async (req: Request, res: Response): Promise<voi
 // ── Sales / Orders ────────────────────────────────────────────
 // Every sale made on the marketplace, with per-order line items
 // so admin can see exactly what sold, to whom, and the impact split.
+// ── Every listing created by every seller ─────────────────
+export const getAllListings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const listings = await pool.query(
+      `SELECT p.id, p.name, p.description, p.price, p.category, p.status,
+              p.stock, p.total_sold, p.image_url, p.story,
+              p.created_at, p.updated_at,
+              p.seller_id, s.alias AS seller_alias, s.real_name AS seller_real_name,
+              s.verification_status AS seller_status,
+              c.id AS centre_id, c.centre_name, c.city AS centre_city
+       FROM products p
+       JOIN sellers s ON s.id = p.seller_id
+       LEFT JOIN centres c ON c.id = s.centre_id
+       ORDER BY p.created_at DESC`
+    );
+    res.json(listings.rows);
+  } catch (err: any) {
+    console.error('[Admin] listings error:', err);
+    res.status(500).json({ error: 'Failed to load listings' });
+  }
+};
+
 export const getSales = async (req: Request, res: Response): Promise<void> => {
   try {
     const orders = await pool.query(

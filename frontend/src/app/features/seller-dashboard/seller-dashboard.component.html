@@ -1,5 +1,3 @@
-
-
 <!-- LOADING STATE -->
 <div class="sd-loading" *ngIf="isLoading">
   <div class="sd-spinner"></div>
@@ -902,8 +900,9 @@
       </div>
     </div>
     <div class="pm-group full">
-      <label>Image URL (optional)</label>
-      <input type="url" [(ngModel)]="currentProduct.image_url" placeholder="https://…">
+      <label>Photo of your piece</label>
+      <input type="file" accept="image/*" (change)="onProductImageSelected($event)">
+      <div class="pm-image-preview" *ngIf="productImagePreview" [style.background-image]="'url(' + productImagePreview + ')'"></div>
     </div>
     <div class="error" *ngIf="productSaveError">{{ productSaveError }}</div>
     <div class="mc-btns">

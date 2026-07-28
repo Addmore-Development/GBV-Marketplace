@@ -7,7 +7,7 @@ import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { RealtimeService } from '../../services/realtime.service';
 
-type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety' | 'activity' | 'sales';
+type AdminTab = 'overview' | 'sellers' | 'centres' | 'buyers' | 'messages' | 'donations' | 'safety' | 'activity' | 'sales' | 'listings';
 
 interface AdminStats {
   totalSellers: number;
@@ -158,6 +158,28 @@ interface SaleRow {
   items: OrderItemRow[];
 }
 
+interface ListingRow {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  category: string | null;
+  status: string;
+  stock: number;
+  total_sold: number;
+  image_url: string | null;
+  story: string | null;
+  created_at: string;
+  updated_at: string;
+  seller_id: string;
+  seller_alias: string;
+  seller_real_name: string;
+  seller_status: string;
+  centre_id: string | null;
+  centre_name: string | null;
+  centre_city: string | null;
+}
+
 @Component({
   selector: 'app-admin',
   standalone: true,
@@ -218,6 +240,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   sales: SaleRow[] = [];
   expandedSaleId: string | null = null;
   loadingSales = false;
+
+  // ── Listings (every product, every seller) ────────────────
+  listings: ListingRow[] = [];
+  loadingListings = false;
+  listingStatusFilter = 'all';
+  listingSearchQuery = '';
 
   // ── Filters ───────────────────────────────────────────────
   sellerFilter = 'all';
@@ -369,6 +397,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadEmergencyStats();
     this.loadActivity();
     this.loadSales();
+    this.loadListings();
     // Poll for new SOS alerts — a survivor triggering the panic button
     // needs the admin view to update without a manual refresh.
     if (!this.emergencyPollHandle) {
@@ -484,6 +513,30 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   toggleSale(id: string): void {
     this.expandedSaleId = this.expandedSaleId === id ? null : id;
+  }
+
+  loadListings(): void {
+    this.loadingListings = this.listings.length === 0;
+    this.http.get<ListingRow[]>(`${this.API}/listings`, this.adminHeaders).subscribe({
+      next: (d) => { this.listings = d; this.loadingListings = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingListings = false; }
+    });
+  }
+
+  get filteredListings(): ListingRow[] {
+    let list = this.listings;
+    if (this.listingStatusFilter !== 'all') {
+      list = list.filter(l => l.status === this.listingStatusFilter);
+    }
+    const q = this.listingSearchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter(l =>
+        l.name?.toLowerCase().includes(q) ||
+        l.seller_alias?.toLowerCase().includes(q) ||
+        l.centre_name?.toLowerCase().includes(q)
+      );
+    }
+    return list;
   }
 
   get filteredActivity(): ActivityRow[] {
@@ -842,8 +895,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   formatDate(d: string): string { return d ? new Date(d).toLocaleDateString('en-ZA') : '—'; }
 
   statusClass(s: string): string {
-    if (s === 'approved') return 'badge-green';
-    if (s === 'rejected') return 'badge-red';
+    if (s === 'approved' || s === 'active') return 'badge-green';
+    if (s === 'rejected' || s === 'archived') return 'badge-red';
     return 'badge-amber';
   }
 }

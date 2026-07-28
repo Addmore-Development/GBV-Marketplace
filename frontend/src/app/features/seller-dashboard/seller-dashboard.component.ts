@@ -133,6 +133,8 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
     isEditing = false;
     productSaveError = '';
     currentProduct: Partial<Product> = {};
+    selectedProductImage: File | null = null;
+    productImagePreview: string | null = null;
     readonly productCategories = [
         'Beaded jewellery','Woven baskets','Clothing & textiles',
         'Food preserves','Art & crafts','Wire art','Candles & soaps',
@@ -223,8 +225,11 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
         private http: HttpClient,
         private router: Router,
         private cdr: ChangeDetectorRef,
-        private sellerAuth: SellerAuthService
+        private sellerAuth: SellerAuthService,
+        private realtime: RealtimeService
     ) {}
+
+    private notifSub: Subscription | null = null;
 
     ngOnInit(): void {
         const id = localStorage.getItem('sellerId');
@@ -298,6 +303,7 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
                 this.loadCentreInfo();
                 this.loadVolunteerOpportunities();
                 this.loadMyApplications();
+                this.subscribeToLiveNotifications();
             },
             error: (err) => {
                 console.error('[Dashboard] Error loading profile:', err);
@@ -504,13 +510,43 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
         }
         this.isEditing = false;
         this.currentProduct = { status: 'active', stock: 1 };
+        this.selectedProductImage = null;
+        this.productImagePreview = null;
         this.showProductModal = true;
     }
 
     editProduct(p: Product): void {
         this.isEditing = true;
         this.currentProduct = { ...p };
+        this.selectedProductImage = null;
+        this.productImagePreview = p.image_url || null;
         this.showProductModal = true;
+    }
+
+    onProductImageSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        this.selectedProductImage = file;
+        const reader = new FileReader();
+        reader.onload = () => {
+            this.productImagePreview = reader.result as string;
+            this.cdr.detectChanges();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    private buildProductFormData(): FormData {
+        const fd = new FormData();
+        const fields: (keyof Product)[] = ['name', 'description', 'price', 'category', 'status', 'stock', 'story'];
+        fields.forEach((key) => {
+            const val = (this.currentProduct as any)[key];
+            if (val !== undefined && val !== null) fd.append(key, String(val));
+        });
+        if (this.selectedProductImage) {
+            fd.append('image', this.selectedProductImage, this.selectedProductImage.name);
+        }
+        return fd;
     }
 
     saveProduct(): void {
@@ -519,36 +555,31 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
             return;
         }
         this.productSaveError = '';
+        const onError = (err: any) => {
+            console.error('[Dashboard] Error saving product:', err);
+            this.productSaveError = err.error?.error || 'Could not save';
+            if (err.error?.code === 'PROFILE_INCOMPLETE') {
+                alert('Your profile is not complete. Please complete it first.');
+                this.activeTab = 'profile';
+            } else if (err.error?.code === 'NOT_APPROVED') {
+                alert('Your account is still pending admin approval.');
+            }
+        };
+        const onSuccess = () => {
+            this.showProductModal = false;
+            this.selectedProductImage = null;
+            this.productImagePreview = null;
+            this.loadProducts();
+        };
+
         if (this.isEditing && this.currentProduct.id) {
-            this.http.put<any>(`${this.API}/products/${this.currentProduct.id}`, this.currentProduct)
-                .subscribe({ 
-                    next: () => { this.showProductModal = false; this.loadProducts(); }, 
-                    error: (err) => {
-                        console.error('[Dashboard] Error updating product:', err);
-                        this.productSaveError = err.error?.error || 'Could not save';
-                        if (err.error?.code === 'PROFILE_INCOMPLETE') {
-                            alert('Your profile is not complete. Please complete it first.');
-                            this.activeTab = 'profile';
-                        } else if (err.error?.code === 'NOT_APPROVED') {
-                            alert('Your account is still pending admin approval.');
-                        }
-                    }
-                });
+            this.http.put<any>(`${this.API}/products/${this.currentProduct.id}`, this.buildProductFormData())
+                .subscribe({ next: onSuccess, error: onError });
         } else {
-            this.http.post<any>(`${this.API}/products`, { ...this.currentProduct, seller_id: this.seller?.id })
-                .subscribe({ 
-                    next: () => { this.showProductModal = false; this.loadProducts(); }, 
-                    error: (err) => {
-                        console.error('[Dashboard] Error creating product:', err);
-                        this.productSaveError = err.error?.error || 'Could not save';
-                        if (err.error?.code === 'PROFILE_INCOMPLETE') {
-                            alert('Your profile is not complete. Please complete it first.');
-                            this.activeTab = 'profile';
-                        } else if (err.error?.code === 'NOT_APPROVED') {
-                            alert('Your account is still pending admin approval.');
-                        }
-                    }
-                });
+            const fd = this.buildProductFormData();
+            fd.append('seller_id', this.seller?.id || '');
+            this.http.post<any>(`${this.API}/products`, fd)
+                .subscribe({ next: onSuccess, error: onError });
         }
     }
 
@@ -1089,6 +1120,30 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
         });
     }
 
+    // Joins this seller's private room and listens for events pushed by the
+    // server the moment one of their products is purchased, so the badge
+    // and bell update live instead of only on next page load. Also asks
+    // for browser notification permission so a sale can surface as an
+    // actual phone/desktop notification even if the tab isn't focused.
+    subscribeToLiveNotifications(): void {
+        if (!this.seller?.id) return;
+
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission().catch(() => {});
+        }
+
+        this.realtime.join(`seller:${this.seller.id}`);
+        this.notifSub = this.realtime.on<any>('notification:new').subscribe((notif) => {
+            this.notifications = [notif, ...this.notifications];
+            this.unreadCount = this.notifications.filter(n => !n.is_read).length;
+            this.cdr.detectChanges();
+
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                new Notification(notif.title || 'Amani', { body: notif.message });
+            }
+        });
+    }
+
     markNotificationRead(notifId: string): void {
         this.http.post(`${this.API}/notifications/mark-read`, { notification_id: notifId }).subscribe({
             next: () => this.loadNotifications()
@@ -1098,5 +1153,10 @@ export class SellerDashboardComponent implements OnInit, OnDestroy {
     toggleNotifications(): void {
         this.showNotifications = !this.showNotifications;
         // Optional: mark all as read when panel is closed? Not needed now.
+    }
+
+    ngOnDestroy(): void {
+        this.notifSub?.unsubscribe();
+        if (this.seller?.id) this.realtime.leave(`seller:${this.seller.id}`);
     }
 }

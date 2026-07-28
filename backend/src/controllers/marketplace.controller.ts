@@ -383,6 +383,30 @@ export const placeOrder = async (req: Request, res: Response) => {
     );
     const orderId = orderResult.rows[0].id;
 
+    // Remember these delivery details on the buyer's own record so they're
+    // pre-filled automatically next time they check out, instead of having
+    // to be re-typed on every order.
+    if (buyer_email) {
+      await client.query(
+        `INSERT INTO buyers (name, email, phone, delivery_address, delivery_suburb, delivery_city, delivery_province, delivery_postal, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+         ON CONFLICT (email) DO UPDATE SET
+           name = EXCLUDED.name,
+           phone = COALESCE(EXCLUDED.phone, buyers.phone),
+           delivery_address = EXCLUDED.delivery_address,
+           delivery_suburb = EXCLUDED.delivery_suburb,
+           delivery_city = EXCLUDED.delivery_city,
+           delivery_province = EXCLUDED.delivery_province,
+           delivery_postal = EXCLUDED.delivery_postal,
+           updated_at = NOW()`,
+        [
+          buyer_name, buyer_email, buyer_phone || null,
+          delivery_address, delivery_suburb, delivery_city,
+          delivery_province, delivery_postal,
+        ]
+      );
+    }
+
     // Insert order items
     for (const oi of orderItems) {
       await client.query(
@@ -658,6 +682,30 @@ export const approveProduct = async (req: Request, res: Response) => {
 // localStorage — the admin dashboard had no way of knowing a new buyer
 // existed until (if ever) they placed an order. This persists the
 // registration and pushes it to the admin dashboard live.
+// ─── BUYER: GET SAVED PROFILE (for checkout prefill) ─────────
+// Looks up a buyer by email and returns whatever delivery details
+// were saved from a previous order, so the checkout form can be
+// pre-filled instead of asking the buyer to re-type everything.
+export const getBuyerProfile = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.params;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const result = await pool.query(
+      `SELECT name, email, phone, delivery_address, delivery_suburb,
+              delivery_city, delivery_province, delivery_postal
+       FROM buyers WHERE email = $1`,
+      [email]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'No saved profile for this email yet' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('getBuyerProfile error:', err);
+    return res.status(500).json({ error: 'Failed to load buyer profile' });
+  }
+};
+
 export const registerBuyer = async (req: Request, res: Response) => {
   try {
     const { name, email, phone } = req.body;

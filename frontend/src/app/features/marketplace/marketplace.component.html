@@ -221,9 +221,7 @@
       <div class="fl-col">
         <h4>Marketplace</h4>
         <a routerLink="/marketplace">All Products</a>
-        <a (click)="activeCategory='jewellery'">Jewellery</a>
-        <a (click)="activeCategory='food'">Food &amp; Jams</a>
-        <a (click)="activeCategory='crafts'">Art &amp; Crafts</a>
+        <a *ngFor="let c of categories.slice(1, 4)" (click)="activeCategory = c.key; scrollToProducts()">{{ c.label }}</a>
       </div>
       <div class="fl-col">
         <h4>Get Involved</h4>
@@ -255,7 +253,7 @@
     <div class="product-modal-grid">
       <div class="pm-image">
         <img [src]="selectedProduct.img" [alt]="selectedProduct.title" />
-        <div class="pm-category-badge">{{ selectedProduct.category }}</div>
+        <div class="pm-category-badge">{{ categoryLabels[selectedProduct.category] || selectedProduct.category }}</div>
       </div>
       <div class="pm-info">
         <div class="pm-centre">{{ selectedProduct.centre_name }}</div>

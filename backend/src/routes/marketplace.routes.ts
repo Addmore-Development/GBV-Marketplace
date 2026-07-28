@@ -8,7 +8,7 @@ import {
   getProducts, getProduct, getCategories,
   getCart, updateCart, placeOrder, getImpactReceipt,
   getOrders, cancelOrder,
-  addProduct, approveProduct, registerBuyer,
+  addProduct, approveProduct, registerBuyer, getBuyerProfile,
 } from '../controllers/marketplace.controller';
 import { verifyAdminToken } from '../middleware/auth.middleware';
 
@@ -28,6 +28,7 @@ router.get('/products',           getProducts);
 router.get('/products/:id',       getProduct);
 router.get('/categories',         getCategories);
 router.post('/buyers/register',   registerBuyer);
+router.get('/buyers/:email',      getBuyerProfile);
 
 // ── Cart ────────────────────────────────────────────────────
 router.get('/cart',               getCart);

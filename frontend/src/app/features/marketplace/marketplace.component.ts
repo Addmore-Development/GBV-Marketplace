@@ -83,21 +83,40 @@ export class MarketplaceComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  readonly categories = [
-    { key: 'all',       label: 'All Products' },
-    { key: 'jewellery', label: 'Jewellery & Accessories' },
-    { key: 'textiles',  label: 'Clothing & Textiles' },
-    { key: 'food',      label: 'Food & Jams' },
-    { key: 'crafts',    label: 'Art & Crafts' },
-  ];
+  readonly categoryLabels: Record<string, string> = {
+    jewellery:           'Jewellery & Accessories',
+    clothing_textiles:   'Clothing & Textiles',
+    food_preserves:      'Food & Preserves',
+    art_crafts:          'Art & Crafts',
+    home_decor:          'Home Decor',
+    skincare_wellness:   'Skincare & Wellness',
+    stationery:          'Stationery',
+    toys_gifts:          'Toys & Gifts',
+  };
 
-  readonly featuredCats = [
-    { key: 'jewellery', label: 'Jewellery & Accessories', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80' },
-    { key: 'textiles',  label: 'Clothing & Textiles',     img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80' },
-    { key: 'food',      label: 'Food & Jams',             img: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=400&q=80' },
-    { key: 'crafts',    label: 'Art & Crafts',            img: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80' },
-    { key: 'all',       label: 'Shop All' },
-  ];
+  private toLabel(key: string): string {
+    return this.categoryLabels[key] || key.split('_').map(w => w[0]?.toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  // Categories are derived live from whatever products are actually posted —
+  // a category only shows up here if at least one product uses it, so the
+  // filter always matches what's really in the marketplace.
+  get categories(): { key: string; label: string }[] {
+    const present = new Set(this.allProducts.map(p => p.category));
+    return [
+      { key: 'all', label: 'All Products' },
+      ...Array.from(present).sort().map(key => ({ key, label: this.toLabel(key) })),
+    ];
+  }
+
+  get featuredCats(): { key: string; label: string; img: string }[] {
+    const present = new Set(this.allProducts.map(p => p.category));
+    const tiles = Array.from(present).sort().map(key => {
+      const sample = this.allProducts.find(p => p.category === key);
+      return { key, label: this.toLabel(key), img: sample?.img || 'https://placehold.co/200x200?text=' + encodeURIComponent(this.toLabel(key)) };
+    });
+    return [...tiles, { key: 'all', label: 'Shop All', img: '' }];
+  }
 
   readonly staticProducts: Product[] = [
     {

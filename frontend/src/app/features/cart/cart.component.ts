@@ -5,9 +5,11 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { CartService, Cart } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-cart',
@@ -135,7 +137,8 @@ import { AuthService, User } from '../../services/auth.service';
           </div>
 
           <div class="item-image">
-            <img [src]="item.thumbnail || 'assets/placeholder.jpg'" [alt]="item.title" />
+            <img [src]="item.thumbnail || 'assets/placeholder.jpg'" [alt]="item.title"
+              (error)="$any($event.target).src='assets/placeholder.jpg'" />
           </div>
 
           <div class="item-details">
@@ -179,7 +182,7 @@ import { AuthService, User } from '../../services/auth.service';
       <div class="reco-strip">
         <div class="reco-card" *ngFor="let r of recommended">
           <div class="reco-img">
-            <img [src]="r.img" [alt]="r.title" />
+            <img [src]="r.img" [alt]="r.title" (error)="$any($event.target).src='assets/placeholder.jpg'" />
           </div>
           <div class="reco-body">
             <div class="reco-title">{{ r.title }}</div>
@@ -1013,12 +1016,8 @@ export class CartComponent implements OnInit, OnDestroy {
     { value: 'card',     label: 'Credit / Debit Card' },
   ];
 
-  readonly recommended = [
-    { title: 'Beaded Map Necklace', price: 'R120', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=300&q=80' },
-    { title: 'Woven Sisal Basket',  price: 'R280', img: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=300&q=80' },
-    { title: 'Rooibos Body Scrub',  price: 'R89',  img: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300&q=80' },
-    { title: 'Pottery Earth Bowl',  price: 'R320', img: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&q=80' },
-  ];
+  // Populated live from real posted products in ngOnInit — see loadRecommended().
+  recommended: { id: string; title: string; price: string; img: string }[] = [];
 
   private destroy$ = new Subject<void>();
 
@@ -1027,6 +1026,7 @@ export class CartComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private fb: FormBuilder,
     private router: Router,
+    private http: HttpClient,
   ) {}
 
   ngOnInit(): void {
@@ -1059,7 +1059,31 @@ export class CartComponent implements OnInit, OnDestroy {
     // Pre-fill if already logged in
     if (this.currentUser) {
       this.checkoutForm.patchValue({ buyer_name: this.currentUser.name, buyer_email: this.currentUser.email });
+      this.prefillSavedDeliveryDetails(this.currentUser.email);
     }
+
+    this.loadRecommended();
+  }
+
+  // Pulls real posted products for "You Might Also Like" instead of a
+  // static demo list, so it always reflects what's actually for sale.
+  loadRecommended(): void {
+    this.http.get<any>(`${environment.apiUrl}/api/marketplace/products`)
+      .subscribe({
+        next: (res) => {
+          const inCart = new Set(this.cart.items.map(i => i.product_id));
+          const all = (res.products ?? []).filter((p: any) => !inCart.has(p.id));
+          // Simple shuffle so "recommended" doesn't always show the same 4.
+          const shuffled = all.sort(() => Math.random() - 0.5);
+          this.recommended = shuffled.slice(0, 4).map((p: any) => ({
+            id: p.id,
+            title: p.title,
+            price: this.formatPrice(p.price),
+            img: p.img || 'assets/placeholder.jpg',
+          }));
+        },
+        error: () => { this.recommended = []; }
+      });
   }
 
   ngOnDestroy(): void { this.destroy$.next(); this.destroy$.complete(); }
@@ -1141,13 +1165,39 @@ export class CartComponent implements OnInit, OnDestroy {
     if (ok) {
       this.authModal = '';
       this.checkoutForm.patchValue({ buyer_name: this.currentUser!.name, buyer_email: this.currentUser!.email });
-      // Signed in — if they already had a valid delivery form waiting,
-      // finish the purchase right away instead of requiring another click.
-      if (this.pendingCheckout && this.currentUser) {
-        this.pendingCheckout = false;
-        this.placeOrder();
-      }
+      this.prefillSavedDeliveryDetails(this.currentUser!.email, () => {
+        // Signed in — if they already had a valid delivery form waiting,
+        // finish the purchase right away instead of requiring another click.
+        if (this.pendingCheckout && this.currentUser) {
+          this.pendingCheckout = false;
+          this.placeOrder();
+        }
+      });
     }
+  }
+
+  // Looks up any delivery details saved from a previous order for this
+  // email and fills them straight into the form, so a returning buyer
+  // never has to re-type their address. Silently does nothing if this
+  // is their first time (no saved profile yet, that's expected).
+  private prefillSavedDeliveryDetails(email: string, after?: () => void): void {
+    this.http.get<any>(`${environment.apiUrl}/api/marketplace/buyers/${encodeURIComponent(email)}`)
+      .subscribe({
+        next: (profile) => {
+          this.checkoutForm.patchValue({
+            buyer_name:        profile.name || this.currentUser?.name,
+            buyer_email:        profile.email,
+            buyer_phone:        profile.phone || '',
+            delivery_address:   profile.delivery_address || '',
+            delivery_suburb:    profile.delivery_suburb || '',
+            delivery_city:      profile.delivery_city || '',
+            delivery_province:  profile.delivery_province || '',
+            delivery_postal:    profile.delivery_postal || '',
+          });
+          if (after) after();
+        },
+        error: () => { if (after) after(); } // no saved profile yet — that's fine
+      });
   }
 
   doRegister(): void {
@@ -1158,10 +1208,12 @@ export class CartComponent implements OnInit, OnDestroy {
     if (ok && this.registerRole === 'buyer') {
       this.authModal = '';
       this.checkoutForm.patchValue({ buyer_name: this.currentUser!.name, buyer_email: this.currentUser!.email });
-      if (this.pendingCheckout && this.currentUser) {
-        this.pendingCheckout = false;
-        this.placeOrder();
-      }
+      this.prefillSavedDeliveryDetails(this.currentUser!.email, () => {
+        if (this.pendingCheckout && this.currentUser) {
+          this.pendingCheckout = false;
+          this.placeOrder();
+        }
+      });
     }
   }
 

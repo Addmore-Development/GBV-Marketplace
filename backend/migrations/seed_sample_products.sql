@@ -9,12 +9,13 @@
 --   thumbnail      -> image_url
 --
 --   * products.centre_id is a real FK -> centres(id)
---   * products.seller_alias is TEXT (not a FK) matched against
---     sellers.alias — sellers stay anonymous on-platform, so there
---     is no seller_id column on products.
---   * Each centre_id below is looked up live from the seller's own
---     row in `sellers`, not typed out by hand, so a product can
---     never end up linked to the wrong centre.
+--   * products.seller_id is ALSO a real, NOT NULL FK -> sellers(id)
+--     (used by the seller-facing addProduct in seller.controller.ts).
+--     products.seller_alias is a separate TEXT column kept in sync
+--     for anonymous display.
+--   * Both centre_id and seller_id below are looked up live from
+--     the seller's own row in `sellers`, not typed out by hand, so
+--     a product can never end up linked to the wrong seller/centre.
 --   * Only APPROVED sellers are seeded (hudson, lopez, jessica,
 --     thando). jayden (pending) and joy (rejected) are skipped.
 --   * Written as plain INSERT ... VALUES per row (not a derived
@@ -24,9 +25,10 @@
 -- ============================================================
 
 -- 1) hudson — Sunrise Children's Haven
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'hudson'),
+  (SELECT id FROM sellers WHERE alias = 'hudson'),
   'hudson', 'youth',
   'Rainbow Beaded Friendship Bracelets',
   'Set of 3 handmade beaded bracelets in bright rainbow colours, adjustable knot closure.',
@@ -37,9 +39,10 @@ VALUES (
 );
 
 -- 2) hudson — Sunrise Children's Haven
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'hudson'),
+  (SELECT id FROM sellers WHERE alias = 'hudson'),
   'hudson', 'youth',
   'Hand-Painted Ceramic Plant Pot',
   'Small terracotta plant pot, hand-painted with a floral pattern. Drainage hole included.',
@@ -50,9 +53,10 @@ VALUES (
 );
 
 -- 3) lopez — Ubuntu Bay Recovery Centre
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'lopez'),
+  (SELECT id FROM sellers WHERE alias = 'lopez'),
   'lopez', 'survivor',
   'Woven Raffia Market Tote',
   'Sturdy hand-woven raffia tote bag with leather-look handles. Great for groceries or the beach.',
@@ -63,9 +67,10 @@ VALUES (
 );
 
 -- 4) lopez — Ubuntu Bay Recovery Centre
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'lopez'),
+  (SELECT id FROM sellers WHERE alias = 'lopez'),
   'lopez', 'survivor',
   'Lavender & Oat Soap Bar Set (3-pack)',
   'Three handmade cold-process soap bars with lavender oil and ground oats for gentle exfoliation.',
@@ -76,9 +81,10 @@ VALUES (
 );
 
 -- 5) jessica — New Dawn Support Network
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'jessica'),
+  (SELECT id FROM sellers WHERE alias = 'jessica'),
   'jessica', 'survivor',
   'Hand-Stitched Journal Cover',
   'Fabric-bound journal cover with hand embroidery, fits standard A5 notebooks (notebook included).',
@@ -89,9 +95,10 @@ VALUES (
 );
 
 -- 6) jessica — New Dawn Support Network
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'jessica'),
+  (SELECT id FROM sellers WHERE alias = 'jessica'),
   'jessica', 'survivor',
   'Recycled Fabric Scrunchie 3-Pack',
   'Set of 3 scrunchies made from upcycled offcut fabric, mixed prints.',
@@ -102,9 +109,10 @@ VALUES (
 );
 
 -- 7) thando — Khanya Golden Years
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'thando'),
+  (SELECT id FROM sellers WHERE alias = 'thando'),
   'thando', 'elderly_resident',
   'Rooibos & Apricot Preserve Jar',
   '350g jar of homemade rooibos-infused apricot preserve. No artificial preservatives.',
@@ -115,9 +123,10 @@ VALUES (
 );
 
 -- 8) thando — Khanya Golden Years
-INSERT INTO products (centre_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
+INSERT INTO products (centre_id, seller_id, seller_alias, seller_type, name, description, category, tags, story, price, stock, status, image_url)
 VALUES (
   (SELECT centre_id FROM sellers WHERE alias = 'thando'),
+  (SELECT id FROM sellers WHERE alias = 'thando'),
   'thando', 'elderly_resident',
   'Hand-Crocheted Baby Blanket',
   'Soft acrylic baby blanket, hand-crocheted in a shell stitch pattern. Machine washable.',

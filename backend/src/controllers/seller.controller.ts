@@ -7,6 +7,7 @@ import { pool } from '../index';
 import { logActivity, getClientIp } from '../utils/activityLog';
 import { getIO } from '../socket';
 import { toAbsoluteMediaUrl } from '../utils/media';
+import { uploadLocalFileToSupabase } from '../utils/supabaseStorage';
 
 import multer from 'multer';
 import path from 'path';
@@ -425,11 +426,17 @@ export const getSellerProducts = async (req: Request, res: Response) => {
 };
 
 export const createProduct = async (req: Request, res: Response) => {
-    // Handle file upload if present
+    // Handle file upload if present — pushed to Supabase Storage since
+    // Railway's local disk (where multer just saved it) gets wiped on
+    // every redeploy.
     let imageUrl = null;
     if ((req as any).file) {
         const file = (req as any).file;
-        imageUrl = `/uploads/products/${file.filename}`;
+        imageUrl = await uploadLocalFileToSupabase(
+            file.path,
+            `products/${file.filename}`,
+            file.mimetype
+        );
     } else if (req.body.image_url) {
         imageUrl = req.body.image_url;
     }
@@ -480,7 +487,11 @@ export const updateProduct = async (req: Request, res: Response) => {
     let imageUrl = req.body.image_url || null;
     if ((req as any).file) {
         const file = (req as any).file;
-        imageUrl = `/uploads/products/${file.filename}`;
+        imageUrl = await uploadLocalFileToSupabase(
+            file.path,
+            `products/${file.filename}`,
+            file.mimetype
+        );
     }
     const { name, description, price, category, status, stock, story } = req.body;
 

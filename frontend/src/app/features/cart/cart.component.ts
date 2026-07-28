@@ -9,6 +9,8 @@ import { HttpClient } from '@angular/common/http';
 import { Subject, takeUntil } from 'rxjs';
 import { CartService, Cart } from '../../services/cart.service';
 import { AuthService, User } from '../../services/auth.service';
+import { SellerAuthService, SellerUser } from '../../services/seller-auth.service';
+import { CentreAuthService, CentreUser } from '../../services/centre-auth.service';
 import { environment } from '../../../environments/environment';
 
 @Component({
@@ -26,7 +28,7 @@ import { environment } from '../../../environments/environment';
       <span class="brand-name">Amani</span>
     </div>
     <div class="nav-right">
-      <ng-container *ngIf="!currentUser">
+      <ng-container *ngIf="!isSignedIn">
         <button class="nav-sign-in" (click)="showAuthModal('login')">Sign In</button>
         <button class="nav-register" (click)="showAuthModal('register')">Register</button>
       </ng-container>
@@ -268,7 +270,7 @@ import { environment } from '../../../environments/environment';
 
           <div class="error-msg" *ngIf="orderError">{{ orderError }}</div>
 
-          <p class="signin-hint" *ngIf="!currentUser">
+          <p class="signin-hint" *ngIf="!isSignedIn">
             You'll be asked to sign in to complete your purchase — your delivery details are saved.
           </p>
 
@@ -276,8 +278,8 @@ import { environment } from '../../../environments/environment';
             [disabled]="checkoutForm.invalid || isPlacingOrder">
             <span *ngIf="isPlacingOrder" class="loading-dots">Placing Order<span>.</span><span>.</span><span>.</span></span>
             <ng-container *ngIf="!isPlacingOrder">
-              <span *ngIf="currentUser">Place Order — {{ formatPrice(getTotal()) }}</span>
-              <span *ngIf="!currentUser">Sign In &amp; Place Order — {{ formatPrice(getTotal()) }}</span>
+              <span *ngIf="isSignedIn">Place Order — {{ formatPrice(getTotal()) }}</span>
+              <span *ngIf="!isSignedIn">Sign In &amp; Place Order — {{ formatPrice(getTotal()) }}</span>
             </ng-container>
           </button>
 
@@ -296,7 +298,7 @@ import { environment } from '../../../environments/environment';
     <div class="cart-right">
 
       <!-- Sign-in prompt if not logged in -->
-      <div class="signin-prompt" *ngIf="!currentUser">
+      <div class="signin-prompt" *ngIf="!isSignedIn">
         <p>Sign in or register to complete your purchase</p>
         <div class="sip-btns">
           <button class="sip-btn-primary" (click)="showAuthModal('login')">Sign In</button>
@@ -992,6 +994,13 @@ export class CartComponent implements OnInit, OnDestroy {
   promoCode = '';
   promoApplied = false;
   currentUser: User | null = null;
+  sellerUser: SellerUser | null = null;
+  centreUser: CentreUser | null = null;
+  // Cart/checkout only prefills from a buyer session, but a signed-in
+  // seller or centre is still a signed-in person — the sign-in/register
+  // prompts and the login gate on placeOrder() should treat any of the
+  // three as "already signed in", not just buyers.
+  get isSignedIn(): boolean { return !!(this.currentUser || this.sellerUser || this.centreUser); }
   // True once a signed-out buyer has a valid delivery form and hits
   // "Place Order" — lets us finish the purchase automatically right
   // after they sign in, instead of requiring a second click.
@@ -1024,6 +1033,8 @@ export class CartComponent implements OnInit, OnDestroy {
   constructor(
     private cartService: CartService,
     private authService: AuthService,
+    private sellerAuth: SellerAuthService,
+    private centreAuth: CentreAuthService,
     private fb: FormBuilder,
     private router: Router,
     private http: HttpClient,
@@ -1042,6 +1053,12 @@ export class CartComponent implements OnInit, OnDestroy {
           this.checkoutForm?.patchValue({ buyer_name: u.name, buyer_email: u.email });
         }
       });
+
+    this.sellerAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => { this.sellerUser = u; });
+
+    this.centreAuth.user$.pipe(takeUntil(this.destroy$))
+      .subscribe(u => { this.centreUser = u; });
 
     this.checkoutForm = this.fb.group({
       buyer_name:        ['', Validators.required],
@@ -1129,8 +1146,8 @@ export class CartComponent implements OnInit, OnDestroy {
       this.checkoutForm.markAllAsTouched();
       return;
     }
-    if (!this.currentUser) {
-      // Form is valid and ready — just need the buyer to be signed in.
+    if (!this.isSignedIn) {
+      // Form is valid and ready — just need them to be signed in.
       // Remember that, so we can finish the purchase automatically the
       // moment they sign in, instead of making them click twice.
       this.pendingCheckout = true;

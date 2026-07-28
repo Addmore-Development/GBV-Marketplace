@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { pool } from '../index';
 import { v4 as uuidv4 } from 'uuid';
 import { getIO } from '../socket';
+import { toAbsoluteMediaUrl } from '../utils/media';
 
 // ─── HELPER: Calculate Impact Split ─────────────────────────
 const calculateImpact = (price: number, survivorPct: number, centrePct: number, platformPct: number) => ({
@@ -95,7 +96,7 @@ export const getProducts = async (req: Request, res: Response) => {
     );
 
     return res.json({
-      products: result.rows,
+      products: result.rows.map(row => ({ ...row, img: toAbsoluteMediaUrl(req, row.img) })),
       total: parseInt(countResult.rows[0].count),
       page: parseInt(page as string),
       pages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit as string)),
@@ -130,6 +131,11 @@ export const getProduct = async (req: Request, res: Response) => {
       [id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Product not found' });
+    const product = {
+      ...result.rows[0],
+      thumbnail: toAbsoluteMediaUrl(req, result.rows[0].thumbnail),
+      image_url: toAbsoluteMediaUrl(req, result.rows[0].image_url),
+    };
 
     // Get reviews – if table exists, otherwise return empty array
     let reviews = [];
@@ -146,7 +152,7 @@ export const getProduct = async (req: Request, res: Response) => {
       console.warn('product_reviews table not found, returning empty reviews');
     }
 
-    return res.json({ ...result.rows[0], reviews });
+    return res.json({ ...product, reviews });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });

@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../index';
 import { logActivity, getClientIp } from '../utils/activityLog';
 import { getIO } from '../socket';
+import { toAbsoluteMediaUrl } from '../utils/media';
 
 import multer from 'multer';
 import path from 'path';
@@ -416,7 +417,7 @@ export const getSellerProducts = async (req: Request, res: Response) => {
              FROM products WHERE seller_id = $1 ORDER BY created_at DESC`,
             [sellerId]
         );
-        res.json(result.rows);
+        res.json(result.rows.map(row => ({ ...row, image_url: toAbsoluteMediaUrl(req, row.image_url) })));
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to load listings' });
@@ -466,7 +467,8 @@ export const createProduct = async (req: Request, res: Response) => {
             [seller_id, name, description || null, price, category || null,
              status || 'active', stock || 0, story || null, imageUrl]
         );
-        res.status(201).json({ product: result.rows[0] });
+        const product = { ...result.rows[0], image_url: toAbsoluteMediaUrl(req, result.rows[0].image_url) };
+        res.status(201).json({ product });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create listing' });
@@ -494,7 +496,8 @@ export const updateProduct = async (req: Request, res: Response) => {
             [name, description || null, price, category || null, status, stock || 0, story || null, imageUrl, id]
         );
         if (!result.rows.length) return res.status(404).json({ error: 'Listing not found' });
-        res.json({ product: result.rows[0] });
+        const product = { ...result.rows[0], image_url: toAbsoluteMediaUrl(req, result.rows[0].image_url) };
+        res.json({ product });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Update failed' });

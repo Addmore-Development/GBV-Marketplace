@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../index';
 import { getIO } from '../socket';
+import { toAbsoluteMediaUrl } from '../utils/media';
 
 // Postgres unique-violation (23505) errors come through as raw messages like
 // `duplicate key value violates unique constraint "centres_contact_email_key"`
@@ -456,7 +457,7 @@ export const getAllListings = async (req: Request, res: Response): Promise<void>
        LEFT JOIN centres c ON c.id = s.centre_id
        ORDER BY p.created_at DESC`
     );
-    res.json(listings.rows);
+    res.json(listings.rows.map(row => ({ ...row, image_url: toAbsoluteMediaUrl(req, row.image_url) })));
   } catch (err: any) {
     console.error('[Admin] listings error:', err);
     res.status(500).json({ error: 'Failed to load listings' });

@@ -166,7 +166,7 @@ interface Product {
 
         <div class="seller-row">
           <span class="seller-alias">✨ Handmade by <em>{{ product.seller_alias }}</em></span>
-          <span class="seller-badge">{{ formatSellerType(product.seller_type) }}</span>
+          <span class="seller-badge">Seller</span>
         </div>
 
         <!-- Rating row -->

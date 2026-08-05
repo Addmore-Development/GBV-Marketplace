@@ -848,7 +848,7 @@ import { environment } from '../../../environments/environment';
     .cf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     /* Payment options */
-    .payment-options { display: flex; flex-direction: column; gap: 8px; }
+    .payment-options { display: flex; flex-direction: column; gap: 5px; }
     .payment-opt {
       display: flex; align-items: center; gap: 10px;
       border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 14px;

@@ -1000,6 +1000,7 @@
 .sale-row { cursor: pointer; }
 .sale-row:hover { background: var(--cream, #FAF6EF); }
 .sale-detail-row td { padding: 0 !important; background: var(--cream, #FAF6EF); }
+.sale-delivery-info { padding: 12px 16px; font-size: .84rem; color: var(--text-mid, #4A3830); }
 .sale-items {
   margin: 12px 16px 16px;
   width: calc(100% - 32px);

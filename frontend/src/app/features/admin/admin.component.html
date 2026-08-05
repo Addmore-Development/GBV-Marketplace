@@ -708,7 +708,7 @@
       <div class="data-table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th></th><th>Buyer</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr>
+            <tr><th></th><th>Buyer</th><th>Total</th><th>Payment</th><th>Province</th><th>Status</th><th>Date</th></tr>
           </thead>
           <tbody>
             <ng-container *ngFor="let s of sales">
@@ -720,11 +720,17 @@
                 </td>
                 <td class="td-amount">{{ formatCurrency(s.total) }}</td>
                 <td>{{ s.payment_method || '—' }} <span *ngIf="s.payment_confirmed">✓</span></td>
+                <td>{{ s.delivery_province || '—' }}</td>
                 <td><span class="badge" [ngClass]="statusClass(s.status)">{{ s.status }}</span></td>
                 <td>{{ formatDate(s.created_at) }}</td>
               </tr>
               <tr *ngIf="expandedSaleId === s.id" class="sale-detail-row">
-                <td colspan="6">
+                <td colspan="7">
+                  <div class="sale-delivery-info">
+                    <strong>Delivery:</strong>
+                    {{ s.delivery_address || '—' }}, {{ s.delivery_suburb }}, {{ s.delivery_city }},
+                    {{ s.delivery_province }} {{ s.delivery_postal }}
+                  </div>
                   <table class="data-table sale-items">
                     <thead>
                       <tr><th>Product</th><th>Seller</th><th>Centre</th><th>Qty</th><th>Unit</th><th>Total</th><th>Survivor</th><th>Centre split</th><th>Platform</th></tr>
@@ -747,10 +753,10 @@
               </tr>
             </ng-container>
             <tr *ngIf="!loadingSales && sales.length === 0">
-              <td colspan="6" class="td-empty">No sales recorded yet.</td>
+              <td colspan="7" class="td-empty">No sales recorded yet.</td>
             </tr>
             <tr *ngIf="loadingSales">
-              <td colspan="6" class="td-empty">Loading…</td>
+              <td colspan="7" class="td-empty">Loading…</td>
             </tr>
           </tbody>
         </table>

@@ -153,6 +153,11 @@ interface SaleRow {
   total: number;
   payment_method: string | null;
   payment_confirmed: boolean;
+  delivery_address: string | null;
+  delivery_suburb: string | null;
+  delivery_city: string | null;
+  delivery_province: string | null;
+  delivery_postal: string | null;
   status: string;
   created_at: string;
   items: OrderItemRow[];

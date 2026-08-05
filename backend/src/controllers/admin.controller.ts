@@ -469,6 +469,8 @@ export const getSales = async (req: Request, res: Response): Promise<void> => {
     const orders = await pool.query(
       `SELECT o.id, o.buyer_name, o.buyer_email, o.subtotal, o.platform_fee_total,
               o.delivery_fee, o.total, o.payment_method, o.payment_confirmed,
+              o.delivery_address, o.delivery_suburb, o.delivery_city,
+              o.delivery_province, o.delivery_postal,
               o.status, o.created_at,
               COALESCE(json_agg(
                 json_build_object(

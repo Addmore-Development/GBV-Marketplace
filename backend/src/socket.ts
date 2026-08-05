@@ -13,7 +13,7 @@ let io: Server | null = null;
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: ['https://gbv-marketplace.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     },
   });

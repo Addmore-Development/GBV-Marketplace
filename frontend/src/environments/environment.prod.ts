@@ -3,5 +3,5 @@
 // No trailing slash.
 export const environment = {
   production: true,
-  apiUrl: 'https://gbv-marketplace-production.up.railway.app',
+  apiUrl: 'https://gbv-marketplace-backend.onrender.com',
 };

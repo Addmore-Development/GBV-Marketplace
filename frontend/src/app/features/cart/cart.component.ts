@@ -87,25 +87,25 @@ import { environment } from '../../../environments/environment';
           <span class="isf-dot survivor"></span>
           <span>Survivor Income</span>
         </div>
-        <strong>{{ formatPrice(totalSurvivor) }}</strong>
+        <strong>{{ formatPrice(finalTotalSurvivor) }}</strong>
       </div>
       <div class="isf-row">
         <div class="isf-left">
           <span class="isf-dot centre"></span>
           <span>Centre Counselling</span>
         </div>
-        <strong>{{ formatPrice(totalCentre) }}</strong>
+        <strong>{{ formatPrice(finalTotalCentre) }}</strong>
       </div>
       <div class="isf-row muted">
         <div class="isf-left">
           <span class="isf-dot platform"></span>
           <span>Platform Sustainability</span>
         </div>
-        <strong>{{ formatPrice(totalPlatform) }}</strong>
+        <strong>{{ formatPrice(finalTotalPlatform) }}</strong>
       </div>
       <div class="isf-total">
         <span>Total Paid</span>
-        <strong>{{ formatPrice(totalSurvivor + totalCentre + totalPlatform) }}</strong>
+        <strong>{{ formatPrice(finalTotalSurvivor + finalTotalCentre + finalTotalPlatform) }}</strong>
       </div>
     </div>
 
@@ -848,7 +848,7 @@ import { environment } from '../../../environments/environment';
     .cf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     /* Payment options */
-    .payment-options { display: flex; flex-direction: column; gap: 5px; }
+    .payment-options { display: flex; flex-direction: column; gap: 8px; }
     .payment-opt {
       display: flex; align-items: center; gap: 10px;
       border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 14px;
@@ -991,6 +991,13 @@ export class CartComponent implements OnInit, OnDestroy {
   totalSurvivor = 0;
   totalCentre = 0;
   totalPlatform = 0;
+  // Snapshot of the impact totals at the moment an order is placed —
+  // the live totalSurvivor/totalCentre/totalPlatform above get zeroed
+  // out as soon as the cart clears post-order, so the confirmation
+  // screen reads from these frozen values instead.
+  finalTotalSurvivor = 0;
+  finalTotalCentre = 0;
+  finalTotalPlatform = 0;
   promoCode = '';
   promoApplied = false;
   currentUser: User | null = null;
@@ -1156,6 +1163,13 @@ export class CartComponent implements OnInit, OnDestroy {
     }
     this.isPlacingOrder = true;
     this.orderError = '';
+
+    // Snapshot the impact split now, while the cart still has its items —
+    // placeOrder() clears the cart on success, which would otherwise zero
+    // these out before the confirmation screen renders.
+    this.finalTotalSurvivor = this.totalSurvivor;
+    this.finalTotalCentre   = this.totalCentre;
+    this.finalTotalPlatform = this.totalPlatform;
 
     this.cartService.placeOrder(this.checkoutForm.value).subscribe({
       next: (res: any) => {

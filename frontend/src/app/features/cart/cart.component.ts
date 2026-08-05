@@ -1234,5 +1234,5 @@ export class CartComponent implements OnInit, OnDestroy {
     }
   }
 
-  formatPrice(p: number): string { return `R${(p || 0).toFixed(2)}`; }
+  formatPrice(p: number | string | null | undefined): string { return `R${(Number(p) || 0).toFixed(2)}`; }
 }

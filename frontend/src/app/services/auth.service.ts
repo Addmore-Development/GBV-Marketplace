@@ -30,13 +30,10 @@ export class AuthService {
       try { this.userSubject.next(JSON.parse(stored)); } catch { localStorage.removeItem('amani_buyer_user'); }
     }
 
-    // Amani only supports one active role per browser session. If a seller
-    // or centre signs in, drop any leftover buyer session immediately so it
-    // can't keep winning on other pages (this was the cause of pages always
-    // falling back to whichever email was first used to test the buyer flow).
-    this.coordinator.roleActivated$.subscribe(role => {
-      if (role !== 'buyer') this.clearLocalSession();
-    });
+    // Buyer sessions are intentionally left alone when a seller or centre
+    // signs in on the same browser — a shopper's cart/checkout session
+    // should survive someone else (or the same person, testing) logging
+    // into a seller or centre dashboard in another tab.
   }
 
   get currentUser(): User | null { return this.userSubject.value; }
